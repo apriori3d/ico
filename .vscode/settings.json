@@ -11,10 +11,6 @@
     "python.analysis.indexing": true,
     "python.analysis.autoImportCompletions": true,
     "python.analysis.completeFunctionParens": true,
-    // Extra import paths (deps)
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/src",
-    ],
     // ───────────────────────────────────────────
     // MYpy — Microsoft Extension
     // ───────────────────────────────────────────
