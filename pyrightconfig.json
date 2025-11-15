@@ -1,0 +1,13 @@
+{
+    "typeCheckingMode": "strict",
+    "include": [
+        "src"
+    ],
+    "reportMissingTypeArgument": true,
+    "reportUnknownMemberType": true,
+    "reportUnknownArgumentType": true,
+    "reportUnknownVariableType": true,
+    "reportUnknownParameterType": true,
+    "reportAny": "error",
+    "useLibraryCodeForTypes": true
+}
