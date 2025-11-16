@@ -1,12 +1,14 @@
-# apriori/ico/core/runtime/mp_queue_channel.py
 from __future__ import annotations
 
 import queue
 from collections.abc import Callable
 from multiprocessing import Queue
-from typing import TYPE_CHECKING, cast, final
+from typing import TYPE_CHECKING, Generic, cast, final
 
-from apriori.ico.core.runtime.channels.channel import IcoReceiveEndpointMixin
+from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.runtime.channels.channel import (
+    IcoSendEndpointMixin,
+)
 from apriori.ico.core.runtime.channels.messages import (
     AcknowledgePayload,
     ChannelMessage,
@@ -16,10 +18,10 @@ from apriori.ico.core.runtime.channels.messages import (
     RuntimeCommandPayload,
     RuntimeEventPayload,
 )
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
+    IcoRuntimeEventProtocol,
 )
 from apriori.ico.core.types import I, NodeType
 
@@ -31,7 +33,9 @@ else:
 
 @final
 class MPQueueSendEndpoint(
-    IcoReceiveEndpointMixin[I],
+    Generic[I],
+    IcoOperator[I, None],
+    IcoSendEndpointMixin,
     ProgressMixin,
 ):
     """
@@ -44,15 +48,18 @@ class MPQueueSendEndpoint(
       • React to runtime events (faults, metrics, etc.)
     """
 
+    __slots__ = ("_main_queue", "_ack_queue", "_timeout")
+
     _main_queue: ChannelQueue
     _ack_queue: ChannelQueue
+    _timeout: int
 
     def __init__(
         self,
         main_queue: ChannelQueue,
         ack_queue: ChannelQueue,
         name: str | None = None,
-        timeout: float = 5.0,
+        timeout: int = 5,
     ) -> None:
         super().__init__(
             fn=self._send_fn,
@@ -84,7 +91,7 @@ class MPQueueSendEndpoint(
         payload = RuntimeCommandPayload(command)
         self._send(payload)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
         """Handle sending of runtime events."""
         payload = RuntimeEventPayload(event)
         self._send(payload)
@@ -109,11 +116,6 @@ class MPQueueSendEndpoint(
                 raise TimeoutError(
                     f"No ACK received for {type(pending_message.payload).__name__} within {timeout}s"
                 ) from e
-
-            if not isinstance(message, ChannelMessage):
-                raise TypeError(
-                    f"Expected ChannelMessage, got {type(message).__name__}"
-                )
 
             handler = self._ack_dispatch_table().get(message.message_type)
             if handler:

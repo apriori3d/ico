@@ -4,13 +4,14 @@ from typing import Protocol
 
 from apriori.ico.core.runtime.types import (
     ConnectedToIcoRuntime,
+    IcoRuntimeFlowProtocol,
     IcoRuntimeProtocol,
 )
 from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
 
 class IcoSendEndpointProtocol(
-    IcoRuntimeProtocol,
+    IcoRuntimeFlowProtocol,
     IcoOperatorProtocol[I, None],
     Protocol[I],
 ):
@@ -21,6 +22,7 @@ class IcoSendEndpointProtocol(
 
 class IcoReceiveEndpointProtocol(
     ConnectedToIcoRuntime,
+    IcoRuntimeFlowProtocol,
     IcoOperatorProtocol[None, O],
     Protocol[O],
 ):

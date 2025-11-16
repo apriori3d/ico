@@ -1,10 +1,10 @@
-# apriori/ico/core/runtime/mp_queue_channel.py
 from __future__ import annotations
 
 from collections.abc import Callable
 from multiprocessing import Queue
-from typing import TYPE_CHECKING, cast, final
+from typing import TYPE_CHECKING, Generic, cast, final
 
+from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.runtime.channels.channel import IcoReceiveEndpointMixin
 from apriori.ico.core.runtime.channels.messages import (
     AcknowledgePayload,
@@ -18,7 +18,7 @@ from apriori.ico.core.runtime.events import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError, IcoStopExecutionSignal
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.core.runtime.types import IcoRuntimeCommandType, IcoRuntimeProtocol
-from apriori.ico.core.types import I, O
+from apriori.ico.core.types import O
 
 if TYPE_CHECKING:
     ChannelQueue = Queue[ChannelMessage]
@@ -28,7 +28,9 @@ else:
 
 @final
 class MPQueueReceiveEndpoint(
-    IcoReceiveEndpointMixin[O],
+    Generic[O],
+    IcoOperator[None, O],
+    IcoReceiveEndpointMixin,
     ProgressMixin,
 ):
     """
@@ -61,13 +63,13 @@ class MPQueueReceiveEndpoint(
         self.runtime = runtime
         self._main_queue = main_queue
         self._ack_queue = ack_queue
-        self.timeout = timeout  # seconds
+        self._timeout = timeout  # seconds
 
     # ────────────────────────────────
     # Main receive loop
     # ────────────────────────────────
 
-    def _receive_fn(self, _: None = None) -> I:
+    def _receive_fn(self, _: None = None) -> O:
         """Blocking receive for a single item.
 
         Waits for a message in the queue, routes it to a handler,
@@ -75,15 +77,8 @@ class MPQueueReceiveEndpoint(
         """
         while True:
             try:
-                message = self._main_queue.get(timeout=self.timeout)
-
-                # Handle progress messages transparently
-                # if ProgressRelay.handle_message(self.progress, message):
-                #     continue
-                if not isinstance(message, ChannelMessage):
-                    raise TypeError(
-                        f"Expected ChannelMessage, got {type(message).__name__}"
-                    )
+                message = self._main_queue.get(timeout=self._timeout)
+                print(f"{self.name} Received message: {message}")
 
                 # Dispatch based on message type
                 handler = self._dispatch_table().get(message.message_type)
@@ -111,7 +106,7 @@ class MPQueueReceiveEndpoint(
 
     def _dispatch_table(
         self,
-    ) -> dict[ChannelMessageType, Callable[[ChannelMessage], None | I]]:
+    ) -> dict[ChannelMessageType, Callable[[ChannelMessage], None | O]]:
         """Return mapping of message types to handler methods."""
         return {
             ChannelMessageType.input: self._handle_input,
@@ -123,11 +118,11 @@ class MPQueueReceiveEndpoint(
     # Handlers
     # ────────────────────────────────
 
-    def _handle_input(self, message: ChannelMessage) -> I:
+    def _handle_input(self, message: ChannelMessage) -> O:
         """Handle normal data input message."""
         self._ack(ChannelMessageType.input)
         input_payload = cast(InputPayload, message.unwrap())
-        return cast(I, input_payload.input)
+        return cast(O, input_payload.input)
 
     def _handle_command(self, message: ChannelMessage) -> None:
         """Handle runtime command (activate, reset, stop, etc.)."""

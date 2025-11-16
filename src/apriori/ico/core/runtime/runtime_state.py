@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
-    IcoRuntimeProtocol,
+    IcoRuntimeEventProtocol,
     IcoRuntimeStateType,
 )
 
@@ -21,14 +21,11 @@ COMMAND_TO_STATE = {
 class IcoRuntimeStateMixin:
     _state: IcoRuntimeStateType
     _last_command: IcoRuntimeCommandType | None
-    _last_event: IcoRuntimeEvent | None
+    _last_event: IcoRuntimeEventProtocol | None
 
-    def __init__(self) -> None:
-        super().__init__()
-        if not isinstance(self, IcoRuntimeProtocol):
-            raise TypeError(
-                "IcoRuntimeLifecycleMixin can only be used with IcoRuntimeProtocol instances"
-            )
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
         self._state = IcoRuntimeStateType.inactive
         self._last_command = None
         self._last_event = None
@@ -58,6 +55,6 @@ class IcoRuntimeStateMixin:
         return self._last_command
 
     @property
-    def last_event(self) -> IcoRuntimeEvent | None:
+    def last_event(self) -> IcoRuntimeEventProtocol | None:
         """Last received runtime event."""
         return self._last_event

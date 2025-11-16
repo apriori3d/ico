@@ -9,7 +9,7 @@ from apriori.ico.channels.mp_queue.receive_endpoint import (
     MPQueueReceiveEndpoint,
 )
 from apriori.ico.channels.mp_queue.send_endpoint import MPQueueSendEndpoint
-from apriori.ico.core.runtime.channels.channel import IcoRuntimeChannelMixin
+from apriori.ico.core.runtime.channels.channel import IcoRuntimeChannel
 from apriori.ico.core.runtime.channels.messages import (
     ChannelMessage,
 )
@@ -25,11 +25,11 @@ else:
 @final
 class MPQueueChannel(
     Generic[I, O],
-    IcoRuntimeChannelMixin[I, O],
+    IcoRuntimeChannel[I, O],
 ):
-    send: MPQueueSendEndpoint[I]
-    receive: MPQueueReceiveEndpoint[O]
     mp_context: SpawnContext
+    _send: MPQueueSendEndpoint[I]
+    _receive: MPQueueReceiveEndpoint[O]
 
     _main_queue: ChannelQueue
     _ack_queue: ChannelQueue
@@ -65,6 +65,8 @@ class MPQueueChannel(
             name=name or "mp_queue_channel",
         )
         self.mp_context = mp_context
+        self._send = send
+        self._receive = receive
         self._main_queue = main_queue
         self._ack_queue = ack_queue
         self._queues_owned = queues_owned
@@ -75,13 +77,10 @@ class MPQueueChannel(
         # Handle close command, if queues were created by this channel,
         # the opposite case is the detached copy used in another process
         if command == IcoRuntimeCommandType.deactivate and self._queues_owned:
-            self.send.close()
-            self.receive.close()
+            self._send.close()
+            self._receive.close()
 
-    def detached_copy(self) -> MPQueueChannel[I, O]:
-        """Create a copy of this channel without references on other runtimes
-        for use in a multiprocessing context."""
-
+    def reverse(self) -> MPQueueChannel[I, O]:
         return MPQueueChannel[I, O](
             mp_context=self.mp_context,
             main_queue=self._main_queue,

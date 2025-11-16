@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-from typing import Generic
+from typing import Any, Generic
 
-from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.runtime.channels.types import (
     IcoReceiveEndpointProtocol,
-    IcoRuntimeChannelProtocol,
     IcoSendEndpointProtocol,
 )
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
 from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
-from apriori.ico.core.runtime.types import IcoRuntimeCommandType, IcoRuntimeFlowProtocol
+from apriori.ico.core.runtime.types import (
+    IcoRuntimeCommandType,
+    IcoRuntimeEventProtocol,
+    IcoRuntimeProtocol,
+)
 from apriori.ico.core.types import I, O
 
 
-class IcoRuntimeChannelMixin(
-    Generic[I, O],
-    IcoRuntimeOperator,
-    IcoRuntimeChannelProtocol[I, O],
-):
+class IcoRuntimeChannel(Generic[I, O], IcoRuntimeOperator):
     send: IcoSendEndpointProtocol[I]
     receive: IcoReceiveEndpointProtocol[O]
 
@@ -29,10 +26,9 @@ class IcoRuntimeChannelMixin(
         *,
         name: str | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__(name=name or f"MPQueueChannel-{id(self)}")
         self.send = send
         self.receive = receive
-        self.name = name or f"MPQueueChannel-{id(self)}"
 
         # Connect remote runtime via endpoint runtime port
         self.receive.runtime = self
@@ -40,35 +36,44 @@ class IcoRuntimeChannelMixin(
     def on_command(self, command: IcoRuntimeCommandType) -> None:
         super().on_command(command)
 
-        # Chanel with a parent runtime forwards commands upstream
-        if self.runtime_parent:
+        # Chanel with a parent runtime forwards commands downstream
+        if self._runtime_parent:
             self.send.on_command(command)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
         super().on_event(event)
 
-        # Channel without a parent runtime bubbles events downstream
-        if not self.runtime_parent:
+        # Channel without a parent runtime bubbles events upstream
+        if not self._runtime_parent:
             self.send.on_event(event)
 
 
-class IcoReceiveEndpointMixin(
-    Generic[O],
-    IcoOperator[None, O],
-    IcoReceiveEndpointProtocol[O],
-):
+class IcoReceiveEndpointMixin:
+    runtime: IcoRuntimeProtocol | None = None
+
+    def __init__(
+        self,
+        runtime: IcoRuntimeProtocol | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.runtime = runtime
+
     def on_command(self, command: IcoRuntimeCommandType) -> None:
+        """Handle runtime connection logic for received commands."""
         if self.runtime:
             self.runtime.broadcast_command(command)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
+        """Handle runtime connection logic for received events."""
         if self.runtime:
             self.runtime.bubble_event(event)
 
 
-class IcoSendEndpointMixin(
-    Generic[I],
-    IcoOperator[I, None],
-    IcoSendEndpointProtocol[I],
-    IcoRuntimeFlowProtocol,
-): ...
+class IcoSendEndpointMixin:
+    def on_command(self, command: IcoRuntimeCommandType) -> None:
+        pass  # To be implemented by subclasses
+
+    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
+        pass  # To be implemented by subclasses

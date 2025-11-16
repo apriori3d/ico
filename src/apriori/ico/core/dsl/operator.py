@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from typing import Any, Generic, TypeVar
+from collections.abc import Callable, Iterator, Sequence
+from typing import Generic, TypeVar, overload
 
-from apriori.ico.core.types import I, IcoOperatorProtocol, NodeType, O
+from apriori.ico.core.types import I, IcoOperatorProtocol, IcoTreeProtocol, NodeType, O
 
 # ──── Generic type variables for composition ────
 
@@ -11,8 +11,12 @@ I2 = TypeVar("I2")
 O2 = TypeVar("O2")
 
 
-# ─── Operator Class ───
-class IcoOperator(IcoOperatorProtocol[I, O], Generic[I, O]):
+# ────────────────────────────────────────────────
+# Operator Class
+# ────────────────────────────────────────────────
+
+
+class IcoOperator(Generic[I, O]):
     """
     An atomic transformation unit following the ICO convention.
 
@@ -52,13 +56,16 @@ class IcoOperator(IcoOperatorProtocol[I, O], Generic[I, O]):
         to_float | scale | to_string
     """
 
-    __slots__ = ("fn", "name", "node_type", "children", "parent")
+    __slots__ = ("_fn", "name", "node_type", "children", "_parent")
 
-    fn: Callable[[I], O]
+    # IcoTreeProtocol attributes
     name: str
     node_type: NodeType
-    parent: IcoOperatorProtocol[Any, Any] | None
-    children: list[IcoOperatorProtocol[Any, Any]]
+
+    _parent: IcoTreeProtocol | None
+    children: Sequence[IcoTreeProtocol]
+
+    _fn: Callable[[I], O]
 
     def __init__(
         self,
@@ -66,66 +73,67 @@ class IcoOperator(IcoOperatorProtocol[I, O], Generic[I, O]):
         *,
         name: str | None = None,
         node_type: NodeType = NodeType.operator,
-        children: list[IcoOperatorProtocol[Any, Any]] | None = None,
+        children: Sequence[IcoTreeProtocol] | None = None,
     ):
         super().__init__()
-        self.fn = fn
+        self._fn = fn
+
         self.name = name or self.__class__.__name__
         self.node_type = node_type
-        self.parent = None
-        self.children = children if children is not None else list()
+
+        self._parent = None
+        self.children = children or []
         for child in self.children:
             child.parent = self
-
-    # ─── Properties ───
 
     def __str__(self) -> str:
         return self.name
 
-    # @overload
-    # def __call__(self, item: I) -> O:
-    #     # Method overload for standard call with input
-    #     ...
+    # ────────────────────────────────────────────────
+    # IcoTreeProtocol
+    # ────────────────────────────────────────────────
 
-    # @overload
-    # def __call__(self) -> O:
-    #     # Method overload for no-argument call in flow with IcoSource
-    #     ...
+    @property
+    def parent(self) -> IcoTreeProtocol | None:
+        return self._parent
+
+    @parent.setter
+    def parent(self, value: IcoTreeProtocol | None) -> None:
+        self._parent = value
+
+    # @property
+    # def children(self) -> Sequence[IcoTreeProtocol]:
+    #     return self.children
+
+    # ────────────────────────────────────────────────
+    # Operator Protocols
+    # ────────────────────────────────────────────────
 
     def __call__(self, item: I) -> O:
-        return self.fn(item)
+        return self._fn(item)
 
-    # ─── Imperative async execution path ───
-
-    async def run_async(self, item: I) -> O:
-        """Asynchronous execution of the operator."""
-        return self(item)
-
-    # ─── Composition of operators ───
-
-    # ─── Chaining ───
-
-    def chain(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperator[I, O2]:
+    def chain(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
         """Function chaining: (I → O, O → O2) == I → O2."""
 
-        def chained(x: I) -> O2:
+        def chained_fn(x: I) -> O2:
             output = self(x)
             return other(output)
 
+        if not isinstance(other, IcoTreeProtocol):
+            raise TypeError("Can only chain with another IcoTreeProtocol.")
+
         return IcoOperator(
-            fn=chained,
+            fn=chained_fn,
             name="chain",
             node_type=NodeType.chain,
             children=[self, other],
         )
 
-    def __or__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperator[I, O2]:
+    def __or__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
         """Pipe composition: a | b == a.chain(b)."""
         return self.chain(other)
 
-    # ─── Map ───
-
-    def map(self) -> IcoOperator[Iterator[I], Iterator[O]]:
+    def map(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]:
         """Apply this operator elementwise over an iterable (lazy generator):
         Iterable[I] → Iterable[O]
         """
@@ -137,18 +145,22 @@ class IcoOperator(IcoOperatorProtocol[I, O], Generic[I, O]):
             children=[self],
         )
 
-    def _map_fn(self, xs: Iterator[I]) -> Iterator[O]:
-        for x in xs:
-            yield self(x)
+    def _map_fn(self, items: Iterator[I]) -> Iterator[O]:
+        for item in items:
+            yield self(item)
 
 
-# ─── Operator Wrapping Utility ───
+# ────────────────────────────────────────────────
+# Operator Wrapping Utility
+# ────────────────────────────────────────────────
 
-from typing import TypeGuard
+
+@overload
+def wrap_operator(fn: IcoOperator[I, O]) -> IcoOperator[I, O]: ...
 
 
-def _is_operator(obj: object) -> TypeGuard[IcoOperator[I, O]]:
-    return isinstance(obj, IcoOperator)
+@overload
+def wrap_operator(fn: Callable[[I], O]) -> IcoOperator[I, O]: ...
 
 
 def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]:
@@ -156,29 +168,8 @@ def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]
     Wrap raw callable into IcoOperator only when necessary.
     Ensures type inference for both mypy and pyright.
     """
-    if _is_operator(fn):
-        return fn
+    if isinstance(fn, IcoOperator):
+        # Suppress runtime type checker warning,
+        # because we know the type is correct here from static analysis.
+        return fn  # pyright: ignore[reportUnknownVariableType]
     return IcoOperator(fn=fn)
-
-
-# ─── Tree traversal Utilities ───
-
-
-def iterate_nodes(
-    node: IcoOperatorProtocol[Any, Any],
-) -> Iterator[IcoOperatorProtocol[Any, Any]]:
-    """Recursively yield all children operators in the flow tree."""
-    yield node
-    for c in node.children:
-        yield from iterate_nodes(c)
-
-
-def iterate_parents(
-    node: IcoOperatorProtocol[Any, Any],
-) -> Iterator[IcoOperatorProtocol[Any, Any]]:
-    """Recursively yield all parent operators in the flow tree."""
-    if node.parent is None:
-        return
-
-    yield node.parent
-    yield from iterate_parents(node.parent)

@@ -86,7 +86,7 @@ class IcoRuntimeStateProtocol(Protocol):
 
 
 class IcoRuntimeFlowProtocol(Protocol):
-    """Operator responsible for pushing data and runtime events downstream."""
+    """Operator responsible for pushing runtime command downstream and runtime events upstream."""
 
     def on_command(self, command: IcoRuntimeCommandType) -> None: ...
 
@@ -94,19 +94,24 @@ class IcoRuntimeFlowProtocol(Protocol):
 
 
 @runtime_checkable
-class IcoRuntimeHierarchyProtocol(Protocol):
-    runtime_children: list[IcoRuntimeHierarchyProtocol]
-    runtime_parent: IcoRuntimeHierarchyProtocol | None
+class IcoRuntimeTreeProtocol(Protocol):
+    runtime_children: list[IcoRuntimeTreeProtocol]
+
+    @property
+    def runtime_parent(self) -> IcoRuntimeTreeProtocol | None: ...
+
+    @runtime_parent.setter
+    def runtime_parent(self, value: IcoRuntimeTreeProtocol | None) -> None: ...
 
     # ─── Runtime Discovery and Connection ───
 
     def discover_runtime(
-        self, closure: IcoOperatorProtocol[None, None]
-    ) -> Iterator[IcoRuntimeProtocol]: ...
+        self, closure: IcoRuntimeTreeProtocol
+    ) -> Iterator[IcoRuntimeTreeProtocol]: ...
 
-    def connect_runtime(self, runtime: IcoRuntimeHierarchyProtocol) -> None: ...
+    def connect_runtime(self, runtime: IcoRuntimeTreeProtocol) -> None: ...
 
-    def disconnect_runtime(self, runtime: IcoRuntimeHierarchyProtocol) -> None: ...
+    def disconnect_runtime(self, runtime: IcoRuntimeTreeProtocol) -> None: ...
 
     # ─── Command & Event Propagation ───
 
@@ -122,7 +127,7 @@ class IcoRuntimeHierarchyProtocol(Protocol):
 @runtime_checkable
 class IcoRuntimeProtocol(
     IcoRuntimeStateProtocol,
-    IcoRuntimeHierarchyProtocol,
+    IcoRuntimeTreeProtocol,
     IcoRuntimeFlowProtocol,
     IcoOperatorProtocol[None, None],
     Protocol,

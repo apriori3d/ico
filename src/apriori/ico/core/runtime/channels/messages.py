@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, ClassVar
 
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
-from apriori.ico.core.runtime.types import IcoRuntimeCommandType
+from apriori.ico.core.runtime.types import (
+    IcoRuntimeCommandType,
+    IcoRuntimeEventProtocol,
+)
 
 # ──────────────────────────────────────────────────────────────
 # Message categories
@@ -85,7 +87,7 @@ class RuntimeCommandPayload(ChannelMessagePayload):
 class RuntimeEventPayload(ChannelMessagePayload):
     """Payload carrying runtime events (faults, progress, etc.)."""
 
-    event: IcoRuntimeEvent
+    event: IcoRuntimeEventProtocol
 
 
 @message(ChannelMessageType.acknowledge)

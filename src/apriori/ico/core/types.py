@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator, Sequence
 from enum import Enum, auto
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Protocol, TypeVar, runtime_checkable
 
 # ──── Generic type variables for ICO model ────
 
-I = TypeVar("I")  # noqa: E741
+I = TypeVar("I", contravariant=True)  # noqa: E741
 C = TypeVar("C")
 O = TypeVar("O")  # noqa: E741
 
@@ -33,27 +33,16 @@ class NodeType(Enum):
     agent = auto()
 
 
-# ─── Operator Protocol ───
-@runtime_checkable
+# ────────────────────────────────────────────────
+# Operator Protocols
+# ────────────────────────────────────────────────
+
+
+# @runtime_checkable
 class IcoOperatorProtocol(Protocol[I, O]):
-    """
-    Protocol for ICO Operators, defining the expected interface.
-    """
-
-    fn: Callable[[I], O]
-
-    # -── Structural attributes for graph representation ───
-
-    name: str
-    node_type: NodeType
-    parent: IcoOperatorProtocol[Any, Any] | None
-    children: list[IcoOperatorProtocol[Any, Any]]
-
-    # ─── Declarative sync execution path ───
+    """Protocol for ICO operators for execution and composition."""
 
     def __call__(self, item: I) -> O: ...
-
-    # ─── Operator composition ───
 
     def chain(
         self, other: IcoOperatorProtocol[O, O2]
@@ -64,3 +53,18 @@ class IcoOperatorProtocol(Protocol[I, O]):
     ) -> IcoOperatorProtocol[I, O2]: ...
 
     def map(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...
+
+
+@runtime_checkable
+class IcoTreeProtocol(Protocol):
+    """Structural attributes for graph representation of ICO operators."""
+
+    name: str
+    node_type: NodeType
+    children: Sequence[IcoTreeProtocol]
+
+    @property
+    def parent(self) -> IcoTreeProtocol | None: ...
+
+    @parent.setter
+    def parent(self, value: IcoTreeProtocol | None) -> None: ...

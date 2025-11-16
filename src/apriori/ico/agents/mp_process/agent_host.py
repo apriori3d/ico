@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
-from typing import final
+from typing import Generic, final
 
 from apriori.ico.agents.mp_process.agent import MPProcessAgent
 from apriori.ico.channels.mp_queue.channel import MPQueueChannel
@@ -16,8 +16,9 @@ from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
 @final
 class MPProcessAgentHost(
-    ProgressMixin,
+    Generic[I, O],
     IcoRuntimeOperator,
+    ProgressMixin,
 ):
     channel: MPQueueChannel[I, O]
     mp_context: SpawnContext
@@ -116,8 +117,6 @@ class MPProcessAgentHost(
         )
         # Establish runtime connection for runtime command/event flow
         channel.connect_runtime(host)
-
-        i: int = "123"
 
         return host
 

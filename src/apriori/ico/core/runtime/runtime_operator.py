@@ -6,20 +6,21 @@ from typing import Any
 from typing_extensions import Self
 
 from apriori.ico.core.dsl.operator import O2
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
-from apriori.ico.core.runtime.runtime_hierarchy import IcoRuntimeHierarchyMixin
 from apriori.ico.core.runtime.runtime_state import (
     COMMAND_TO_STATE,
     IcoRuntimeStateMixin,
 )
-from apriori.ico.core.runtime.types import IcoRuntimeCommandType, IcoRuntimeProtocol
+from apriori.ico.core.runtime.runtime_tree import IcoRuntimeTreeMixin
+from apriori.ico.core.runtime.types import (
+    IcoRuntimeCommandType,
+    IcoRuntimeEventProtocol,
+)
 from apriori.ico.core.types import IcoOperatorProtocol, NodeType
 
 
 class IcoRuntimeOperator(
     IcoRuntimeStateMixin,
-    IcoRuntimeHierarchyMixin,
-    IcoRuntimeProtocol,
+    IcoRuntimeTreeMixin,
 ):
     name: str
     children: list[IcoOperatorProtocol[Any, Any]]
@@ -27,9 +28,9 @@ class IcoRuntimeOperator(
     node_type: NodeType
     fn: Callable[[None], None]
 
-    def __init__(self) -> None:
+    def __init__(self, name: str | None = None) -> None:
         super().__init__()
-        self.name = self.__class__.__name__
+        self.name = self.__class__.__name__ if name is None else name
         self.parent = None
         self.children = []
         self.node_type = NodeType.runtime
@@ -37,7 +38,7 @@ class IcoRuntimeOperator(
 
     # ─── Command Handling ───
 
-    def broadcast_command(self, command):
+    def broadcast_command(self, command: IcoRuntimeCommandType) -> None:
         super().broadcast_command(command)
         self.on_command(command)
 
@@ -53,11 +54,11 @@ class IcoRuntimeOperator(
 
     # ─── Event Handling ───
 
-    def bubble_event(self, event):
+    def bubble_event(self, event: IcoRuntimeEventProtocol) -> None:
         self.on_event(event)
         super().bubble_event(event)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
         """
         Handle a single runtime event.
 
@@ -109,7 +110,7 @@ class IcoRuntimeOperator(
 
     # ─── Declarative sync execution path ───
 
-    def __call__(self, _: None) -> None:
+    def __call__(self, item: None) -> None:
         raise RuntimeError(
             "IcoRuntimeMixin does not implement data flow and has ICO form () → ()"
         )
