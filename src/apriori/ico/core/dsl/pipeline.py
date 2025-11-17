@@ -7,7 +7,7 @@ from apriori.ico.core.dsl.operator import (
     IcoOperator,
     wrap_operator,
 )
-from apriori.ico.core.types import C, I, IcoOperatorProtocol, NodeType, O
+from apriori.ico.core.types import C, I, IcoNodeType, IcoOperatorProtocol, O
 
 
 @final
@@ -73,7 +73,7 @@ class IcoPipeline(
         super().__init__(
             fn=self._run_pipeline,
             name=name,
-            node_type=NodeType.pipeline,
+            node_type=IcoNodeType.pipeline,
             children=[context_op] + body_ops + [output_op],
         )
         self.context = context_op

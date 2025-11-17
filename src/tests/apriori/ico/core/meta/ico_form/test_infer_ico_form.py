@@ -1,12 +1,9 @@
-from apriori.ico.core import (
-    IcoForm,
-    IcoOperator,
-    IcoPipeline,
-    IcoProcess,
-    IcoSource,
-    IcoStream,
-)
-from apriori.ico.core.meta.ico_form import infer_ico_form
+from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.dsl.pipeline import IcoPipeline
+from apriori.ico.core.dsl.process import IcoProcess
+from apriori.ico.core.dsl.source import IcoSource
+from apriori.ico.core.dsl.stream import IcoStream
+from apriori.ico.core.meta.ico_form import IcoForm, infer_ico_form
 
 # ─── Operator ───
 
@@ -27,8 +24,8 @@ def test_infer_form_operator_annotations() -> None:
 
 
 def test_infer_form_operator_no_hints() -> None:
-    op = IcoOperator(lambda x: x)  # type: ignore
-    assert infer_ico_form(op).name == "Any → Any"
+    op = IcoOperator(lambda x: x)  # pyright: ignore[reportUnknownVariableType]
+    assert infer_ico_form(op).name == "Any → Any"  # pyright: ignore[reportUnknownArgumentType]
 
 
 # ─── Composition ───
@@ -95,7 +92,7 @@ def test_infer_form_pipeline_without_hints() -> None:
 
 
 def test_infer_form_source_with_generics() -> None:
-    src = IcoSource[float](lambda: [1.0, 2.0, 3.0])
+    src = IcoSource[float](lambda: iter([1.0, 2.0, 3.0]))
     form = infer_ico_form(src)
     assert form.name == "() → Iterable[float]"
 

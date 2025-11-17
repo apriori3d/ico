@@ -7,7 +7,7 @@ from apriori.ico.core.runtime.types import (
     IcoRuntimeMixin,
     IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoOperatorProtocol, NodeType
+from apriori.ico.core.types import IcoNodeType, IcoOperatorProtocol
 
 
 def test_lifecycle_broadcast_updates_nested_states() -> None:
@@ -48,12 +48,12 @@ def test_lifecycle_broadcast_updates_nested_states() -> None:
 
         fn: Callable[[int], int]
         name: str
-        node_type: NodeType
+        node_type: IcoNodeType
         children: list[IcoOperatorProtocol[Any, Any]]
 
         def __init__(self, name: str):
             self.name = name
-            self.node_type = NodeType.operator
+            self.node_type = IcoNodeType.operator
             self.children = []
             self.fn = self.__call__
 

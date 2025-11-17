@@ -23,7 +23,7 @@ from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
     IcoRuntimeEventProtocol,
 )
-from apriori.ico.core.types import I, NodeType
+from apriori.ico.core.types import I, IcoNodeType
 
 if TYPE_CHECKING:
     ChannelQueue = Queue[ChannelMessage]
@@ -64,7 +64,7 @@ class MPQueueSendEndpoint(
         super().__init__(
             fn=self._send_fn,
             name=name or "mp_queue_send_endpoint",
-            node_type=NodeType.operator,
+            node_type=IcoNodeType.operator,
         )
         self._main_queue = main_queue
         self._ack_queue = ack_queue

@@ -15,7 +15,7 @@ from apriori.ico.core.runtime.types import (
     IcoRuntimeEventProtocol,
     IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoTreeProtocol, NodeType
+from apriori.ico.core.types import IcoNodeProtocol, IcoNodeType
 
 
 class IcoRuntimeOperator(
@@ -27,13 +27,13 @@ class IcoRuntimeOperator(
         self,
         fn: Callable[[None], None] | None = None,
         *,
-        children: Sequence[IcoTreeProtocol] | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
         name: str | None = None,
     ) -> None:
         super().__init__(
             fn=fn or self._noop_fn,
             name=name,
-            node_type=NodeType.runtime,
+            node_type=IcoNodeType.runtime,
             children=children,
         )
 

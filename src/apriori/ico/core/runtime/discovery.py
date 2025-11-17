@@ -1,20 +1,20 @@
 from collections.abc import Iterator
 
 from apriori.ico.core.runtime.types import ConnectedToIcoRuntime, IcoRuntimeTreeProtocol
-from apriori.ico.core.types import IcoTreeProtocol
+from apriori.ico.core.types import IcoNodeProtocol
 
 # ────────────────────────────────────────────────
 # Runtime Discovery and Connection Utilities
 # ────────────────────────────────────────────────
 
 
-def discover_runtime(flow: IcoTreeProtocol) -> Iterator[IcoRuntimeTreeProtocol]:
+def discover_runtime(flow: IcoNodeProtocol) -> Iterator[IcoRuntimeTreeProtocol]:
     """Discover all runtime hosts within the given closure."""
     yield from _discover_runtime_deep(flow)
 
 
 def _discover_runtime_deep(
-    operator: IcoTreeProtocol,
+    operator: IcoNodeProtocol,
     in_runtime_scope: bool = False,
 ) -> Iterator[IcoRuntimeTreeProtocol]:
     """Discover all runtime hosts within the given closure."""
@@ -33,7 +33,7 @@ def _discover_runtime_deep(
 
 def discover_and_connect_runtimes(
     runtime: IcoRuntimeTreeProtocol,
-    flow: IcoTreeProtocol,
+    flow: IcoNodeProtocol,
 ) -> None:
     """Discover and connect all runtime hosts within the given closure."""
     for nested_runtime in discover_runtime(flow):

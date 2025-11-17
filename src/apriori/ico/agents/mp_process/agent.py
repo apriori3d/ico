@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from multiprocessing.context import SpawnContext, SpawnProcess
-from typing import final
+from typing import Generic, final
 
 from typing_extensions import Self
 
@@ -19,6 +19,7 @@ from apriori.ico.core.types import I, IcoOperatorProtocol, O
 @final
 class MPProcessAgent(
     IcoRuntimeContour,
+    Generic[I, O],
     ProgressMixin,
 ):
     def __init__(
@@ -78,11 +79,10 @@ class MPProcessAgent(
         channel: MPQueueChannel[I, O],
         flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         name: str | None = None,
-        relay_progress: bool = True,
     ) -> SpawnProcess:
         process = mp_context.Process(
-            target=MPProcessAgent._process_fn,
-            args=(channel, flow_factory, name, relay_progress),
+            target=MPProcessAgent[I, O]._process_fn,
+            args=(channel, flow_factory, name),
         )
         # TODO: relay_progress
         process.start()
@@ -93,9 +93,8 @@ class MPProcessAgent(
         channel: IcoRuntimeChannelProtocol[I, O],
         flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         name: str | None = None,
-        relay_progress: bool = True,
     ) -> None:
-        agent = MPProcessAgent(
+        agent = MPProcessAgent[I, O](
             channel=channel,
             flow_factory=flow_factory,
             name=name,

@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import Generic, TypeVar, overload
+from typing import Generic, overload
 
-from apriori.ico.core.types import I, IcoOperatorProtocol, IcoTreeProtocol, NodeType, O
-
-# ──── Generic type variables for composition ────
-
-I2 = TypeVar("I2")
-O2 = TypeVar("O2")
-
+from apriori.ico.core.types import (
+    O2,
+    I,
+    IcoNodeProtocol,
+    IcoNodeType,
+    IcoOperatorProtocol,
+    O,
+)
 
 # ────────────────────────────────────────────────
 # Operator Class
@@ -56,27 +57,26 @@ class IcoOperator(Generic[I, O]):
         to_float | scale | to_string
     """
 
-    __slots__ = ("_fn", "name", "node_type", "children", "_parent")
+    # Note: do not use __slots__ here to allow dynamic inference of ICO-form attributes
 
-    # IcoTreeProtocol attributes
+    fn: Callable[[I], O]
+
+    # IcoNodeProtocol attributes
     name: str
-    node_type: NodeType
-
-    _parent: IcoTreeProtocol | None
-    children: Sequence[IcoTreeProtocol]
-
-    _fn: Callable[[I], O]
+    node_type: IcoNodeType
+    _parent: IcoNodeProtocol | None
+    children: Sequence[IcoNodeProtocol]
 
     def __init__(
         self,
         fn: Callable[[I], O],
         *,
         name: str | None = None,
-        node_type: NodeType = NodeType.operator,
-        children: Sequence[IcoTreeProtocol] | None = None,
+        node_type: IcoNodeType = IcoNodeType.operator,
+        children: Sequence[IcoNodeProtocol] | None = None,
     ):
         super().__init__()
-        self._fn = fn
+        self.fn = fn
 
         self.name = name or self.__class__.__name__
         self.node_type = node_type
@@ -90,27 +90,23 @@ class IcoOperator(Generic[I, O]):
         return self.name
 
     # ────────────────────────────────────────────────
-    # IcoTreeProtocol
+    # IcoTree Protocol
     # ────────────────────────────────────────────────
 
     @property
-    def parent(self) -> IcoTreeProtocol | None:
+    def parent(self) -> IcoNodeProtocol | None:
         return self._parent
 
     @parent.setter
-    def parent(self, value: IcoTreeProtocol | None) -> None:
+    def parent(self, value: IcoNodeProtocol | None) -> None:
         self._parent = value
 
-    # @property
-    # def children(self) -> Sequence[IcoTreeProtocol]:
-    #     return self.children
-
     # ────────────────────────────────────────────────
-    # Operator Protocols
+    # Computation Protocols
     # ────────────────────────────────────────────────
 
     def __call__(self, item: I) -> O:
-        return self._fn(item)
+        return self.fn(item)
 
     def chain(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
         """Function chaining: (I → O, O → O2) == I → O2."""
@@ -119,10 +115,10 @@ class IcoOperator(Generic[I, O]):
             output = self(x)
             return other(output)
 
-        return IcoOperator(
+        return IcoOperator[I, O2](
             fn=chained_fn,
             name="chain",
-            node_type=NodeType.chain,
+            node_type=IcoNodeType.chain,
             children=[self, other],
         )
 
@@ -135,10 +131,10 @@ class IcoOperator(Generic[I, O]):
         Iterable[I] → Iterable[O]
         """
 
-        return IcoOperator(
+        return IcoOperator[Iterator[I], Iterator[O]](
             fn=self._map_fn,
             name="map",
-            node_type=NodeType.map,
+            node_type=IcoNodeType.map,
             children=[self],
         )
 
@@ -169,4 +165,4 @@ def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]
         # Suppress runtime type checker warning,
         # because we know the type is correct here from static analysis.
         return fn  # pyright: ignore[reportUnknownVariableType]
-    return IcoOperator(fn=fn)
+    return IcoOperator[I, O](fn=fn)

@@ -5,12 +5,12 @@
 
 from collections.abc import Iterator
 
-from apriori.ico.core.types import IcoTreeProtocol
+from apriori.ico.core.types import IcoNodeProtocol
 
 
 def iterate_nodes(
-    node: IcoTreeProtocol,
-) -> Iterator[IcoTreeProtocol]:
+    node: IcoNodeProtocol,
+) -> Iterator[IcoNodeProtocol]:
     """Recursively yield all children operators in the flow tree."""
     yield node
     for c in node.children:
@@ -18,8 +18,8 @@ def iterate_nodes(
 
 
 def iterate_parents(
-    node: IcoTreeProtocol,
-) -> Iterator[IcoTreeProtocol]:
+    node: IcoNodeProtocol,
+) -> Iterator[IcoNodeProtocol]:
     """Recursively yield all parent operators in the flow tree."""
     if node.parent is None:
         return

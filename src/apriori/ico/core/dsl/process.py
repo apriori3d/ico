@@ -7,7 +7,7 @@ from apriori.ico.core.dsl.operator import (
     IcoOperator,
     wrap_operator,
 )
-from apriori.ico.core.types import C, IcoOperatorProtocol, NodeType
+from apriori.ico.core.types import C, IcoNodeType, IcoOperatorProtocol
 
 
 @final
@@ -54,7 +54,7 @@ class IcoProcess(
         super().__init__(
             fn=self._run_loop_fn,
             name=name,
-            node_type=NodeType.process,
+            node_type=IcoNodeType.process,
             children=[body_op],
         )
         self.body = body_op

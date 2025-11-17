@@ -12,7 +12,7 @@ from apriori.ico.core.runtime.channels.messages import (
     WorkerMessage,
 )
 from apriori.ico.core.runtime.types import IcoRuntimeMixin
-from apriori.ico.core.types import IcoOperatorProtocol, NodeType
+from apriori.ico.core.types import IcoNodeType, IcoOperatorProtocol
 
 if TYPE_CHECKING:
     WorkerQueue = Queue[WorkerMessage[Any]]
@@ -26,7 +26,7 @@ else:
 @dataclass
 class EchoOperator(IcoOperatorProtocol[int, int]):
     name: str = "Echo"
-    node_type: NodeType = NodeType.operator
+    node_type: IcoNodeType = IcoNodeType.operator
     children: list[IcoOperatorProtocol[Any, Any]] = field(default_factory=list)
     fn: Callable[[int], int] = lambda x: x
 
@@ -47,7 +47,7 @@ class EchoOperator(IcoOperatorProtocol[int, int]):
 @dataclass
 class FailingOperator(IcoOperatorProtocol[int, int]):
     name: str = "Fail"
-    node_type: NodeType = NodeType.operator
+    node_type: IcoNodeType = IcoNodeType.operator
     children: list[IcoOperatorProtocol[Any, Any]] = field(default_factory=list)
     fn: Callable[[int], int] = lambda x: x
 
@@ -76,7 +76,7 @@ class LifecycleEventsRecordingOperator(
     """
 
     name: str = "EventRecorder"
-    node_type: NodeType = NodeType.operator
+    node_type: IcoNodeType = IcoNodeType.operator
     children: list[IcoOperatorProtocol[Any, Any]]
     fn: Callable[[Any], Any]
 

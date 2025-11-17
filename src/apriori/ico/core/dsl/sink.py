@@ -2,7 +2,7 @@ from collections.abc import Callable, Iterator
 from typing import Generic
 
 from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.types import I, NodeType
+from apriori.ico.core.types import I, IcoNodeType
 
 
 class IcoSink(
@@ -17,4 +17,4 @@ class IcoSink(
     def __init__(
         self, fn: Callable[[Iterator[I]], None], name: str | None = None
     ) -> None:
-        super().__init__(fn=fn, name=name or "IcoSink", node_type=NodeType.sink)
+        super().__init__(fn=fn, name=name or "IcoSink", node_type=IcoNodeType.sink)

@@ -10,7 +10,7 @@ from apriori.ico.core.runtime.types import (
     IcoRuntimeOperatorProtocol,
     IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoOperatorProtocol, NodeType
+from apriori.ico.core.types import IcoNodeType, IcoOperatorProtocol
 
 
 @final
@@ -28,7 +28,7 @@ class IcoFlowMeta:
       • hierarchical composition of children
     """
 
-    node_type: NodeType
+    node_type: IcoNodeType
     ico_form: IcoForm
     name: str
     state: IcoRuntimeStateType | None = None

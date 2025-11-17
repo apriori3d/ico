@@ -1,6 +1,6 @@
 from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.dsl.tree import iterate_nodes, iterate_parents
-from apriori.ico.core.types import NodeType
+from apriori.ico.core.types import IcoNodeType
 
 IntOperator = IcoOperator[int, int]
 
@@ -33,16 +33,16 @@ def test_pipeline_iter_order() -> None:
 
     all_children = list(iterate_nodes(pipeline))
     assert len(all_children) == 5
-    assert all_children[0].node_type == NodeType.chain
-    assert all_children[1].node_type == NodeType.chain
+    assert all_children[0].node_type == IcoNodeType.chain
+    assert all_children[1].node_type == IcoNodeType.chain
     assert all_children[2] == a
     assert all_children[3] == b
     assert all_children[4] == c
 
     all_parents = list(iterate_parents(a))
     assert len(all_parents) == 2
-    assert all_parents[0].node_type == NodeType.chain
-    assert all_parents[1].node_type == NodeType.chain
+    assert all_parents[0].node_type == IcoNodeType.chain
+    assert all_parents[1].node_type == IcoNodeType.chain
 
 
 if __name__ == "__main__":

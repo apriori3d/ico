@@ -7,7 +7,7 @@ from apriori.ico.core.dsl.operator import (
     IcoOperator,
     wrap_operator,
 )
-from apriori.ico.core.types import I, IcoOperatorProtocol, NodeType, O
+from apriori.ico.core.types import I, IcoNodeType, IcoOperatorProtocol, O
 
 
 @final
@@ -42,7 +42,7 @@ class IcoStream(
         super().__init__(
             fn=self._stream_fn,
             name=name,
-            node_type=NodeType.stream,
+            node_type=IcoNodeType.stream,
             children=[body_op],
         )
         self.body = body_op

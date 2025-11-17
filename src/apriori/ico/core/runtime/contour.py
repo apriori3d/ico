@@ -54,6 +54,7 @@ class IcoRuntimeContour(
     def __init__(
         self,
         closure: IcoOperatorProtocol[None, None],
+        *,
         name: str | None = None,
     ) -> None:
         # Contour executes the given closure e.g. flow () → ()
@@ -65,6 +66,7 @@ class IcoRuntimeContour(
             children=[closure],
         )
         self._closure = closure
+
         discover_and_connect_runtimes(self, closure)
 
     # ─── Execution ───
