@@ -17,7 +17,10 @@ from apriori.ico.core.runtime.channels.messages import (
 from apriori.ico.core.runtime.events import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError, IcoStopExecutionSignal
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
-from apriori.ico.core.runtime.types import IcoRuntimeCommandType, IcoRuntimeProtocol
+from apriori.ico.core.runtime.types import (
+    IcoRuntimeCommandType,
+    IcoRuntimeOperatorProtocol,
+)
 from apriori.ico.core.types import O
 
 if TYPE_CHECKING:
@@ -43,7 +46,7 @@ class MPQueueReceiveEndpoint(
       • Acknowledge receipt to the sender
     """
 
-    runtime: IcoRuntimeProtocol | None
+    runtime: IcoRuntimeOperatorProtocol | None
 
     _main_queue: ChannelQueue
     _ack_queue: ChannelQueue
@@ -52,7 +55,7 @@ class MPQueueReceiveEndpoint(
         self,
         main_queue: ChannelQueue,
         ack_queue: ChannelQueue,
-        runtime: IcoRuntimeProtocol | None = None,
+        runtime: IcoRuntimeOperatorProtocol | None = None,
         name: str | None = None,
         timeout: float = 5.0,
     ) -> None:

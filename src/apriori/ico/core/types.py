@@ -38,23 +38,6 @@ class NodeType(Enum):
 # ────────────────────────────────────────────────
 
 
-# @runtime_checkable
-class IcoOperatorProtocol(Protocol[I, O]):
-    """Protocol for ICO operators for execution and composition."""
-
-    def __call__(self, item: I) -> O: ...
-
-    def chain(
-        self, other: IcoOperatorProtocol[O, O2]
-    ) -> IcoOperatorProtocol[I, O2]: ...
-
-    def __or__(
-        self, other: IcoOperatorProtocol[O, O2]
-    ) -> IcoOperatorProtocol[I, O2]: ...
-
-    def map(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...
-
-
 @runtime_checkable
 class IcoTreeProtocol(Protocol):
     """Structural attributes for graph representation of ICO operators."""
@@ -68,3 +51,23 @@ class IcoTreeProtocol(Protocol):
 
     @parent.setter
     def parent(self, value: IcoTreeProtocol | None) -> None: ...
+
+
+# @runtime_checkable
+class IcoOperatorProtocol(
+    IcoTreeProtocol,
+    Protocol[I, O],
+):
+    """Protocol for ICO operators for execution and composition."""
+
+    def __call__(self, item: I) -> O: ...
+
+    def chain(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> IcoOperatorProtocol[I, O2]: ...
+
+    def __or__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> IcoOperatorProtocol[I, O2]: ...
+
+    def map(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...

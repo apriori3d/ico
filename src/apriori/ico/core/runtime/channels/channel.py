@@ -10,12 +10,15 @@ from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
     IcoRuntimeEventProtocol,
-    IcoRuntimeProtocol,
+    IcoRuntimeOperatorProtocol,
 )
 from apriori.ico.core.types import I, O
 
 
-class IcoRuntimeChannel(Generic[I, O], IcoRuntimeOperator):
+class IcoRuntimeChannel(
+    IcoRuntimeOperator,
+    Generic[I, O],
+):
     send: IcoSendEndpointProtocol[I]
     receive: IcoReceiveEndpointProtocol[O]
 
@@ -49,11 +52,11 @@ class IcoRuntimeChannel(Generic[I, O], IcoRuntimeOperator):
 
 
 class IcoReceiveEndpointMixin:
-    runtime: IcoRuntimeProtocol | None = None
+    runtime: IcoRuntimeOperatorProtocol | None = None
 
     def __init__(
         self,
-        runtime: IcoRuntimeProtocol | None = None,
+        runtime: IcoRuntimeOperatorProtocol | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:

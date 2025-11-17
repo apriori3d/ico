@@ -7,10 +7,9 @@ from typing_extensions import Self
 
 from apriori.ico.core.runtime.progress.types import ProgressProtocol, SupportsProgress
 from apriori.ico.core.runtime.types import (
-    ConnectedToIcoRuntime,
     IcoRuntimeCommandType,
     IcoRuntimeEventProtocol,
-    IcoRuntimeProtocol,
+    IcoRuntimeOperatorProtocol,
     IcoRuntimeTreeProtocol,
 )
 
@@ -58,32 +57,6 @@ class IcoRuntimeTreeMixin:
         if self._runtime_parent:
             self._runtime_parent.bubble_event(event)
 
-    # ─── Runtime Discovery and Connection ───
-
-    def discover_runtime(
-        self, closure: IcoRuntimeTreeProtocol
-    ) -> Iterator[IcoRuntimeTreeProtocol]:
-        """Discover all runtime hosts within the given closure."""
-        yield from self._discover_runtime_deep(closure)
-
-    def _discover_runtime_deep(
-        self,
-        operator: IcoRuntimeTreeProtocol,
-        in_runtime_scope: bool = False,
-    ) -> Iterator[IcoRuntimeTreeProtocol]:
-        """Discover all runtime hosts within the given closure."""
-
-        if isinstance(operator, ConnectedToIcoRuntime):
-            # If we are already in a runtime scope, do not yield nested hosts
-            if in_runtime_scope:
-                return
-            if operator.runtime is not None:
-                yield operator.runtime
-            in_runtime_scope = True
-
-        for child in operator.runtime_children:
-            yield from self._discover_runtime_deep(child, in_runtime_scope)
-
     def connect_runtime(self, runtime: IcoRuntimeTreeProtocol) -> None:
         """Connect to a runtime host for command propagation."""
         if runtime not in self.runtime_children:
@@ -95,16 +68,6 @@ class IcoRuntimeTreeMixin:
         if runtime in self.runtime_children:
             self.runtime_children.remove(runtime)
         runtime.runtime_parent = None
-
-    def discover_and_connect_runtimes(self, closure: IcoRuntimeTreeProtocol) -> None:
-        """Discover and connect all runtime hosts within the given closure."""
-        for runtime in self.discover_runtime(closure):
-            self.connect_runtime(runtime)
-
-    def disconnect_all_runtimes(self) -> None:
-        """Disconnect from all connected runtime hosts."""
-        for runtime in list(self.runtime_children):
-            self.disconnect_runtime(runtime)
 
     # ─── Progress ───
 
@@ -123,9 +86,11 @@ class IcoRuntimeTreeMixin:
         return self
 
 
-def iterate_nodes(node: Any, strict: bool = True) -> Iterator[IcoRuntimeProtocol]:
+def iterate_nodes(
+    node: Any, strict: bool = True
+) -> Iterator[IcoRuntimeOperatorProtocol]:
     """Recursively yield all children operators in the flow tree."""
-    if strict and not isinstance(node, IcoRuntimeProtocol):
+    if strict and not isinstance(node, IcoRuntimeOperatorProtocol):
         raise TypeError(
             f"Operator {node} in runtime should be an instance of IcoRuntimeProtocol"
         )

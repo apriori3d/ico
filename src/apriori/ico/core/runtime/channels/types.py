@@ -5,7 +5,7 @@ from typing import Protocol
 from apriori.ico.core.runtime.types import (
     ConnectedToIcoRuntime,
     IcoRuntimeFlowProtocol,
-    IcoRuntimeProtocol,
+    IcoRuntimeOperatorProtocol,
 )
 from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
@@ -31,6 +31,6 @@ class IcoReceiveEndpointProtocol(
     ...
 
 
-class IcoRuntimeChannelProtocol(IcoRuntimeProtocol, Protocol[I, O]):
+class IcoRuntimeChannelProtocol(IcoRuntimeOperatorProtocol, Protocol[I, O]):
     send: IcoSendEndpointProtocol[I]
     receive: IcoReceiveEndpointProtocol[O]

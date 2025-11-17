@@ -4,18 +4,20 @@ import time
 
 import pytest
 
+from apriori.ico.core.dsl.async_stream import AsyncStream
 from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.parallel_stream import AsyncStream
 
 # ───────────────────────────────────────────────
 #  Test: basic synchronous processing
 # ───────────────────────────────────────────────
 
+IntOperator = IcoOperator[int, int]
+
 
 def test_parallel_stream_basic() -> None:
     """Ensure all items are processed by ParallelStream."""
-    ops = [IcoOperator[int, int](lambda x: x * 2) for _ in range(3)]
-    stream = AsyncStream[int, int](ops)
+    ops = [IntOperator(lambda x: x * 2) for _ in range(3)]
+    stream = AsyncStream(ops)
 
     data = [1, 2, 3, 4, 5]
     result = list(stream(iter(data)))
@@ -30,11 +32,11 @@ def test_parallel_stream_basic() -> None:
 def test_parallel_stream_parallel_execution() -> None:
     """Simulate random processing delays to ensure concurrency."""
 
-    async def delayed_op(x):
+    async def delayed_op(x: int) -> int:
         await asyncio.sleep(random.uniform(0.05, 0.2))
         return x * 10
 
-    ops = [IcoOperator(delayed_op) for _ in range(3)]
+    ops = [IntOperator(delayed_op) for _ in range(3)]
     stream = AsyncStream(ops)
 
     data = list(range(10))

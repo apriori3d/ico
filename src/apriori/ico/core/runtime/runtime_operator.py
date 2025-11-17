@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from typing import Any
+from collections.abc import Callable, Sequence
 
 from typing_extensions import Self
 
-from apriori.ico.core.dsl.operator import O2
+from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.runtime.runtime_state import (
     COMMAND_TO_STATE,
     IcoRuntimeStateMixin,
@@ -14,27 +13,48 @@ from apriori.ico.core.runtime.runtime_tree import IcoRuntimeTreeMixin
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
     IcoRuntimeEventProtocol,
+    IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoOperatorProtocol, NodeType
+from apriori.ico.core.types import IcoTreeProtocol, NodeType
 
 
 class IcoRuntimeOperator(
+    IcoOperator[None, None],
     IcoRuntimeStateMixin,
     IcoRuntimeTreeMixin,
 ):
-    name: str
-    children: list[IcoOperatorProtocol[Any, Any]]
-    parent: IcoOperatorProtocol[Any, Any] | None
-    node_type: NodeType
-    fn: Callable[[None], None]
+    def __init__(
+        self,
+        fn: Callable[[None], None] | None = None,
+        *,
+        children: Sequence[IcoTreeProtocol] | None = None,
+        name: str | None = None,
+    ) -> None:
+        super().__init__(
+            fn=fn or self._noop_fn,
+            name=name,
+            node_type=NodeType.runtime,
+            children=children,
+        )
 
-    def __init__(self, name: str | None = None) -> None:
-        super().__init__()
-        self.name = self.__class__.__name__ if name is None else name
-        self.parent = None
-        self.children = []
-        self.node_type = NodeType.runtime
-        self.fn = self._noop_fn
+    # ─── Execution ───
+
+    def __call__(self, item: None) -> None:
+        try:
+            self._state = IcoRuntimeStateType.running
+            super().__call__(None)
+            self._state = IcoRuntimeStateType.ready
+        except Exception:
+            self._state = IcoRuntimeStateType.error
+            raise
+
+    def _noop_fn(self, _: None) -> None:
+        pass
+
+    def run(self) -> Self:
+        """Execute the contour by calling itself."""
+        self(None)
+        return self
 
     # ─── Command Handling ───
 
@@ -98,47 +118,3 @@ class IcoRuntimeOperator(
         """Broadcast 'stop' event through the entire flow."""
         self.broadcast_command(IcoRuntimeCommandType.stop)
         return self
-
-    # ─── Execution ───
-
-    def _noop_fn(self, _: None) -> None:
-        pass
-
-    def run(self) -> Self:
-        """Execute the contour by calling itself."""
-        return self
-
-    # ─── Declarative sync execution path ───
-
-    def __call__(self, item: None) -> None:
-        raise RuntimeError(
-            "IcoRuntimeMixin does not implement data flow and has ICO form () → ()"
-        )
-
-    # ─── Imperative async execution path ───
-
-    async def run_async(self, item: None) -> None:
-        raise RuntimeError(
-            "IcoRuntimeMixin does not implement data flow and has ICO form () → ()"
-        )
-
-    # ─── Operator composition ───
-
-    def chain(
-        self, other: IcoOperatorProtocol[None, O2]
-    ) -> IcoOperatorProtocol[None, O2]:
-        raise RuntimeError(
-            "IcoRuntimeMixin does not implement data flow and has ICO form () → ()"
-        )
-
-    def __or__(
-        self, other: IcoOperatorProtocol[None, O2]
-    ) -> IcoOperatorProtocol[None, O2]:
-        raise RuntimeError(
-            "IcoRuntimeMixin does not implement data flow and has ICO form () → ()"
-        )
-
-    def map(self) -> IcoOperatorProtocol[Iterator[None], Iterator[None]]:
-        raise RuntimeError(
-            "IcoRuntimeMixin does not implement data flow and has ICO form () → ()"
-        )

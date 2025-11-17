@@ -11,7 +11,10 @@ from apriori.ico.core.types import C, I, IcoOperatorProtocol, NodeType, O
 
 
 @final
-class IcoPipeline(IcoOperator[I, O], Generic[I, C, O], IcoOperatorProtocol[I, O]):
+class IcoPipeline(
+    Generic[I, C, O],
+    IcoOperator[I, O],
+):
     """
     A transformation pipeline following the ICO convention.
 

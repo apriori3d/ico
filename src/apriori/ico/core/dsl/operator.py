@@ -119,9 +119,6 @@ class IcoOperator(Generic[I, O]):
             output = self(x)
             return other(output)
 
-        if not isinstance(other, IcoTreeProtocol):
-            raise TypeError("Can only chain with another IcoTreeProtocol.")
-
         return IcoOperator(
             fn=chained_fn,
             name="chain",

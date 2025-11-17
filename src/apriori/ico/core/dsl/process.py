@@ -11,7 +11,10 @@ from apriori.ico.core.types import C, IcoOperatorProtocol, NodeType
 
 
 @final
-class IcoProcess(IcoOperator[C, C], Generic[C], IcoOperatorProtocol[C, C]):
+class IcoProcess(
+    Generic[C],
+    IcoOperator[C, C],
+):
     """
     Repeatedly applies an operator to the same context.
 

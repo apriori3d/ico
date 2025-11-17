@@ -2,18 +2,17 @@ from typing import Any
 
 from typing_extensions import Self
 
-from apriori.ico.core.dsl.operator import iterate_nodes
+from apriori.ico.core.dsl.tree import iterate_nodes
 from apriori.ico.core.meta.ico_form import infer_ico_form
+from apriori.ico.core.runtime.discovery import discover_and_connect_runtimes
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.core.runtime.progress.types import ProgressProtocol, SupportsProgress
 from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
-from apriori.ico.core.runtime.types import IcoRuntimeProtocol
 from apriori.ico.core.types import IcoOperatorProtocol
 
 
 class IcoRuntimeContour(
     IcoRuntimeOperator,
-    IcoRuntimeProtocol,
     ProgressMixin,
 ):
     """
@@ -60,18 +59,18 @@ class IcoRuntimeContour(
         # Contour executes the given closure e.g. flow () → ()
         self._validate_closure(closure)
 
-        super().__init__()
-
-        self.name = name or "ico_runtime_contour"
+        super().__init__(
+            fn=self._contour_fn,
+            name=name or "ico_runtime_contour",
+            children=[closure],
+        )
         self._closure = closure
-        self.discover_and_connect_runtimes(closure)
+        discover_and_connect_runtimes(self, closure)
 
     # ─── Execution ───
 
-    def run(self) -> Self:
-        """Execute the contour by calling itself."""
-        self._track(self._closure)
-        return self
+    def _contour_fn(self, _: None) -> None:
+        self._closure(None)
 
     # ─── Progress ───
 

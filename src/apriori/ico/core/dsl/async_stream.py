@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Generic, TypeVar, final
 
 from apriori.ico.core.dsl.operator import IcoOperator
@@ -7,7 +7,10 @@ from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
 
 @final
-class AsyncStream(Generic[I, O], IcoOperator[Iterator[I], Iterator[O]]):
+class AsyncStream(
+    Generic[I, O],
+    IcoOperator[Iterator[I], Iterator[O]],
+):
     """
     Asynchronous stream operator.
 
@@ -36,28 +39,34 @@ class AsyncStream(Generic[I, O], IcoOperator[Iterator[I], Iterator[O]]):
         "_next_index",
         "_ordering_buffer",
     )
+    operators: list[IcoOperatorProtocol[I, O]]
+    ordered: bool
+    _num_executors: int
+
+    # ─── Async iterator state ───
+
+    _has_job: bool  # An indicator whether input_stream produced any items
+    _next_index: int  # Handle ordered result emission
+    _ordering_buffer: dict[int, O | Exception]
 
     def __init__(
         self,
-        operators: list[IcoOperatorProtocol[I, O]],
+        operators: Sequence[IcoOperatorProtocol[I, O]],
         *,
         ordered: bool = False,
         name: str | None = None,
     ) -> None:
         super().__init__(
             fn=self._run_stream,
-            name=name or "parallel_stream",
+            name=name or "async_stream",
             children=operators,
         )
-        self.operators = operators
+        self.operators = list(operators)
         self.ordered = ordered
-
         self._num_executors = len(self.operators)
 
-        # ─── Async iterator state ───
-        # Set indicator whether input_stream produced any items
+        # Async iterator state
         self._has_job = False
-        # Handle ordered result emission
         self._next_index = 0
         self._ordering_buffer: dict[int, O | Exception] = {}
 

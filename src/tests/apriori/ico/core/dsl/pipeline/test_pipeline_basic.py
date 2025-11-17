@@ -1,20 +1,24 @@
-from apriori.ico.core import IcoOperator, IcoPipeline
+from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.dsl.pipeline import IcoPipeline
+
+IntPipeline = IcoPipeline[int, int, int]
+IntOperator = IcoOperator[int, int]
 
 
 def test_pipeline_execution_order() -> None:
-    p = IcoPipeline[int, int, int](
-        context=IcoOperator[int, int](lambda x: x + 1),
+    p = IntPipeline(
+        context=IntOperator(lambda x: x + 1),
         body=[
-            IcoOperator[int, int](lambda x: x * 2),
-            IcoOperator[int, int](lambda x: x - 3),
+            IntOperator(lambda x: x * 2),
+            IntOperator(lambda x: x - 3),
         ],
-        output=IcoOperator[int, int](lambda x: x * 10),
+        output=IntOperator(lambda x: x * 10),
     )
     assert p(2) == ((2 + 1) * 2 - 3) * 10  # 30
 
 
 def test_pipeline_callable_init() -> None:
-    p = IcoPipeline[int, int, int](
+    p = IntPipeline(
         context=lambda x: x + 1,
         body=[
             lambda x: x * 2,
@@ -26,13 +30,21 @@ def test_pipeline_callable_init() -> None:
 
 
 def test_pipeline_len_and_iter() -> None:
-    p = IcoPipeline[int, int, int](
-        context=IcoOperator[int, int](lambda x: x + 1),
+    p = IntPipeline(
+        context=IntOperator(lambda x: x + 1),
         body=[
-            IcoOperator[int, int](lambda x: x + 1),
-            IcoOperator[int, int](lambda x: x + 2),
+            IntOperator(lambda x: x + 1),
+            IntOperator(lambda x: x + 2),
         ],
-        output=IcoOperator[int, int](lambda x: x),
+        output=IntOperator(lambda x: x),
     )
     assert len(p) == 2
     assert list(p) == list(p.body)
+
+
+if __name__ == "__main__":
+    import sys
+
+    import pytest
+
+    sys.exit(pytest.main([__file__]))

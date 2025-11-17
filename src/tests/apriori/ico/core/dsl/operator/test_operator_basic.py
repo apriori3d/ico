@@ -1,4 +1,6 @@
-from apriori.ico.core import IcoOperator
+import pytest
+
+from apriori.ico.core.dsl.operator import IcoOperator
 
 
 def test_basic_composition() -> None:
@@ -20,3 +22,9 @@ def test_then_aliases_are_equivalent() -> None:
 def test_operator_is_callable() -> None:
     negate = IcoOperator[float, float](lambda x: -x)
     assert negate(5) == -5
+
+
+if __name__ == "__main__":
+    import sys
+
+    sys.exit(pytest.main([__file__]))

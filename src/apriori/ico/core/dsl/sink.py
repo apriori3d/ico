@@ -5,7 +5,10 @@ from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.types import I, NodeType
 
 
-class IcoSink(IcoOperator[Iterator[I], None], Generic[I]):
+class IcoSink(
+    Generic[I],
+    IcoOperator[Iterator[I], None],
+):
     """A terminal operator, consumes output and ends the data flow.
     ICO form:
         Iterator[I] → ()

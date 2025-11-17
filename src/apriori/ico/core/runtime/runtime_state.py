@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 from apriori.ico.core.runtime.types import (
@@ -29,18 +28,6 @@ class IcoRuntimeStateMixin:
         self._state = IcoRuntimeStateType.inactive
         self._last_command = None
         self._last_event = None
-
-    # ─── Runtime State tracking ───
-
-    def _track(self, fn: Callable[[None], None]) -> None:
-        """Execute function while managing runtime state transitions."""
-        try:
-            self._state = IcoRuntimeStateType.running
-            fn(None)
-            self._state = IcoRuntimeStateType.ready
-        except Exception:
-            self._state = IcoRuntimeStateType.error
-            raise
 
     # ─── Properties ───
 

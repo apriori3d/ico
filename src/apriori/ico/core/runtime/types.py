@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
 from enum import Enum, auto
 from typing import Any, Protocol, runtime_checkable
 
@@ -103,11 +102,7 @@ class IcoRuntimeTreeProtocol(Protocol):
     @runtime_parent.setter
     def runtime_parent(self, value: IcoRuntimeTreeProtocol | None) -> None: ...
 
-    # ─── Runtime Discovery and Connection ───
-
-    def discover_runtime(
-        self, closure: IcoRuntimeTreeProtocol
-    ) -> Iterator[IcoRuntimeTreeProtocol]: ...
+    # ─── Runtime Connection ───
 
     def connect_runtime(self, runtime: IcoRuntimeTreeProtocol) -> None: ...
 
@@ -125,7 +120,7 @@ class IcoRuntimeTreeProtocol(Protocol):
 
 
 @runtime_checkable
-class IcoRuntimeProtocol(
+class IcoRuntimeOperatorProtocol(
     IcoRuntimeStateProtocol,
     IcoRuntimeTreeProtocol,
     IcoRuntimeFlowProtocol,
@@ -136,5 +131,5 @@ class IcoRuntimeProtocol(
 
 @runtime_checkable
 class ConnectedToIcoRuntime(Protocol):
-    runtime: IcoRuntimeProtocol | None
+    runtime: IcoRuntimeOperatorProtocol | None
     """Get the associated runtime protocol."""

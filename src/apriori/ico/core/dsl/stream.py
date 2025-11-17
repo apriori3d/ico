@@ -12,9 +12,8 @@ from apriori.ico.core.types import I, IcoOperatorProtocol, NodeType, O
 
 @final
 class IcoStream(
-    IcoOperator[Iterator[I], Iterator[O]],
-    IcoOperatorProtocol[Iterator[I], Iterator[O]],
     Generic[I, O],
+    IcoOperator[Iterator[I], Iterator[O]],
 ):
     """
     Applies a body operator to each element in a data stream.
@@ -35,18 +34,19 @@ class IcoStream(
     def __init__(
         self,
         body: Callable[[I], O],
+        *,
         name: str | None = None,
     ):
         body_op = wrap_operator(body)
 
         super().__init__(
-            fn=self._stream_items_fn,
+            fn=self._stream_fn,
             name=name,
             node_type=NodeType.stream,
             children=[body_op],
         )
         self.body = body_op
 
-    def _stream_items_fn(self, items: Iterator[I]) -> Iterator[O]:
+    def _stream_fn(self, items: Iterator[I]) -> Iterator[O]:
         for item in items:
             yield self.body(item)

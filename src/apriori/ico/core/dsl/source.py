@@ -2,14 +2,13 @@ from collections.abc import Callable, Iterator
 from typing import Generic, final
 
 from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.types import IcoOperatorProtocol, NodeType, O
+from apriori.ico.core.types import NodeType, O
 
 
 @final
 class IcoSource(
-    IcoOperator[None, Iterator[O]],
-    IcoOperatorProtocol[None, Iterator[O]],
     Generic[O],
+    IcoOperator[None, Iterator[O]],
 ):
     """
     A data source operator, produces a data generator without requiring any input.
