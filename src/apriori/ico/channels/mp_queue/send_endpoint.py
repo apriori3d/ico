@@ -155,13 +155,3 @@ class MPQueueSendEndpoint(
         event = payload.event
         event.raise_if_fault()
         raise RuntimeError(f"Unexpected runtime event during ACK wait: {event.type}")
-
-    # ────────────────────────────────
-    # Utilities
-    # ────────────────────────────────
-
-    def close(self) -> None:
-        self._main_queue.close()
-        self._main_queue.join_thread()
-        self._ack_queue.close()
-        self._ack_queue.join_thread()

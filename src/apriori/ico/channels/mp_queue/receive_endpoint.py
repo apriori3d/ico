@@ -155,12 +155,6 @@ class MPQueueReceiveEndpoint(
     # Utilities
     # ────────────────────────────────
 
-    def close(self) -> None:
-        self._main_queue.close()
-        self._main_queue.join_thread()
-        self._ack_queue.close()
-        self._ack_queue.join_thread()
-
     def _ack(self, msg_type: ChannelMessageType) -> None:
         """Send acknowledgment to the sender."""
         self._ack_queue.put(AcknowledgePayload(msg_type).wrap())

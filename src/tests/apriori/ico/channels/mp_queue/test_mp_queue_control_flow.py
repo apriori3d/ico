@@ -15,7 +15,7 @@ from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
-    IcoRuntimeEventType,
+    IcoRuntimeEventProtocol,
 )
 
 # ───────────────────────────────────────────────
@@ -27,7 +27,7 @@ class ControlFlowTestingRuntime(IcoRuntimeOperator):
     """Runtime that records received commands and events for testing."""
 
     commands_received: list[IcoRuntimeCommandType]
-    events_received: list[IcoRuntimeEventType]
+    events_received: list[IcoRuntimeEventProtocol]
 
     def __init__(self):
         super().__init__()
@@ -38,12 +38,13 @@ class ControlFlowTestingRuntime(IcoRuntimeOperator):
         # Echo command back through send endpoint
         self.commands_received.append(command)
 
-    def on_event(self, event: IcoRuntimeEventType) -> None:
+    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
         self.events_received.append(event)
 
 
 def recording_agent(
-    channel: MPQueueChannel[str, dict[str, Any]], runs_num: int = 1
+    channel: MPQueueChannel[dict[str, Any], str],
+    runs_num: int = 1,
 ) -> None:
     """Agent process that records received commands and sends back acknowledgements."""
 
@@ -75,7 +76,7 @@ def recording_agent(
     run_num = 1
     while run_num <= runs_num:
         try:
-            closure()
+            closure(None)
             run_num += 1
         except IcoRuntimeError as e:
             # Send exception event back to host runtime
@@ -107,7 +108,7 @@ def test_runtime_flow_propagation() -> None:
     process: SpawnProcess = ctx.Process(
         target=recording_agent,
         args=(
-            channel.detached_copy(),  # Use detached copy to avoid sharing runtime refs
+            channel.make_pair(),
             3,  # first run for 'report', second for 'error', third to test clean exit
         ),
         daemon=True,
@@ -148,8 +149,6 @@ def test_runtime_flow_propagation() -> None:
 
 
 if __name__ == "__main__":
-    test_runtime_flow_propagation()
-
     import sys
 
     sys.exit(pytest.main([__file__]))

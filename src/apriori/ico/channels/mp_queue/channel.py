@@ -27,35 +27,52 @@ class MPQueueChannel(
     Generic[I, O],
     IcoRuntimeChannel[I, O],
 ):
+    __slots__ = (
+        "mp_context",
+        "_send",
+        "_receive",
+        "_in_queue",
+        "_out_queue",
+        "_in_ack_queue",
+        "_out_ack_queue",
+        "_queues_owned",
+    )
+
     mp_context: SpawnContext
     _send: MPQueueSendEndpoint[I]
     _receive: MPQueueReceiveEndpoint[O]
 
-    _main_queue: ChannelQueue
-    _ack_queue: ChannelQueue
+    _in_queue: ChannelQueue
+    _out_queue: ChannelQueue
+    _in_ack_queue: ChannelQueue
+    _out_ack_queue: ChannelQueue
     _queues_owned: bool
 
     def __init__(
         self,
         mp_context: SpawnContext,
-        main_queue: ChannelQueue | None = None,
-        ack_queue: ChannelQueue | None = None,
+        in_queue: ChannelQueue | None = None,
+        out_queue: ChannelQueue | None = None,
+        in_ack_queue: ChannelQueue | None = None,
+        out_ack_queue: ChannelQueue | None = None,
         queues_owned: bool = True,
         name: str | None = None,
     ) -> None:
-        main_queue = main_queue or mp_context.Queue()
-        ack_queue = ack_queue or mp_context.Queue()
+        in_queue = in_queue or mp_context.Queue()
+        out_queue = out_queue or mp_context.Queue()
+        in_ack_queue = in_ack_queue or mp_context.Queue()
+        out_ack_queue = out_ack_queue or mp_context.Queue()
 
         # Define endpoints
         send = MPQueueSendEndpoint[I](
-            main_queue=main_queue,
-            ack_queue=ack_queue,
+            main_queue=out_queue,
+            ack_queue=out_ack_queue,
             name=f"{name}_send_endpoint" if name else None,
         )
 
         receive = MPQueueReceiveEndpoint[O](
-            main_queue=main_queue,
-            ack_queue=ack_queue,
+            main_queue=in_queue,
+            ack_queue=in_ack_queue,
             name=f"{name}_receive_endpoint" if name else None,
         )
 
@@ -67,8 +84,10 @@ class MPQueueChannel(
         self.mp_context = mp_context
         self._send = send
         self._receive = receive
-        self._main_queue = main_queue
-        self._ack_queue = ack_queue
+        self._in_queue = in_queue
+        self._out_queue = out_queue
+        self._in_ack_queue = in_ack_queue
+        self._out_ack_queue = out_ack_queue
         self._queues_owned = queues_owned
 
     def on_command(self, command: IcoRuntimeCommandType) -> None:
@@ -77,14 +96,24 @@ class MPQueueChannel(
         # Handle close command, if queues were created by this channel,
         # the opposite case is the detached copy used in another process
         if command == IcoRuntimeCommandType.deactivate and self._queues_owned:
-            self._send.close()
-            self._receive.close()
+            self._in_queue.close()
+            self._in_queue.join_thread()
+            self._out_queue.close()
+            self._out_queue.join_thread()
+            self._in_ack_queue.close()
+            self._in_ack_queue.join_thread()
+            self._out_ack_queue.close()
+            self._out_ack_queue.join_thread()
 
-    def reverse(self) -> MPQueueChannel[I, O]:
-        return MPQueueChannel[I, O](
+    def make_pair(self) -> MPQueueChannel[O, I]:
+        """Create a paired channel for the opposite endpoint roles."""
+
+        return MPQueueChannel[O, I](
             mp_context=self.mp_context,
-            main_queue=self._main_queue,
-            ack_queue=self._ack_queue,
+            in_queue=self._out_queue,
+            out_queue=self._in_queue,
+            in_ack_queue=self._out_ack_queue,
+            out_ack_queue=self._in_ack_queue,
             queues_owned=False,
-            name=self.name,
+            name=f"{self.name}_pair",
         )

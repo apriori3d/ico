@@ -59,7 +59,7 @@ class MPProcessAgent(
 
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
-                self.output_channel.send.send_event(IcoRuntimeEvent.exception(e))
+                self.bubble_event(IcoRuntimeEvent.exception(e))
                 break
 
         return self

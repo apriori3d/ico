@@ -20,9 +20,6 @@
     "mypy-type-checker.args": [
         "--strict"
     ],
-    // ОТКЛЮЧАЕМ старый Matan Gober mypy plugin
-    //"python.linting.mypyEnabled": false,
-    // Disable legacy mypy from python extension
     "python.linting.mypyEnabled": false,
     "python.linting.enabled": false,
     // ───────────────────────────────────────────

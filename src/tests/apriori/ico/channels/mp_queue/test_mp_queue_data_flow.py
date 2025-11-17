@@ -1,4 +1,3 @@
-# tests/test_mp_queue_channel_basic.py
 from __future__ import annotations
 
 import time
@@ -20,19 +19,16 @@ from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
 def agent(
     channel: IcoRuntimeChannelProtocol[I, O],
-    flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
-    n: int | None = 1,
+    flow_factory: Callable[[], IcoOperatorProtocol[O, I]],
+    n: int = 1,
 ) -> None:
     """Simulated remote process executing receive → flow → send loop."""
     flow = flow_factory()
     closure = channel.receive | flow | channel.send
     count = 0
-    try:
-        while n is None or count < n:
-            closure()
-            count += 1
-    except Exception:
-        pass
+    while count < n:
+        closure(None)
+        count += 1
 
 
 def flow_identity() -> IcoOperatorProtocol[int, int]:
@@ -65,7 +61,7 @@ def start_mp_process_agent(
 def test_send_receive_roundtrip_flow_basic() -> None:
     """Ensure data passes through full MPQueueChannel roundtrip."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    process = start_mp_process_agent(channel, flow_identity)
+    process = start_mp_process_agent(channel.make_pair(), flow_identity)
 
     try:
         flow = channel.send | channel.receive
@@ -85,7 +81,7 @@ def test_send_receive_roundtrip_flow_basic() -> None:
 def test_send_receive_roundtrip_transform() -> None:
     """Verify that data transformation inside remote flow works."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    process = start_mp_process_agent(channel, flow_double)
+    process = start_mp_process_agent(channel.make_pair(), flow_double)
 
     try:
         flow = channel.send | channel.receive
@@ -105,12 +101,13 @@ def test_send_receive_roundtrip_transform() -> None:
 def test_send_receive_multiple_items() -> None:
     """Ensure multiple sequential messages are handled correctly."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    process = start_mp_process_agent(channel, flow_double, n=5)
+    num_queries = 5
+    process = start_mp_process_agent(channel.make_pair(), flow_double, n=num_queries)
 
     try:
         flow = channel.send | channel.receive
-        results = [flow(i) for i in range(5)]
-        assert results == [i * 2 for i in range(5)]
+        results = [flow(i) for i in range(num_queries)]
+        assert results == [i * 2 for i in range(num_queries)]
     finally:
         process.terminate()
         process.join(timeout=0.5)

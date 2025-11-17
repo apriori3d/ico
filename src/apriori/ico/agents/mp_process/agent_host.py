@@ -22,14 +22,14 @@ class MPProcessAgentHost(
 ):
     channel: MPQueueChannel[I, O]
     mp_context: SpawnContext
-    flow_factory: Callable[[], IcoOperatorProtocol[I, O]]
+    flow_factory: Callable[[], IcoOperatorProtocol[O, I]]
     _agent_process: SpawnProcess | None
 
     def __init__(
         self,
         channel: MPQueueChannel[I, O],
         mp_context: SpawnContext,
-        flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
+        flow_factory: Callable[[], IcoOperatorProtocol[O, I]],
         name: str | None = None,
     ) -> None:
         super().__init__()
@@ -48,13 +48,15 @@ class MPProcessAgentHost(
 
             case IcoRuntimeCommandType.deactivate:
                 self._shutdown_agent()
+            case _:
+                pass
 
     # ─── Agent process management ───
 
     def _spawn_agent(self) -> None:
         self._agent_process = MPProcessAgent.spawn(
             mp_context=self.mp_context,
-            channel=self.channel,
+            channel=self.channel.make_pair(),
             flow_factory=self.flow_factory,
         )
 
@@ -97,7 +99,7 @@ class MPProcessAgentHost(
     @classmethod
     def create(
         cls,
-        flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
+        flow_factory: Callable[[], IcoOperatorProtocol[O, I]],
         *,
         name: str | None = None,
     ) -> MPProcessAgentHost[I, O]:
@@ -109,7 +111,7 @@ class MPProcessAgentHost(
             name=f"{host_name}_channel",
         )
 
-        host = MPProcessAgentHost(
+        host = MPProcessAgentHost[I, O](
             mp_context=mp_context,
             flow_factory=flow_factory,
             channel=channel,
@@ -121,13 +123,11 @@ class MPProcessAgentHost(
         return host
 
 
-def create_portal(
-    input: IcoRuntimeOperator[I],
-    output: IcoRuntimeOperator[O],
-    flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
+def mp_process(
+    flow_factory: Callable[[], IcoOperatorProtocol[O, I]],
 ) -> IcoOperatorProtocol[I, O]:
-    host = MPProcessAgentHost.create(
+    host = MPProcessAgentHost[I, O].create(
         flow_factory=flow_factory,
         name=f"mp_process_agent_portal_host_{id(flow_factory)}",
     )
-    return input | host.channel.send | host.channel.receive | output
+    return host.channel.send | host.channel.receive
