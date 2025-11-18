@@ -27,7 +27,10 @@ class IcoSource(
     """
 
     def __init__(
-        self, generator: Callable[[None], Iterator[O]], name: str | None = None
+        self,
+        generator: Callable[[None], Iterator[O]],
+        *,
+        name: str | None = None,
     ):
         super().__init__(
             fn=generator,
@@ -37,4 +40,4 @@ class IcoSource(
         )
 
     def __call__(self, item: None = None) -> Iterator[O]:
-        yield from self.fn(item)
+        yield from self.fn(None)

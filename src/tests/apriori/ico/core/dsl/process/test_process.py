@@ -1,5 +1,7 @@
 from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.dsl.process import IcoProcess
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.types import IcoNodeType
 
 
 def test_process_applies_body_multiple_times() -> None:
@@ -46,23 +48,21 @@ def test_process_body_can_mutate_context() -> None:
     assert c is result  # same object reference
 
 
-# TODO: Re-enable when IcoFlowMeta is available
+def test_process_structure_representation() -> None:
+    """
+    Test that IcoProcess exposes correct flow structure.
+    """
 
-# def test_process_structure_representation() -> None:
-#     """
-#     Test that IcoProcess exposes correct flow structure.
-#     """
+    step = IcoOperator[int, int](lambda x: x * 2, name="scale")
+    process = IcoProcess[int](body=step, num_iterations=2)
 
-#     step = IcoOperator[int, int](lambda x: x * 2, name="scale")
-#     process = IcoProcess[int](body=step, num_iterations=2)
+    flow = IcoFlowMeta.from_operator(process)
 
-#     flow = IcoFlowMeta.from_operator(process)
-
-#     # Root node should be a process
-#     assert flow.node_type == NodeType.process
-#     assert len(flow.children) == 1
-#     assert flow.children[0].name == "scale"
-#     assert flow.children[0].node_type == NodeType.operator
+    # Root node should be a process
+    assert flow.node_type == IcoNodeType.process
+    assert len(flow.children) == 1
+    assert flow.children[0].name == "scale"
+    assert flow.children[0].node_type == IcoNodeType.operator
 
 
 if __name__ == "__main__":

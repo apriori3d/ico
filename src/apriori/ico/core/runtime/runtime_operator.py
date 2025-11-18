@@ -19,21 +19,23 @@ from apriori.ico.core.types import IcoNodeProtocol, IcoNodeType
 
 
 class IcoRuntimeOperator(
-    IcoOperator[None, None],
     IcoRuntimeStateMixin,
     IcoRuntimeTreeMixin,
+    IcoOperator[None, None],
 ):
     def __init__(
         self,
         fn: Callable[[None], None] | None = None,
         *,
         children: Sequence[IcoNodeProtocol] | None = None,
+        runtime_children: list[IcoRuntimeOperator] | None = None,
         name: str | None = None,
     ) -> None:
         super().__init__(
             fn=fn or self._noop_fn,
             name=name,
             node_type=IcoNodeType.runtime,
+            runtime_children=runtime_children,
             children=children,
         )
 
@@ -41,11 +43,11 @@ class IcoRuntimeOperator(
 
     def __call__(self, item: None) -> None:
         try:
-            self._state = IcoRuntimeStateType.running
+            self._set_state(IcoRuntimeStateType.running)
             super().__call__(None)
-            self._state = IcoRuntimeStateType.ready
+            self._set_state(IcoRuntimeStateType.ready)
         except Exception:
-            self._state = IcoRuntimeStateType.error
+            self._set_state(IcoRuntimeStateType.error)
             raise
 
     def _noop_fn(self, _: None) -> None:
@@ -69,7 +71,7 @@ class IcoRuntimeOperator(
         Subclasses may override to implement additional behavior
         (e.g., resource allocation, reset hooks, or teardown logic).
         """
-        self._state = COMMAND_TO_STATE.get(command, self._state)
+        self._set_state(COMMAND_TO_STATE.get(command, self._state))
         self._last_command = command
 
     # ─── Event Handling ───

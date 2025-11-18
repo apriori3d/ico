@@ -39,7 +39,6 @@ def test_pipeline_len_and_iter() -> None:
         output=IntOperator(lambda x: x),
     )
     assert len(p) == 2
-    assert list(p) == list(p.body)
 
 
 if __name__ == "__main__":

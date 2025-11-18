@@ -1,11 +1,9 @@
-[project]
+[tool.poetry]
 name = "apriori.ico"
 version = "0.1.0"
 requires-python = ">=3.10,<3.11"
 description = "Apriori ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows."
 readme = "README.md"
-
-[tool.poetry]
 packages = [
     { include = "apriori", from = "src" },
 ]
@@ -57,6 +55,8 @@ disallow_any_expr = true
 disallow_any_unimported = true
 disallow_subclassing_any = true
 show_error_codes = true
+
+#disable_error_code = misc
 
 # this project uses namespace package from src/
 mypy_path = "src"

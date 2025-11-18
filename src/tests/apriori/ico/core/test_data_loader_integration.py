@@ -1,19 +1,20 @@
-from collections.abc import Iterable
+from collections.abc import Iterator
 
-from apriori.ico.core import (
-    IcoFlowMeta,
-    IcoOperator,
-    IcoPipeline,
-    IcoSource,
-    IcoStream,
-    NodeType,
-)
+from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.dsl.pipeline import IcoPipeline
+from apriori.ico.core.dsl.source import IcoSource
+from apriori.ico.core.dsl.stream import IcoStream
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.types import IcoNodeType
+
+Batch = Iterator[int]
+DataStream = Iterator[Batch]
 
 
 def test_ico_integration_data_runner_pipeline() -> None:
     """
     Integration test for full ICO dataflow:
-        IcoData → IcoRunner → IcoPipeline → IcoOperators
+        IcoSource → IcoStream(IcoPipeline) → IcoSink
 
     Verifies correct data transformation and structural hierarchy.
     """
@@ -27,28 +28,29 @@ def test_ico_integration_data_runner_pipeline() -> None:
         [7, 8, 9],
     ]
 
-    def data_generator() -> Iterable[Iterable[float]]:
-        yield from data
+    def data_generator(_: None) -> DataStream:
+        for batch in data:
+            yield iter(batch)
 
-    dataset = IcoSource[Iterable[float]](data_generator)
+    dataset = IcoSource[Batch](data_generator)
 
     # ─────────────────────────────
     # 2. Define atomic operators
     # ─────────────────────────────
-    to_context = IcoOperator[float, float](lambda x: x)
-    scale = IcoOperator[float, float](lambda x: x * 2)
-    to_output = IcoOperator[float, float](lambda x: x)
+    to_context = IcoOperator[int, int](lambda x: x)
+    scale = IcoOperator[int, int](lambda x: x * 2)
+    to_output = IcoOperator[int, int](lambda x: x)
 
     # ─────────────────────────────
     # 3. Define pipelines
     # ─────────────────────────────
-    augment = IcoPipeline[float, float, float](
+    augment = IcoPipeline[int, int, int](
         context=to_context,
         body=[scale],
         output=to_output,
     )
 
-    collate = IcoPipeline[Iterable[float], Iterable[float], float](
+    collate = IcoPipeline[Batch, list[int], int](
         context=list,
         body=[],
         output=max,
@@ -59,8 +61,8 @@ def test_ico_integration_data_runner_pipeline() -> None:
     # ─────────────────────────────
     # 4. Wrap into runner and connect with data
     # ─────────────────────────────
-    runner = IcoStream[Iterable[float], float](pipeline)
-    data_flow = dataset | runner
+    data_stream = IcoStream[Batch, int](pipeline)
+    data_flow = dataset | data_stream
 
     # ─────────────────────────────
     # 5. Execute flow
@@ -74,17 +76,17 @@ def test_ico_integration_data_runner_pipeline() -> None:
     flow = IcoFlowMeta.from_operator(data_flow)
 
     # Root should be compose node
-    assert flow.node_type == NodeType.chain
+    assert flow.node_type == IcoNodeType.chain
 
     # Compose should have two children: Data and Runner
     assert len(flow.children) == 2
-    assert flow.children[0].node_type == NodeType.source
-    assert flow.children[1].node_type == NodeType.stream
+    assert flow.children[0].node_type == IcoNodeType.source
+    assert flow.children[1].node_type == IcoNodeType.stream
 
     # Runner should contain one child, the compose of map for augmentation over batch and collation
     runner_node = flow.children[1]
     assert len(runner_node.children) == 1
-    assert runner_node.children[0].node_type == NodeType.chain
+    assert runner_node.children[0].node_type == IcoNodeType.chain
 
     # Compose should have two children: the map for augmentation + collation
     compose_node = runner_node.children[0]
@@ -92,19 +94,25 @@ def test_ico_integration_data_runner_pipeline() -> None:
 
     # Map should have one children: the pipeline for augmentation
     map_node = compose_node.children[0]
-    assert map_node.node_type == NodeType.map
+    assert map_node.node_type == IcoNodeType.map
     assert len(map_node.children) == 1
 
     # Augmentation pipeline should contain exactly 3 children (context, flow step, output)
     pipeline_node = map_node.children[0]
-    assert pipeline_node.node_type == NodeType.pipeline
+    assert pipeline_node.node_type == IcoNodeType.pipeline
     assert len(pipeline_node.children) == 3
     for node in pipeline_node.children:
-        assert node.node_type == NodeType.operator
+        assert node.node_type == IcoNodeType.operator
 
-    # Collation pipeline should contain exactly 2 children (context, output)
+    # Collation pipeline should contain exactly zero children, because it use functions
     collate_node = compose_node.children[1]
-    assert collate_node.node_type == NodeType.pipeline
-    assert len(collate_node.children) == 2
-    for node in collate_node.children:
-        assert node.node_type == NodeType.operator
+    assert collate_node.node_type == IcoNodeType.pipeline
+    assert len(collate_node.children) == 0
+
+
+if __name__ == "__main__":
+    import sys
+
+    import pytest
+
+    sys.exit(pytest.main(sys.argv))

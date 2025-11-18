@@ -16,12 +16,12 @@
     // ───────────────────────────────────────────
     "mypy-type-checker.runUsingActiveInterpreter": true,
     "mypy-type-checker.preferDaemon": true,
-    "mypy-type-checker.importStrategy": "fromWorkspace",
+    //"mypy-type-checker.importStrategy": "fromWorkspace",
     "mypy-type-checker.args": [
         "--strict"
     ],
-    "python.linting.mypyEnabled": false,
-    "python.linting.enabled": false,
+    //"python.linting.mypyEnabled": false,
+    //"python.linting.enabled": false,
     // ───────────────────────────────────────────
     // RUFF
     // ───────────────────────────────────────────

@@ -13,7 +13,7 @@ COMMAND_TO_STATE = {
     IcoRuntimeCommandType.reset: IcoRuntimeStateType.ready,
     IcoRuntimeCommandType.deactivate: IcoRuntimeStateType.inactive,
     IcoRuntimeCommandType.pause: IcoRuntimeStateType.paused,
-    IcoRuntimeCommandType.resume: IcoRuntimeStateType.running,
+    IcoRuntimeCommandType.resume: IcoRuntimeStateType.ready,
 }
 
 
@@ -25,7 +25,7 @@ class IcoRuntimeStateMixin:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
-        self._state = IcoRuntimeStateType.inactive
+        self._set_state(IcoRuntimeStateType.inactive)
         self._last_command = None
         self._last_event = None
 
@@ -35,6 +35,9 @@ class IcoRuntimeStateMixin:
     def state(self) -> IcoRuntimeStateType:
         """Current runtime state of the operator."""
         return self._state
+
+    def _set_state(self, state: IcoRuntimeStateType) -> None:
+        self._state = state
 
     @property
     def last_command(self) -> IcoRuntimeCommandType | None:

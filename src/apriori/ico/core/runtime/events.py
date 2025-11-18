@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import traceback
-from dataclasses import dataclass, field
 from typing import Any
 
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.types import IcoRuntimeEventType
 
 
-@dataclass(slots=True)
 class IcoRuntimeEvent:
+    __slots__ = ("type", "meta")
     type: IcoRuntimeEventType
-    meta: dict[Any, Any] = field(default_factory=dict)
+    meta: dict[Any, Any]
+
+    def __init__(
+        self,
+        type: IcoRuntimeEventType,
+        meta: dict[Any, Any] | None = None,
+    ) -> None:
+        self.type = type
+        self.meta = meta or {}
 
     @staticmethod
     def heartbeat() -> IcoRuntimeEvent:

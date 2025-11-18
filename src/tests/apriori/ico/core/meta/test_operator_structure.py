@@ -1,6 +1,8 @@
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.types import IcoNodeType
 
 
 def test_operator_structure_builds_correct_tree() -> None:
@@ -11,7 +13,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     The tested dataflow:
         augment.map() | collate
     corresponds to:
-        Iterable[float] → Iterable[float] → float
+        Iterator[float] → Iterator[float] → float
 
     Steps:
         1. augment: multiply each element by 2
@@ -22,7 +24,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # 1. Define base operators
     # ─────────────────────────────
     augment = IcoOperator[float, float](lambda x: x * 2, name="augment")
-    collate = IcoOperator[Iterable[float], float](max, name="collate")
+    collate = IcoOperator[Iterator[float], float](max, name="collate")
 
     # ─────────────────────────────
     # 2. Compose operators into a small pipeline
@@ -32,7 +34,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     # 3. Execute the pipeline
     # ─────────────────────────────
-    result = pipeline([1.0, 5.0, 3.0])
+    result = pipeline(iter([1.0, 5.0, 3.0]))
     assert result == 10.0  # (5 * 2) = 10
 
     # ─────────────────────────────
@@ -41,7 +43,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     flow = IcoFlowMeta.from_operator(pipeline)
 
     # Root node — composition
-    assert flow.node_type == NodeType.chain
+    assert flow.node_type == IcoNodeType.chain
 
     # ─────────────────────────────
     # 5. Validate hierarchy
@@ -50,10 +52,10 @@ def test_operator_structure_builds_correct_tree() -> None:
     map_node, collate_node = flow.children
 
     # Child 1: map
-    assert map_node.node_type == NodeType.map
+    assert map_node.node_type == IcoNodeType.map
 
     # Child 2: collate
-    assert collate_node.node_type == NodeType.operator
+    assert collate_node.node_type == IcoNodeType.operator
     assert collate_node.name == "collate"
 
     # ─────────────────────────────
@@ -61,7 +63,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     assert len(map_node.children) == 1
     inner_augment = map_node.children[0]
-    assert inner_augment.node_type == NodeType.operator
+    assert inner_augment.node_type == IcoNodeType.operator
     assert inner_augment.name == "augment"
 
     # ─────────────────────────────
@@ -78,3 +80,11 @@ def _collect_names(node: IcoFlowMeta) -> list[str]:
     for child in node.children:
         result.extend(_collect_names(child))
     return result
+
+
+if __name__ == "__main__":
+    import sys
+
+    import pytest
+
+    sys.exit(pytest.main([__file__]))

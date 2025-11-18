@@ -21,12 +21,15 @@ class IcoRuntimeTreeMixin:
     def __init__(
         self,
         runtime_parent: IcoRuntimeTreeProtocol | None = None,
+        runtime_children: list[IcoRuntimeTreeProtocol] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.runtime_children = []
+        self.runtime_children = runtime_children or []
         self._runtime_parent = runtime_parent
+        for child in self.runtime_children:
+            child.runtime_parent = self
 
     @property
     def runtime_parent(self) -> IcoRuntimeTreeProtocol | None:

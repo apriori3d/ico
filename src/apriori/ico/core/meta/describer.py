@@ -11,7 +11,7 @@ from apriori.ico.core.dsl.sink import IcoSink
 from apriori.ico.core.dsl.source import IcoSource
 from apriori.ico.core.dsl.stream import IcoStream
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
+from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import IcoRuntimeStateType
 
 
@@ -55,8 +55,8 @@ def _format_label(
     if show_states and flow_meta.runtime_state is not None:
         color = {
             IcoRuntimeStateType.inactive: "grey50",
-            IcoRuntimeStateType.ready: "yellow",
-            IcoRuntimeStateType.running: "green",
+            IcoRuntimeStateType.ready: "green",
+            IcoRuntimeStateType.running: "yellow",
             IcoRuntimeStateType.paused: "grey70",
             IcoRuntimeStateType.error: "red",
         }.get(flow_meta.runtime_state, "white")
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     # ──── 5. Combine all into the full flow ────
     full_flow = dataset | aug_stream | train_stream | sink
 
-    runtime = IcoRuntimeContour(full_flow, name="full_flow_runtime")
+    runtime = IcoRuntimeOperator(full_flow, name="full_flow_runtime")
     runtime.activate()
 
     # ──── 6. Visualize ────

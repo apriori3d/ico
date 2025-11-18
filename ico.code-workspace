@@ -1,0 +1,13 @@
+{
+    "folders": [
+        { "path": "." }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "python.envFile": "${workspaceFolder}/.env",
+        "python.analysis.extraPaths": ["${workspaceFolder}/src"],
+
+        "ruff.enable": true,
+        "mypy-type-checker.preferDaemon": true
+    }
+}

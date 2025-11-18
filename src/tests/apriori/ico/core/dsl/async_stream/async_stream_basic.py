@@ -291,8 +291,6 @@ def test_parallel_stream_parallel_speedup() -> None:
 
 
 if __name__ == "__main__":
-    # test_parallel_stream_unordered()
-
     import sys
 
     sys.exit(pytest.main([__file__]))
