@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass, field
-from typing import Any, final
+from typing import final
 
 from apriori.ico.core.meta.ico_form import IcoForm
-from apriori.ico.core.runtime.execution import IcoExecutionState, SupportsIcoExecution
 from apriori.ico.core.runtime.types import (
     IcoRuntimeOperatorProtocol,
     IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoNodeType, IcoOperatorProtocol
+from apriori.ico.core.types import IcoNodeProtocol, IcoNodeType, IcoOperatorProtocol
 
 
 @final
-@dataclass(slots=True)
 class IcoFlowMeta:
     """Meta-description of an ICO computational flow.
 
@@ -28,12 +25,34 @@ class IcoFlowMeta:
       • hierarchical composition of children
     """
 
+    __slots__ = (
+        "name",
+        "node_type",
+        "ico_form",
+        "runtime_state",
+        "children",
+    )
+
     node_type: IcoNodeType
     ico_form: IcoForm
     name: str
-    state: IcoRuntimeStateType | None = None
-    exec_state: IcoExecutionState | None = None
-    children: list[IcoFlowMeta] = field(default_factory=list)
+    runtime_state: IcoRuntimeStateType | None
+    children: list[IcoFlowMeta]
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        node_type: IcoNodeType,
+        ico_form: IcoForm,
+        runtime_state: IcoRuntimeStateType | None = None,
+        children: list[IcoFlowMeta] | None = None,
+    ) -> None:
+        self.name = name
+        self.node_type = node_type
+        self.ico_form = ico_form
+        self.runtime_state = runtime_state
+        self.children = children or []
 
     def __str__(self) -> str:
         return self.name
@@ -46,19 +65,25 @@ class IcoFlowMeta:
     # ─── Factory helpers ───
 
     @staticmethod
-    def from_operator(operator: IcoOperatorProtocol[Any, Any]) -> IcoFlowMeta:
+    def from_operator(operator: IcoNodeProtocol) -> IcoFlowMeta:
         """Recursively build an IcoFlow from an operator tree."""
-        state = (
+        runtime_state = (
             operator.state if isinstance(operator, IcoRuntimeOperatorProtocol) else None
         )
-        exec_state = (
-            operator.exec_state if isinstance(operator, SupportsIcoExecution) else None
-        )
+        ico_form = IcoForm.from_operator(operator)
+
+        if not isinstance(operator, IcoOperatorProtocol):
+            return IcoFlowMeta(
+                name=operator.name,
+                node_type=IcoNodeType.unknown,
+                ico_form=ico_form,
+                runtime_state=runtime_state,
+            )
+
         return IcoFlowMeta(
             name=operator.name,
             node_type=operator.node_type,
-            ico_form=IcoForm.from_operator(operator),
-            state=state,
-            exec_state=exec_state,
+            ico_form=ico_form,
+            runtime_state=runtime_state,
             children=[IcoFlowMeta.from_operator(c) for c in operator.children],
         )

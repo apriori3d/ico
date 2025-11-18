@@ -1,6 +1,9 @@
+from collections.abc import Iterator
+
 from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.dsl.pipeline import IcoPipeline
 from apriori.ico.core.dsl.process import IcoProcess
+from apriori.ico.core.dsl.sink import IcoSink
 from apriori.ico.core.dsl.source import IcoSource
 from apriori.ico.core.dsl.stream import IcoStream
 from apriori.ico.core.meta.ico_form import IcoForm, infer_ico_form
@@ -15,7 +18,7 @@ def test_infer_form_operator_generics() -> None:
     assert form.name == "int → float"
 
 
-def test_infer_form_operator_annotations() -> None:
+def test_infer_form_operator_fn() -> None:
     def fn(x: str) -> int:
         return len(x)
 
@@ -48,15 +51,35 @@ def test_infer_form_map_and_stream() -> None:
     mapped = base.map()
     streamed = IcoStream(base)
 
-    assert infer_ico_form(mapped).name == "Iterable[int] → Iterable[float]"
-    assert infer_ico_form(streamed).name == "Iterable[int] → Iterable[float]"
+    assert infer_ico_form(mapped).name == "Iterator[int] → Iterator[float]"
+    assert infer_ico_form(streamed).name == "Iterator[int] → Iterator[float]"
 
 
 # ─── Process ───
 
 
-def test_infer_form_process() -> None:
+def test_infer_form_process_from_generic() -> None:
     proc = IcoProcess[float](lambda c: c + 1, num_iterations=3)
+    form = infer_ico_form(proc)
+    assert form.name == "float → float"
+
+
+def test_infer_form_process_from_body() -> None:
+    def source_fn(c: float) -> float:
+        return c + 1
+
+    body_op = IcoOperator(source_fn)
+
+    proc = IcoProcess(body_op, num_iterations=3)
+    form = infer_ico_form(proc)
+    assert form.name == "float → float"
+
+
+def test_infer_form_process_from_fn() -> None:
+    def increment_fn(c: float) -> float:
+        return c + 1
+
+    proc = IcoProcess(increment_fn, num_iterations=3)
     form = infer_ico_form(proc)
     assert form.name == "float → float"
 
@@ -71,9 +94,6 @@ def test_infer_form_pipeline_generics() -> None:
         output=IcoOperator[float, str](str),
     )
     assert infer_ico_form(p).name == "int → float → str"
-    assert infer_ico_form(p.context).name == "int → float"
-    assert infer_ico_form(p.body[0]).name == "float → float"
-    assert infer_ico_form(p.output).name == "float → str"
 
 
 def test_infer_form_pipeline_without_hints() -> None:
@@ -83,18 +103,62 @@ def test_infer_form_pipeline_without_hints() -> None:
         output=lambda x: str(x),
     )
     assert infer_ico_form(p).name == "int → float → str"
-    assert infer_ico_form(p.context).name == "Any → Any"
-    assert infer_ico_form(p.body[0]).name == "Any → Any"
-    assert infer_ico_form(p.output).name == "Any → Any"
+
+
+def test_infer_form_pipeline_with_fn() -> None:
+    def context_fn(x: int) -> float:
+        return float(x)
+
+    def body_fn(x: float) -> float:
+        return x * 2
+
+    def output_fn(x: float) -> str:
+        return str(x)
+
+    p = IcoPipeline(
+        context=context_fn,
+        body=[body_fn],
+        output=output_fn,
+    )
+    assert infer_ico_form(p).name == "int → float → str"
 
 
 # ─── Source ───
 
 
 def test_infer_form_source_with_generics() -> None:
-    src = IcoSource[float](lambda: iter([1.0, 2.0, 3.0]))
+    src = IcoSource[float](lambda _: iter([1.0, 2.0, 3.0]))
     form = infer_ico_form(src)
-    assert form.name == "() → Iterable[float]"
+    assert form.name == "() → Iterator[float]"
+
+
+def test_infer_form_source_with_fn() -> None:
+    def source_fn(_: None) -> Iterator[float]:
+        yield from [1.0, 2.0, 3.0]
+
+    src = IcoSource(source_fn)
+    form = infer_ico_form(src)
+    assert form.name == "() → Iterator[float]"
+
+
+# ─── Sink ───
+
+
+def sink_fn(x: Iterator[float]) -> None:
+    for _ in x:
+        pass
+
+
+def test_infer_form_sink_with_generics() -> None:
+    sink = IcoSink[float](sink_fn)
+    form = infer_ico_form(sink)
+    assert form.name == "Iterator[float] → ()"
+
+
+def test_infer_form_sink_with_fn() -> None:
+    sink = IcoSink(sink_fn)
+    form = infer_ico_form(sink)
+    assert form.name == "Iterator[float] → ()"
 
 
 if __name__ == "__main__":

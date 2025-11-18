@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from rich.text import Text
 from rich.tree import Tree
 
+from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.dsl.pipeline import IcoPipeline
+from apriori.ico.core.dsl.sink import IcoSink
+from apriori.ico.core.dsl.source import IcoSource
+from apriori.ico.core.dsl.stream import IcoStream
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
-from apriori.ico.core.runtime.execution import IcoExecutionState
-from apriori.ico.core.runtime.types import IcoRuntimeCommandType, IcoRuntimeStateType
+from apriori.ico.core.runtime.contour import IcoRuntimeContour
+from apriori.ico.core.runtime.types import IcoRuntimeStateType
 
 
 def describe(
@@ -44,77 +51,76 @@ def _format_label(
     text = Text(flow_meta.name or flow_meta.node_type.name, style="bold cyan")
     text.append(f" ({flow_meta.node_type.name})", style="dim")
 
+    # Show runtime states if available
+    if show_states and flow_meta.runtime_state is not None:
+        color = {
+            IcoRuntimeStateType.inactive: "grey50",
+            IcoRuntimeStateType.ready: "yellow",
+            IcoRuntimeStateType.running: "green",
+            IcoRuntimeStateType.paused: "grey70",
+            IcoRuntimeStateType.error: "red",
+        }.get(flow_meta.runtime_state, "white")
+        text.append(f" [{flow_meta.runtime_state.name}]", style=color)
+
     # Show ICO form (signature)
     if show_ico_form:
-        text.append(f"  [{flow_meta.ico_form.name}]", style="magenta")
-
-    # Show runtime states if available
-    if show_states:
-        if flow_meta.state is not None:
-            color = {
-                IcoRuntimeStateType.unknown: "grey50",
-                IcoRuntimeStateType.running: "yellow",
-                IcoRuntimeStateType.running: "green",
-                IcoRuntimeStateType.cleaned: "grey70",
-            }.get(flow_meta.state, "white")
-            text.append(f" [{flow_meta.state.name}]", style=color)
-
-        if flow_meta.exec_state is not None:
-            color = {
-                IcoExecutionState.idle: "grey50",
-                IcoExecutionState.running: "blue",
-                IcoExecutionState.done: "green",
-                IcoExecutionState.faulted: "red",
-            }.get(flow_meta.exec_state, "white")
-            text.append(f" <{flow_meta.exec_state.name}>", style=color)
+        text.append(f"  {flow_meta.ico_form.name}", style="dim blue")
 
     return text
 
 
 # ──── Example usage ────
 
-if __name__ == "__main__":
-    from collections.abc import Iterable
+Item = float
+DataBatch = Iterator[Item]
+TrainBatch = float
 
+if __name__ == "__main__":
     from rich.console import Console
 
-    from apriori.ico.core import (
-        IcoFlowMeta,
-        IcoOperator,
-        IcoPipeline,
-        IcoSource,
-        IcoStream,
-    )
-
     # ──── 1. Define a batched data source ────
-    def generate_batches() -> Iterable[list[float]]:
+    def generate_batches(_: None) -> Iterator[DataBatch]:
         """Simulate dataset batches: () → Iterable[list[float]]"""
-        return [
+        data = [
             [0.5, 1.0, 1.5],
             [2.0, 0.8, 0.2],
             [1.0, 1.2, 0.9],
         ]
+        for batch in data:
+            yield iter(batch)
 
-    dataset = IcoSource[list[float]](generate_batches, name="dataset")
+    dataset = IcoSource(generate_batches, name="dataset")
 
-    # ──── 2. Define augmentation & collation pipelines ────
+    # ──── 2. Define augmentation & collation pipelines per item ────
 
-    augment = IcoPipeline[float, float, float](
-        context=IcoOperator[float, float](lambda x: x, name="identity_ctx"),
+    def identity_ctx(x: Item) -> Item:
+        return x
+
+    def scale_fn(x: Item) -> Item:
+        return x * 1.1
+
+    def shift_fn(x: Item) -> Item:
+        return x + 0.1
+
+    augment = IcoPipeline(
+        context=IcoOperator(identity_ctx),
         body=[
-            IcoOperator[float, float](lambda x: x * 1.1, name="scale_up"),
-            IcoOperator[float, float](lambda x: x + 0.1, name="shift"),
+            IcoOperator(scale_fn),
+            IcoOperator(shift_fn),
         ],
-        output=IcoOperator[float, float](lambda x: x, name="identity_out"),
+        output=IcoOperator(identity_ctx),
         name="augment_pipeline",
     )
 
-    collate = IcoPipeline[Iterable[float], Iterable[float], float](
-        context=IcoOperator[Iterable[float], Iterable[float]](list, name="to_list"),
-        body=[],
-        output=IcoOperator[Iterable[float], float](max, name="max_value"),
-        name="collate_pipeline",
-    )
+    def collate_max(batch: DataBatch) -> Item:
+        return max(batch)
+
+    collate = IcoOperator(collate_max)
+
+    # Augment each item in the batch, then collate to single value (mimic data loader collate)
+    batch_flow = augment.map() | collate
+    aug_stream = IcoStream(batch_flow, name="data_stream")
+
     """
     ──── 3. Compose into a full data stream ────
     • dataset: () → Iterable[Iterable[float]]
@@ -124,8 +130,7 @@ if __name__ == "__main__":
     • collate: Iterable[float] → Iterable[float] → float
     • dataflow: () → Iterable[float]
     """
-
-    dataflow = dataset | IcoStream(augment.map() | collate, name="data_stream")
+    dataflow = dataset | aug_stream
 
     # ──── 4. Define training pipeline ────
     # We collate batch into single float via max, so input into training stream is Iterable[float],
@@ -135,29 +140,36 @@ if __name__ == "__main__":
     # train_process: float -> float, ICO Form: C → C
     # I → C → O = Iterable[float] → Iterable[float] → Iterable[float]
 
-    def pow_if_needed(values: float) -> float:
+    def pow_if_needed(values: TrainBatch) -> TrainBatch:
         return values**2 if values <= 1.0 else values
 
-    train_step = IcoOperator[float, float](pow_if_needed, name="train_step")
+    def identity_context_train(x: TrainBatch) -> TrainBatch:
+        return x
 
-    train_pipeline = IcoPipeline[float, float, float](
-        context=IcoOperator[float, float](lambda xs: xs, name="identity_ctx"),
-        body=[train_step],
-        output=IcoOperator[float, float](lambda xs: xs, name="identity_out"),
+    train_iter = IcoPipeline(
+        context=IcoOperator(identity_context_train),
+        body=[IcoOperator(pow_if_needed)],
+        output=IcoOperator(identity_context_train),
         name="train_pipeline",
     )
 
-    train_stream = IcoStream(train_pipeline, name="train_stream")
+    train_stream = IcoStream(train_iter, name="train_stream")
+
+    def sink_fn(stream: Iterator[TrainBatch]) -> None:
+        for _ in stream:
+            pass
+
+    sink = IcoSink(sink_fn)
 
     # ──── 5. Combine all into the full flow ────
-    full_flow = dataflow | train_stream
+    full_flow = dataset | aug_stream | train_stream | sink
 
-    full_flow.broadcast_event(IcoRuntimeCommandType.activate)
-    full_flow.broadcast_event(IcoRuntimeCommandType.reset)
+    runtime = IcoRuntimeContour(full_flow, name="full_flow_runtime")
+    runtime.activate()
 
     # ──── 6. Visualize ────
-    flow_meta = IcoFlowMeta.from_operator(full_flow)
+    flow_meta = IcoFlowMeta.from_operator(runtime)
 
     console = Console()
-    console.rule("[bold blue]ICO Dataflow: Dataset → Stream → Train")
-    console.print(describe(flow_meta, show_states=True))
+    console.rule("[bold blue]ICO Dataflow: Dataset → Stream → Train → Sink")
+    console.print(describe(flow_meta, show_states=True, show_ico_form=True))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -13,9 +14,11 @@ from typing import (
 )
 
 from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.dsl.pipeline import IcoPipeline
+from apriori.ico.core.dsl.process import IcoProcess
 from apriori.ico.core.types import (
+    IcoNodeProtocol,
     IcoNodeType,
-    IcoOperatorProtocol,
 )
 
 # ─── IcoForm dataclass ───
@@ -31,150 +34,222 @@ class IcoForm:
     @property
     def name(self) -> str:
         if self.c is None:
-            # Operator node
             return f"{self.i} → {self.o}"
         else:
-            # Pipeline node
             return f"{self.i} → {self.c} → {self.o}"
 
-    def __str__(self) -> str:
-        return self.name
-
     @staticmethod
-    def from_operator(operator: IcoOperatorProtocol[Any, Any]) -> IcoForm:
-        """Infer IcoForm from an operator."""
+    def from_operator(operator: IcoNodeProtocol) -> IcoForm:
         return infer_ico_form(operator)
 
 
 # ──── ICO form inference ────
 
 
-def infer_ico_form(operator: IcoOperatorProtocol[Any, Any]) -> IcoForm:
+def infer_ico_form(obj: Any) -> IcoForm:
     """
-    Infer (I, C, O) form of an ICO operator using:
+    Infer (I, C, O) form of an ICO operator using, in order:
+
       1. Generic annotations (`__orig_class__`)
-      2. Function type hints for IcoOperator instances
+      2. Function type hints (for IcoOperator only)
       3. Fallback to ("Any", None, "Any")
     """
+
+    # 1) Try match by structural node type first (map, stream, pipeline, etc.)
+    if isinstance(obj, IcoNodeProtocol):
+        ico_form = infer_ico_form_by_node_type(obj)
+        if ico_form:
+            return ico_form
+
+    # 2) Try infer from generics (__orig_class__)
+    generic_form = try_infer_ico_form_from_generic(obj)
+    if generic_form:
+        return generic_form
+
+    # 3) try infer using function annotations via inspect
+    if isinstance(obj, IcoOperator):
+        function_form = try_infer_ico_form_from_function(obj.fn)  # pyright: ignore[reportUnknownMemberType]
+        if function_form:
+            return function_form
+
+    function_form = try_infer_ico_form_from_function(obj)  # pyright: ignore[reportUnknownVariableType]
+    if function_form:
+        return function_form
+
+    # 4) Final fallback
+    return IcoForm("Any", None, "Any")
+
+
+# ──── Generic inference helper ────
+
+
+def infer_ico_form_by_node_type(operator: IcoNodeProtocol) -> IcoForm | None:
     match operator.node_type:
-        # ──── Infer types for compositional nodes ────
+        # Structural composition nodes
 
         case IcoNodeType.chain if len(operator.children) == 2:
-            # Infer types from children
-            left_form = try_infer_ico_form_from_generic(operator.children[0])
-            right_form = try_infer_ico_form_from_generic(operator.children[1])
-            if left_form and right_form:
-                return IcoForm(left_form.i, None, right_form.o)
+            left = infer_ico_form(operator.children[0])
+            right = infer_ico_form(operator.children[1])
+            return IcoForm(left.i, None, right.o)
 
         case IcoNodeType.stream | IcoNodeType.map if len(operator.children) == 1:
-            # Infer types from body operator
-            body_form = try_infer_ico_form_from_generic(operator.children[0])
-            if body_form:
-                return IcoForm(
-                    f"Iterable[{body_form.i}]",
-                    None,
-                    f"Iterable[{body_form.o}]",
-                )
+            body = infer_ico_form(operator.children[0])
+            return IcoForm(
+                f"Iterator[{body.i}]",
+                None,
+                f"Iterator[{body.o}]",
+            )
 
-        # ──── Infer types for special type nodes ────
+        case IcoNodeType.pipeline:
+            generic_form = try_infer_ico_form_from_generic(operator)
+            if generic_form:
+                return generic_form
+
+            # Infer from context, body, output as child operators
+            if len(operator.children) >= 3:
+                context = infer_ico_form(operator.children[0])
+                body = infer_ico_form(operator.children[1])
+                output = infer_ico_form(operator.children[-1])
+                return IcoForm(context.i, body.o, output.o)
+
+            # Infer from context, body, output as functions
+            if isinstance(operator, IcoPipeline) and len(operator.body) >= 1:  # type: ignore
+                context_fn_form = infer_ico_form(
+                    operator.context  # pyright: ignore[reportUnknownMemberType]
+                )
+                body_fn_form = infer_ico_form(
+                    operator.body[0]  # pyright: ignore[reportUnknownMemberType]
+                )
+                output_fn_form = infer_ico_form(
+                    operator.output  # pyright: ignore[reportUnknownMemberType]
+                )
+                if context_fn_form and body_fn_form and output_fn_form:
+                    return IcoForm(
+                        context_fn_form.i,
+                        body_fn_form.o,
+                        output_fn_form.o,
+                    )
+
+        case IcoNodeType.process:
+            generic_names = get_generic_type_names(operator)
+            if generic_names and len(generic_names) == 1:
+                return IcoForm(generic_names[0], None, generic_names[0])
+
+            if len(operator.children) == 1:
+                body_form = infer_ico_form(operator.children[0])
+                return IcoForm(body_form.i, None, body_form.o)
+
+            if isinstance(operator, IcoProcess):
+                function_form = infer_ico_form(operator.body)  # pyright: ignore[reportUnknownMemberType]
+                if function_form:
+                    return function_form
+
+        # Note: ICO Form should have at least two types (I, O) to be defined.
+        # Some nodes only have one type each,
+        # so ICO Form must be defined depending on node type.
 
         case IcoNodeType.source:
-            form = try_infer_ico_form_from_generic(operator)
-            if form:
-                return IcoForm("()", None, f"Iterable[{form.o}]")
+            # Source has only one generic type: Output
+            generic_names = get_generic_type_names(operator)
+
+            if generic_names and len(generic_names) == 1:
+                return IcoForm("()", None, f"Iterator[{generic_names[0]}]")
 
         case IcoNodeType.sink:
-            form = try_infer_ico_form_from_generic(operator)
-            if form:
-                return IcoForm(f"Iterable[{form.i}]", None, "()")
+            # Sink has only one generic type: Input
+            generic_names = get_generic_type_names(operator)
+
+            if generic_names and len(generic_names) == 1:
+                return IcoForm(f"Iterator[{generic_names[0]}]", None, "()")
+
+        case IcoNodeType.runtime:
+            if not get_generic_type_names(operator):
+                return IcoForm("()", None, "()")
 
         case _:
             pass
 
-    # Infer from generics
-    ico_form = try_infer_ico_form_from_generic(operator)
-    if ico_form:
-        return ico_form
-
-    # Fallback to Any
-    if not isinstance(operator, IcoOperator):
-        return IcoForm("Any", None, "Any")
-
-    # Fallback: infer from function type hints
-    try:
-        hints = get_type_hints(operator.fn)
-        input_type = next(iter(hints.values()), Any)
-        output_type = hints.get("return", Any)
-        return IcoForm(_type_name(input_type), None, _type_name(output_type))
-
-    except Exception:
-        return IcoForm("Any", None, "Any")
+    return None
 
 
-def try_infer_ico_form_from_generic(operator: Any) -> IcoForm | None:
-    """Infer ICO form from generic annotations, if available."""
+def get_generic_type_names(operator: Any) -> list[str] | None:
     args = get_args(getattr(operator, "__orig_class__", None))
     if not args:
         return None
+    return [_type_name(a) for a in args]
 
-    num_args = len(args)
-    if num_args == 1:
-        # Process node: (C) → (C)
-        c_name = _type_name(args[0])
-        return IcoForm(c_name, None, c_name)
 
-    if num_args == 2:
-        # Operator node: (I) → (O)
-        i_name, o_name = (_type_name(a) for a in args)
-        return IcoForm(i_name, None, o_name)
+def try_infer_ico_form_from_generic(operator: Any) -> IcoForm | None:
+    type_names = get_generic_type_names(operator)
 
-    if num_args == 3:
-        # Pipeline node: (I) → (C) → (O)
-        i_name, c_name, o_name = (_type_name(a) for a in args)
-        return IcoForm(i_name, c_name, o_name)
+    if not type_names:
+        return None
+
+    if len(type_names) == 2:
+        i, o = type_names
+        return IcoForm(i, None, o)
+
+    if len(type_names) == 3:
+        i, c, o = type_names
+        return IcoForm(i, c, o)
 
     return None
 
 
-# ──── Type name formatter ────
+def try_infer_ico_form_from_function(fn: Any) -> IcoForm | None:
+    try:
+        signature = inspect.signature(fn)  # type: ignore
+        hints = get_type_hints(fn)  # type: ignore
+
+        # extract input type (first annotated parameter)
+        params = list(signature.parameters.values())
+        if params and params[0].annotation is not inspect._empty:  # pyright: ignore[reportPrivateUsage]
+            input_type = hints.get(params[0].name, Any)
+        else:
+            input_type = Any
+
+        # extract return type
+        if signature.return_annotation is not inspect._empty:  # pyright: ignore[reportPrivateUsage]
+            output_type = hints.get("return", Any)
+        else:
+            output_type = Any
+
+        return IcoForm(_type_name(input_type), None, _type_name(output_type))
+
+    except Exception:
+        return None
+
+
+# ──── Formatter ────
 
 
 def _type_name(tp: Any) -> str:
-    """Return readable name for a possibly generic type (Iterable[float], tuple[int, str], etc.)."""
     origin = get_origin(tp)
     args = get_args(tp)
 
-    # ---- Generic types (Iterable[float], dict[str, int], etc.) ----
     if origin:
         origin_name = getattr(origin, "__name__", str(origin))
 
-        # Handle Union/Optional explicitly
         if origin is Union:
-            # Optional[T] is Union[T, NoneType]
             if len(args) == 2 and type(None) in args:
                 non_none = next(a for a in args if a is not type(None))
                 return f"Optional[{_type_name(non_none)}]"
-            args_str = " | ".join(_type_name(a) for a in args)
-            return f"Union[{args_str}]"
+            return " | ".join(_type_name(a) for a in args)
 
         if origin is Literal:
-            # Literal[...] is special — represent as Literal[...]
-            args_str = ", ".join(repr(a) for a in args)
-            return f"Literal[{args_str}]"
+            return f"Literal[{', '.join(repr(a) for a in args)}]"
 
-        # Regular generics
         if args:
-            args_str = ", ".join(_type_name(a) for a in args)
-            return f"{origin_name}[{args_str}]"
+            return f"{origin_name}[{', '.join(_type_name(a) for a in args)}]"
+
         return origin_name
 
-    # ---- Base cases ----
+    # Base cases
+    if tp in (None, type(None)):
+        return "()"
     if isinstance(tp, type):
-        if isinstance(None, tp):
-            return "()"
         return tp.__name__
     if tp is Any or isinstance(tp, TypeVar):
         return "Any"
-    if tp is None or tp is type(None):
-        return "()"
+
     return str(tp)
