@@ -26,16 +26,15 @@ class IcoSource(
         12.0
     """
 
-    generator: Callable[[], Iterator[O]]
-
-    def __init__(self, generator: Callable[[], Iterator[O]], name: str | None = None):
+    def __init__(
+        self, generator: Callable[[None], Iterator[O]], name: str | None = None
+    ):
         super().__init__(
-            fn=self._generator_fn,
+            fn=generator,
             name=name,
             node_type=IcoNodeType.source,
             children=[],
         )
-        self.generator = generator
 
-    def _generator_fn(self, item: None) -> Iterator[O]:
-        yield from self.generator()
+    def __call__(self, item: None = None) -> Iterator[O]:
+        yield from self.fn(item)

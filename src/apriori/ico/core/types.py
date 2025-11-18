@@ -58,18 +58,35 @@ class IcoNodeProtocol(Protocol):
 
 class IcoNodeType(Enum):
     operator = auto()
+
     # Specialized nodes
     source = auto()
     sink = auto()
     runtime = auto()
+
     # Structural nodes
     pipeline = auto()
     process = auto()
+
     # Compositional nodes
     chain = auto()
     map = auto()
     stream = auto()
+
+    unknown = auto()
+
     # agent = auto()
+
+
+# ────────────────────────────────────────────────
+# ICO Form Typed Node Protocol
+# ────────────────────────────────────────────────
+
+
+class IcoTypedNodeProtocol(Protocol):
+    ico_input: type | None
+    ico_context: type | None
+    ico_output: type | None
 
 
 # ────────────────────────────────────────────────

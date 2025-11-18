@@ -12,6 +12,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
+rich = "^14.2.0"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.18.2"

@@ -12,7 +12,7 @@ def test_data_produces_iterable() -> None:
     Test that IcoData produces an iterable when called.
     """
 
-    dataset = IcoSource[int](lambda: iter([1, 2, 3]), name="dataset")
+    dataset = IcoSource[int](lambda _: iter([1, 2, 3]), name="dataset")
     result = list(dataset(None))
 
     assert result == [1, 2, 3]
@@ -23,7 +23,7 @@ def test_data_stream_composition() -> None:
     Test that IcoData can be composed with IcoStream and downstream operators.
     """
 
-    dataset = IcoSource[int](lambda: iter([1, 2, 3]), name="dataset")
+    dataset = IcoSource[int](lambda _: iter([1, 2, 3]), name="dataset")
     scale = IntOperator(lambda x: x * 2, name="scale")
     total = IcoOperator[Iterable[int], int](sum, name="sum")
 

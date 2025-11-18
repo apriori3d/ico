@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Sequence
 from typing import Generic, final
 
 from apriori.ico.core.dsl.operator import (
     IcoOperator,
-    wrap_operator,
 )
-from apriori.ico.core.types import C, I, IcoNodeType, IcoOperatorProtocol, O
+from apriori.ico.core.types import (
+    C,
+    I,
+    IcoNodeProtocol,
+    IcoNodeType,
+    O,
+)
 
 
 @final
@@ -54,9 +59,9 @@ class IcoPipeline(
 
     __slots__ = ("context", "body", "output")
 
-    context: IcoOperatorProtocol[I, C]
-    body: Sequence[IcoOperatorProtocol[C, C]]
-    output: IcoOperatorProtocol[C, O]
+    context: Callable[[I], C]
+    body: Sequence[Callable[[C], C]]
+    output: Callable[[C], O]
 
     def __init__(
         self,
@@ -65,29 +70,42 @@ class IcoPipeline(
         output: Callable[[C], O],
         name: str | None = None,
     ):
-        # Wrap all components into IcoOperators if needed
-        context_op = wrap_operator(context)
-        body_ops = [wrap_operator(op) for op in body]
-        output_op = wrap_operator(output)
+        context_fn = context
+        body_fn = body
+        output_fn = output
+
+        # Collect children for ICO structure
+        children: list[IcoNodeProtocol] = []
+
+        if isinstance(context, IcoNodeProtocol):
+            children.append(context)
+
+        for step in body:
+            if isinstance(step, IcoNodeProtocol):
+                children.append(step)
+
+        if isinstance(output, IcoNodeProtocol):
+            children.append(output)
 
         super().__init__(
             fn=self._run_pipeline,
             name=name,
             node_type=IcoNodeType.pipeline,
-            children=[context_op] + body_ops + [output_op],
+            children=children,
         )
-        self.context = context_op
-        self.body = body_ops
-        self.output = output_op
+        self.context = context_fn
+        self.body = body_fn
+        self.output = output_fn
 
     def _run_pipeline(self, item: I) -> O:
         ctx = self.context(item)
+
         for step in self.body:
             ctx = step(ctx)
-        return self.output(ctx)
+
+        result = self.output(ctx)
+
+        return result
 
     def __len__(self) -> int:
         return len(self.body)
-
-    def __iter__(self) -> Iterator[IcoOperatorProtocol[C, C]]:
-        yield from self.body

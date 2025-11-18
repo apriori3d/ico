@@ -78,7 +78,7 @@ class IcoOperator(Generic[I, O]):
         super().__init__()
         self.fn = fn
 
-        self.name = name or self.__class__.__name__
+        self.name = name or self.fn.__name__
         self.node_type = node_type
 
         self._parent = None

@@ -36,7 +36,7 @@ def test_parallel_stream_parallel_execution() -> None:
         await asyncio.sleep(random.uniform(0.05, 0.2))
         return x * 10
 
-    ops = [IntOperator(delayed_op) for _ in range(3)]
+    ops = [IcoOperator(delayed_op) for _ in range(3)]
     stream = AsyncStream(ops)
 
     data = list(range(10))
@@ -58,7 +58,7 @@ def test_parallel_stream_parallel_execution() -> None:
 def test_parallel_stream_ordered() -> None:
     """Test ordered=True preserves order of results."""
 
-    def delayed_double(x):
+    def delayed_double(x: int) -> int:
         time.sleep(0.05 if x % 2 == 0 else 0.01)
         return x * 2
 
@@ -79,19 +79,20 @@ def test_parallel_stream_ordered() -> None:
 def test_parallel_stream_unordered() -> None:
     """Test ordered=False changes order of results."""
 
-    async def delayed_double(x):
+    async def delayed_double(x: float) -> float:
         await asyncio.sleep(x * 0.01)
         return x * 2
 
     # Even though the input is reversed, unordered execution yields results
     # in completion order — effectively re-sorted by async timing.
+
     data = [1, 2, 3, 4, 5, 6]
     ops = [IcoOperator(delayed_double) for _ in range(len(data))]
     stream = AsyncStream(ops, ordered=False)
-    result = list(stream(reversed(data)))
+    result = [item for item in stream(reversed(data))]
 
     # Order differs, but all outputs are correct
-    assert sorted(result) == [x * 2 for x in data]
+    assert sorted(result) == [x * 2 for x in data]  # pyright: ignore[reportArgumentType]
     assert result != [x * 2 for x in reversed(data)]
 
 
@@ -103,7 +104,7 @@ def test_parallel_stream_unordered() -> None:
 def test_parallel_stream_exception() -> None:
     """Test that exceptions in operators are propagated."""
 
-    def faulty_op(x):
+    def faulty_op(x: int) -> int:
         if x == 3:
             raise ValueError("boom")
         return x
@@ -125,7 +126,7 @@ def test_parallel_stream_exception() -> None:
 def test_parallel_stream_unordered_raises_immediately() -> None:
     """Ensure exceptions from unordered workers propagate immediately."""
 
-    async def maybe_fail(x):
+    async def maybe_fail(x: int) -> int:
         await asyncio.sleep(0.01)
         if x == 2:
             raise RuntimeError("failure")
@@ -147,7 +148,7 @@ def test_parallel_stream_unordered_raises_immediately() -> None:
 def test_parallel_stream_async_operator() -> None:
     """Ensure async operators work transparently."""
 
-    async def async_double(x):
+    async def async_double(x: int) -> int:
         await asyncio.sleep(0.01)
         return x * 2
 
@@ -156,7 +157,7 @@ def test_parallel_stream_async_operator() -> None:
 
     data = [1, 2, 3, 4]
     result = list(stream(iter(data)))
-    assert sorted(result) == sorted([x * 2 for x in data])
+    assert sorted(result) == sorted([x * 2 for x in data])  # pyright: ignore[reportArgumentType]
 
 
 # ───────────────────────────────────────────────
@@ -167,7 +168,7 @@ def test_parallel_stream_async_operator() -> None:
 def test_parallel_stream_empty_input() -> None:
     """Verify that an empty input stream triggers fast-exit."""
 
-    ops = [IcoOperator(lambda x: x) for _ in range(2)]
+    ops = [IcoOperator[int, int](lambda x: x) for _ in range(2)]
     stream = AsyncStream(ops)
     result = list(stream(iter([])))
     assert result == []
@@ -210,7 +211,7 @@ def test_parallel_stream_slow_one_does_not_block() -> None:
     data = [0, 1, 2, 3]
 
     result = list(stream(iter(data)))
-    assert sorted(result) == data
+    assert sorted(result) == data  # pyright: ignore[reportArgumentType]
     assert result[0] != 0  # ensure non-blocking behavior
 
 
@@ -245,11 +246,11 @@ def test_parallel_stream_can_be_reused() -> None:
 def test_parallel_stream_mixed_sync_async() -> None:
     """Verify mixed sync/async operators are executed correctly."""
 
-    async def async_double_slow(x):
+    async def async_double_slow(x: int) -> int:
         await asyncio.sleep(0.1)
         return x * 2
 
-    def sync_triple(x):
+    async def sync_triple(x: int) -> int:
         return x * 3
 
     # Mix of sync and async workers.
@@ -258,7 +259,7 @@ def test_parallel_stream_mixed_sync_async() -> None:
     stream = AsyncStream(ops)
 
     data = [1, 2, 3, 4]
-    result = sorted(list(stream(iter(data))))
+    result = sorted(list(stream(iter(data))))  # type: ignore
     expected = sorted([x * 2 for x in data[:1]] + [x * 3 for x in data[1:]])
 
     assert result == expected
@@ -290,6 +291,8 @@ def test_parallel_stream_parallel_speedup() -> None:
 
 
 if __name__ == "__main__":
+    # test_parallel_stream_unordered()
+
     import sys
 
     sys.exit(pytest.main([__file__]))

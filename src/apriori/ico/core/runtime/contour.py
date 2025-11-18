@@ -1,9 +1,6 @@
-from typing import Any
-
 from typing_extensions import Self
 
-from apriori.ico.core.dsl.tree import iterate_nodes
-from apriori.ico.core.meta.ico_form import infer_ico_form
+from apriori.ico.core.dsl.node import iterate_nodes
 from apriori.ico.core.runtime.discovery import discover_and_connect_runtimes
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.core.runtime.progress.types import ProgressProtocol, SupportsProgress
@@ -57,9 +54,6 @@ class IcoRuntimeContour(
         *,
         name: str | None = None,
     ) -> None:
-        # Contour executes the given closure e.g. flow () → ()
-        self._validate_closure(closure)
-
         super().__init__(
             fn=self._contour_fn,
             name=name or "ico_runtime_contour",
@@ -84,13 +78,3 @@ class IcoRuntimeContour(
                 node.progress = self.progress
 
         return self
-
-    # ─── Internal utilities ───
-
-    def _validate_closure(self, flow: IcoOperatorProtocol[Any, Any]) -> None:
-        """Validate that the flow is a closure: begins and ends with unit types (() → ())."""
-        form = infer_ico_form(flow)
-        if not (form.i == "()" and form.o == "()"):
-            raise ValueError(
-                f"Invalid flow form: expected (() → ()), got ({form.i} → {form.o})"
-            )

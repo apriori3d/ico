@@ -1,5 +1,5 @@
+from apriori.ico.core.dsl.node import iterate_nodes, iterate_parents
 from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.tree import iterate_nodes, iterate_parents
 from apriori.ico.core.types import IcoNodeType
 
 IntOperator = IcoOperator[int, int]

@@ -4,8 +4,28 @@
 
 
 from collections.abc import Iterator
+from typing import Any
 
 from apriori.ico.core.types import IcoNodeProtocol
+
+
+class IcoTypeInfo:
+    ico_input: type | None
+    ico_context: type | None
+    ico_output: type | None
+
+    def __init__(
+        self,
+        i: type | None = None,
+        c: type | None = None,
+        o: type | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ):
+        super().__init__(*args, **kwargs)
+        self.ico_input = i
+        self.ico_context = c
+        self.ico_output = o
 
 
 def iterate_nodes(

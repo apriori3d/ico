@@ -5,9 +5,8 @@ from typing import Generic, final
 
 from apriori.ico.core.dsl.operator import (
     IcoOperator,
-    wrap_operator,
 )
-from apriori.ico.core.types import C, IcoNodeType, IcoOperatorProtocol
+from apriori.ico.core.types import C, IcoNodeProtocol, IcoNodeType
 
 
 @final
@@ -36,12 +35,10 @@ class IcoProcess(
         └── operator[fib_step]
     """
 
-    __slots__ = (
-        "body",
-        "num_iterations",
-    )
+    __slots__ = ("num_iterations", "body")
 
-    body: IcoOperatorProtocol[C, C]
+    body: Callable[[C], C]
+    num_iterations: int
 
     def __init__(
         self,
@@ -49,18 +46,18 @@ class IcoProcess(
         num_iterations: int,
         name: str | None = None,
     ):
-        body_op = wrap_operator(body)
+        body_fn = body
 
         super().__init__(
-            fn=self._run_loop_fn,
+            fn=body,
             name=name,
             node_type=IcoNodeType.process,
-            children=[body_op],
+            children=[body] if isinstance(body, IcoNodeProtocol) else [],
         )
-        self.body = body_op
+        self.body = body_fn
         self.num_iterations = num_iterations
 
-    def _run_loop_fn(self, context: C) -> C:
+    def __call__(self, context: C) -> C:
         for _ in range(self.num_iterations):
-            context = self.body(context)
+            context = self.fn(context)
         return context
