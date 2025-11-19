@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Coroutine, Iterator, Sequence
 from enum import Enum, auto
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 # ────────────────────────────────────────────────
 # Computational Protocols
@@ -12,7 +12,7 @@ from typing import Protocol, TypeVar, runtime_checkable
 # Generic type variables for ICO model
 I = TypeVar("I", contravariant=True)  # noqa: E741
 C = TypeVar("C")
-O = TypeVar("O")  # noqa: E741
+O = TypeVar("O", covariant=True)  # noqa: E741
 
 
 # Generic type variables for composition
@@ -20,10 +20,24 @@ I2 = TypeVar("I2")
 O2 = TypeVar("O2")
 
 
-class IcoComputationProtocol(Protocol[I, O]):
+@runtime_checkable
+class IcoCallableProtocol(Protocol[I, O]):
     """Protocol for ICO operators for execution and composition."""
 
     def __call__(self, item: I) -> O: ...
+
+
+@runtime_checkable
+class IcoAsyncCallableProtocol(Protocol[I, O]):
+    """Protocol for ICO operators for execution and composition."""
+
+    async def __call__(self, item: I) -> Coroutine[Any, Any, O]: ...
+
+    # async def acall(self, item: I) -> O: ...
+
+
+class IcoCompositionalProtocol(Protocol[I, O]):
+    """Protocol for ICO operators for execution and composition."""
 
     def chain(
         self, other: IcoOperatorProtocol[O, O2]
@@ -97,7 +111,8 @@ class IcoTypedNodeProtocol(Protocol):
 @runtime_checkable
 class IcoOperatorProtocol(
     IcoNodeProtocol,
-    IcoComputationProtocol[I, O],
+    IcoCallableProtocol[I, O],
+    IcoCompositionalProtocol[I, O],
     Protocol[I, O],
 ):
     """Protocol for ICO operators combining computation and tree structure."""

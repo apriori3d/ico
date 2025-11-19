@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Generic
 
-from apriori.ico.core.runtime.channels.types import (
-    IcoReceiveEndpointProtocol,
-    IcoSendEndpointProtocol,
-)
+from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
@@ -19,13 +16,13 @@ class IcoRuntimeChannel(
     IcoRuntimeOperator,
     Generic[I, O],
 ):
-    send: IcoSendEndpointProtocol[I]
-    receive: IcoReceiveEndpointProtocol[O]
+    send: IcoSendEndpoint[I]
+    receive: IcoReceiveEndpoint[O]
 
     def __init__(
         self,
-        send: IcoSendEndpointProtocol[I],
-        receive: IcoReceiveEndpointProtocol[O],
+        send: IcoSendEndpoint[I],
+        receive: IcoReceiveEndpoint[O],
         *,
         name: str | None = None,
     ) -> None:
@@ -51,7 +48,10 @@ class IcoRuntimeChannel(
             self.send.on_event(event)
 
 
-class IcoReceiveEndpointMixin:
+class IcoReceiveEndpoint(
+    Generic[O],
+    IcoOperator[None, O],
+):
     runtime: IcoRuntimeOperatorProtocol | None = None
 
     def __init__(
@@ -74,7 +74,10 @@ class IcoReceiveEndpointMixin:
             self.runtime.bubble_event(event)
 
 
-class IcoSendEndpointMixin:
+class IcoSendEndpoint(
+    Generic[I],
+    IcoOperator[I, None],
+):
     def on_command(self, command: IcoRuntimeCommandType) -> None:
         pass  # To be implemented by subclasses
 

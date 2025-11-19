@@ -4,7 +4,8 @@ import time
 
 import pytest
 
-from apriori.ico.core.dsl.async_stream import AsyncStream
+from apriori.ico.core.dsl.async_operator import IcoAsyncOperator
+from apriori.ico.core.dsl.async_stream import IcoAsyncStream
 from apriori.ico.core.dsl.operator import IcoOperator
 
 # ───────────────────────────────────────────────
@@ -17,7 +18,7 @@ IntOperator = IcoOperator[int, int]
 def test_parallel_stream_basic() -> None:
     """Ensure all items are processed by ParallelStream."""
     ops = [IntOperator(lambda x: x * 2) for _ in range(3)]
-    stream = AsyncStream(ops)
+    stream = IcoAsyncStream(ops)
 
     data = [1, 2, 3, 4, 5]
     result = list(stream(iter(data)))
@@ -36,8 +37,8 @@ def test_parallel_stream_parallel_execution() -> None:
         await asyncio.sleep(random.uniform(0.05, 0.2))
         return x * 10
 
-    ops = [IcoOperator(delayed_op) for _ in range(3)]
-    stream = AsyncStream(ops)
+    ops = [IcoAsyncOperator(delayed_op) for _ in range(3)]
+    stream = IcoAsyncStream(ops)
 
     data = list(range(10))
     t0 = time.perf_counter()
@@ -63,7 +64,7 @@ def test_parallel_stream_ordered() -> None:
         return x * 2
 
     ops = [IcoOperator(delayed_double) for _ in range(3)]
-    stream = AsyncStream(ops, ordered=True)
+    stream = IcoAsyncStream(ops, ordered=True)
 
     data = [1, 2, 3, 4, 5, 6]
     result = list(stream(iter(data)))
@@ -87,8 +88,8 @@ def test_parallel_stream_unordered() -> None:
     # in completion order — effectively re-sorted by async timing.
 
     data = [1, 2, 3, 4, 5, 6]
-    ops = [IcoOperator(delayed_double) for _ in range(len(data))]
-    stream = AsyncStream(ops, ordered=False)
+    ops = [IcoAsyncOperator[int, float](delayed_double) for _ in range(len(data))]
+    stream = IcoAsyncStream[int, float](ops, ordered=False)
     result = [item for item in stream(reversed(data))]
 
     # Order differs, but all outputs are correct
@@ -110,7 +111,7 @@ def test_parallel_stream_exception() -> None:
         return x
 
     ops = [IcoOperator(faulty_op) for _ in range(2)]
-    stream = AsyncStream(ops)
+    stream = IcoAsyncStream(ops)
 
     data = [1, 2, 3, 4]
 
@@ -132,8 +133,8 @@ def test_parallel_stream_unordered_raises_immediately() -> None:
             raise RuntimeError("failure")
         return x * 2
 
-    ops = [IcoOperator(maybe_fail) for _ in range(3)]
-    stream = AsyncStream(ops, ordered=False)
+    ops = [IcoAsyncOperator(maybe_fail) for _ in range(3)]
+    stream = IcoAsyncStream(ops, ordered=False)
     data = [1, 2, 3]
 
     with pytest.raises(RuntimeError):
@@ -152,8 +153,8 @@ def test_parallel_stream_async_operator() -> None:
         await asyncio.sleep(0.01)
         return x * 2
 
-    ops = [IcoOperator(async_double) for _ in range(2)]
-    stream = AsyncStream(ops)
+    ops = [IcoAsyncOperator(async_double) for _ in range(2)]
+    stream = IcoAsyncStream(ops)
 
     data = [1, 2, 3, 4]
     result = list(stream(iter(data)))
@@ -169,7 +170,7 @@ def test_parallel_stream_empty_input() -> None:
     """Verify that an empty input stream triggers fast-exit."""
 
     ops = [IcoOperator[int, int](lambda x: x) for _ in range(2)]
-    stream = AsyncStream(ops)
+    stream = IcoAsyncStream(ops)
     result = list(stream(iter([])))
     assert result == []
 
@@ -186,7 +187,7 @@ def test_parallel_stream_single_operator_single_item() -> None:
         await asyncio.sleep(0.01)
         return x + 1
 
-    stream = AsyncStream([IcoOperator(op)])
+    stream = IcoAsyncStream([IcoAsyncOperator(op)])
     result = list(stream(iter([10])))
     assert result == [11]
 
@@ -206,8 +207,8 @@ def test_parallel_stream_slow_one_does_not_block() -> None:
             await asyncio.sleep(0.001)
         return x
 
-    ops = [IcoOperator(slow_or_fast) for _ in range(3)]
-    stream = AsyncStream(ops, ordered=False)
+    ops = [IcoAsyncOperator(slow_or_fast) for _ in range(3)]
+    stream = IcoAsyncStream(ops, ordered=False)
     data = [0, 1, 2, 3]
 
     result = list(stream(iter(data)))
@@ -227,8 +228,8 @@ def test_parallel_stream_can_be_reused() -> None:
         await asyncio.sleep(0.001)
         return x + 1
 
-    ops = [IcoOperator(f) for _ in range(2)]
-    stream = AsyncStream(ops)
+    ops = [IcoAsyncOperator(f) for _ in range(2)]
+    stream = IcoAsyncStream(ops)
     data = [1, 2, 3]
 
     first_run = list(stream(iter(data)))
@@ -250,13 +251,13 @@ def test_parallel_stream_mixed_sync_async() -> None:
         await asyncio.sleep(0.1)
         return x * 2
 
-    async def sync_triple(x: int) -> int:
+    def sync_triple(x: int) -> int:
         return x * 3
 
     # Mix of sync and async workers.
     # Asssume async_double_slow should get only first item, second operator the rest.
-    ops = [IcoOperator(async_double_slow), IcoOperator(sync_triple)]
-    stream = AsyncStream(ops)
+    ops = [IcoAsyncOperator(async_double_slow), IcoOperator(sync_triple)]
+    stream = IcoAsyncStream(ops)
 
     data = [1, 2, 3, 4]
     result = sorted(list(stream(iter(data))))  # type: ignore
@@ -278,8 +279,8 @@ def test_parallel_stream_parallel_speedup() -> None:
         return x * 2
 
     data = list(range(6))
-    ops = [IcoOperator(slow_double) for _ in range(len(data))]
-    stream = AsyncStream(ops)
+    ops = [IcoAsyncOperator[int, int](slow_double) for _ in range(len(data))]
+    stream = IcoAsyncStream[int, int](ops)
 
     start = time.perf_counter()
     result = list(stream(iter(data)))

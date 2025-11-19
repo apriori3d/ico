@@ -9,6 +9,7 @@ import pytest
 
 from apriori.ico.channels.mp_queue.channel import MPQueueChannel
 from apriori.ico.core.dsl.operator import IcoOperator
+from apriori.ico.core.dsl.source import IcoSource
 from apriori.ico.core.runtime.channels.types import IcoRuntimeChannelProtocol
 from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
@@ -31,19 +32,19 @@ def agent(
         count += 1
 
 
-def flow_identity() -> IcoOperatorProtocol[int, int]:
+def flow_identity() -> IcoOperator[int, int]:
     """Simple identity operator."""
     return IcoOperator[int, int](lambda x: x)
 
 
-def flow_double() -> IcoOperatorProtocol[int, int]:
+def flow_double() -> IcoOperator[int, int]:
     """Doubles numeric input."""
     return IcoOperator[int, int](lambda x: x * 2)
 
 
 def start_mp_process_agent(
     channel: MPQueueChannel[I, O],
-    flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
+    flow_factory: Callable[[], IcoOperator[I, O]],
     n: int | None = 1,
 ) -> SpawnProcess:
     """Launch isolated process that runs an agent closure."""
@@ -107,6 +108,22 @@ def test_send_receive_multiple_items() -> None:
     try:
         flow = channel.send | channel.receive
         results = [flow(i) for i in range(num_queries)]
+        assert results == [i * 2 for i in range(num_queries)]
+    finally:
+        process.terminate()
+        process.join(timeout=0.5)
+
+
+def test_send_receive_stream() -> None:
+    """Ensure multiple sequential messages are handled correctly."""
+    channel = MPQueueChannel[int, int](get_context("spawn"))
+    num_queries = 5
+    process = start_mp_process_agent(channel.make_pair(), flow_double, n=num_queries)
+
+    try:
+        src = IcoSource(lambda _: iter(range(num_queries)))
+        flow = src | (channel.send | channel.receive).map()
+        results = list(flow(None))
         assert results == [i * 2 for i in range(num_queries)]
     finally:
         process.terminate()

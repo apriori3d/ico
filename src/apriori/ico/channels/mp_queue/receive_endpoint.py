@@ -4,8 +4,7 @@ from collections.abc import Callable
 from multiprocessing import Queue
 from typing import TYPE_CHECKING, Generic, cast, final
 
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.runtime.channels.channel import IcoReceiveEndpointMixin
+from apriori.ico.core.runtime.channels.channel import IcoReceiveEndpoint
 from apriori.ico.core.runtime.channels.messages import (
     AcknowledgePayload,
     ChannelMessage,
@@ -18,7 +17,6 @@ from apriori.ico.core.runtime.events import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError, IcoStopExecutionSignal
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.core.runtime.types import (
-    IcoRuntimeCommandType,
     IcoRuntimeOperatorProtocol,
 )
 from apriori.ico.core.types import O
@@ -32,8 +30,7 @@ else:
 @final
 class MPQueueReceiveEndpoint(
     Generic[O],
-    IcoOperator[None, O],
-    IcoReceiveEndpointMixin,
+    IcoReceiveEndpoint[O],
     ProgressMixin,
 ):
     """
@@ -81,7 +78,6 @@ class MPQueueReceiveEndpoint(
         while True:
             try:
                 message = self._main_queue.get(timeout=self._timeout)
-                print(f"{self.name} Received message: {message}")
 
                 # Dispatch based on message type
                 handler = self._dispatch_table().get(message.message_type)
@@ -136,10 +132,6 @@ class MPQueueReceiveEndpoint(
         self.on_command(command)
 
         self._ack(ChannelMessageType.runtime_command)
-
-        # Stop or deactivate ends receive loop
-        if command in {IcoRuntimeCommandType.deactivate, IcoRuntimeCommandType.stop}:
-            raise IcoStopExecutionSignal
 
     def _handle_event(self, message: ChannelMessage) -> None:
         """Handle runtime events (faults, metrics, progress, etc.)."""

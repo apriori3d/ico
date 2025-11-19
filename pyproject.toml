@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "apriori.ico"
 version = "0.1.0"
-requires-python = ">=3.10,<3.11"
+#requires-python = ">=3.10,<3.11"
 description = "Apriori ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows."
 readme = "README.md"
 packages = [

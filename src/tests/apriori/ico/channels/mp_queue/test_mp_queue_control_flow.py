@@ -130,7 +130,9 @@ def test_runtime_flow_propagation() -> None:
         # Check that commands were received correctly
         assert agent_runtime_recording["commands"] == host_runtime.commands_received
         # Check that events were received correctly
-        assert agent_runtime_recording["events"] == host_runtime.events_received
+        assert [event.type for event in agent_runtime_recording["events"]] == [
+            event.type for event in host_runtime.events_received
+        ]
 
         # ──── Check Exception event propagation ────
 

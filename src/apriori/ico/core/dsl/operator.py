@@ -8,7 +8,6 @@ from apriori.ico.core.types import (
     I,
     IcoNodeProtocol,
     IcoNodeType,
-    IcoOperatorProtocol,
     O,
 )
 
@@ -111,7 +110,7 @@ class IcoOperator(Generic[I, O]):
     def __call__(self, item: I) -> O:
         return self.fn(item)
 
-    def chain(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
+    def chain(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
         """Function chaining: (I → O, O → O2) == I → O2."""
 
         def chained_fn(x: I) -> O2:
@@ -125,11 +124,11 @@ class IcoOperator(Generic[I, O]):
             children=[self, other],
         )
 
-    def __or__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
+    def __or__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
         """Pipe composition: a | b == a.chain(b)."""
         return self.chain(other)
 
-    def map(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]:
+    def map(self) -> IcoOperator[Iterator[I], Iterator[O]]:
         """Apply this operator elementwise over an iterable (lazy generator):
         Iterable[I] → Iterable[O]
         """

@@ -5,9 +5,8 @@ from collections.abc import Callable
 from multiprocessing import Queue
 from typing import TYPE_CHECKING, Generic, cast, final
 
-from apriori.ico.core.dsl.operator import IcoOperator
 from apriori.ico.core.runtime.channels.channel import (
-    IcoSendEndpointMixin,
+    IcoSendEndpoint,
 )
 from apriori.ico.core.runtime.channels.messages import (
     AcknowledgePayload,
@@ -34,8 +33,7 @@ else:
 @final
 class MPQueueSendEndpoint(
     Generic[I],
-    IcoOperator[I, None],
-    IcoSendEndpointMixin,
+    IcoSendEndpoint[I],
     ProgressMixin,
 ):
     """

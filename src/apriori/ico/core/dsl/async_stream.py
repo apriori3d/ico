@@ -2,12 +2,16 @@ import asyncio
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Generic, TypeVar, final
 
+from apriori.ico.core.dsl.async_operator import IcoAsyncOperator
 from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.types import I, IcoOperatorProtocol, O
+from apriori.ico.core.types import (
+    I,
+    O,
+)
 
 
 @final
-class AsyncStream(
+class IcoAsyncStream(
     Generic[I, O],
     IcoOperator[Iterator[I], Iterator[O]],
 ):
@@ -39,7 +43,7 @@ class AsyncStream(
         "_next_index",
         "_ordering_buffer",
     )
-    operators: list[IcoOperatorProtocol[I, O]]
+    operators: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
     ordered: bool
     _num_executors: int
 
@@ -51,7 +55,7 @@ class AsyncStream(
 
     def __init__(
         self,
-        operators: Sequence[IcoOperatorProtocol[I, O]],
+        operators: Sequence[IcoOperator[I, O] | IcoAsyncOperator[I, O]],
         *,
         ordered: bool = False,
         name: str | None = None,
@@ -59,7 +63,7 @@ class AsyncStream(
         super().__init__(
             fn=self._run_stream,
             name=name or "async_stream",
-            children=operators,
+            children=[op for op in operators],
         )
         self.operators = list(operators)
         self.ordered = ordered
@@ -213,7 +217,7 @@ class AsyncStream(
 
     async def _execute_operator(
         self,
-        operator: IcoOperatorProtocol[I, O],
+        operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
         in_queue: asyncio.Queue[tuple[int, I] | None],
         out_queue: asyncio.Queue[tuple[int, O | Exception]],
     ) -> None:
@@ -241,11 +245,17 @@ class AsyncStream(
 
     # ─── Async operator execution ───
 
-    async def _call_async(self, worker: IcoOperatorProtocol[I, O], item: I) -> O:
+    async def _call_async(
+        self,
+        operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
+        item: I,
+    ) -> O:
         """Async wrapper around operator call (compatible with sync operators)."""
-        result = worker(item)
-        if asyncio.iscoroutine(result):
-            return await result
+        if isinstance(operator, IcoAsyncOperator):
+            result = await operator(item)
+        else:
+            result = await asyncio.to_thread(operator, item)
+
         return result
 
 
