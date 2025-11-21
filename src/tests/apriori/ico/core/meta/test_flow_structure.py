@@ -1,13 +1,13 @@
 import pytest
 
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.pipeline import IcoPipeline
-from apriori.ico.core.dsl.process import IcoProcess
-from apriori.ico.core.dsl.source import IcoSource
-from apriori.ico.core.dsl.stream import IcoStream
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
-from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.pipeline import IcoPipeline
+from apriori.ico.core.process import IcoProcess
+from apriori.ico.core.runtime.operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import IcoRuntimeStateType
+from apriori.ico.core.source import IcoSource
+from apriori.ico.core.stream import IcoStream
 from apriori.ico.core.types import IcoNodeType
 
 

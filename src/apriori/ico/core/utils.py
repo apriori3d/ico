@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from apriori.ico.core.meta.ico_form import infer_ico_form
-from apriori.ico.core.types import IcoOperatorProtocol
+from apriori.ico.core.types import IcoOperator
 
 
-def is_sink(node: IcoOperatorProtocol[Any, Any]) -> bool:
+def is_sink(node: IcoOperator[Any, Any]) -> bool:
     """
     Identify whether a node is a Sink (final consumer).
 
@@ -17,7 +17,7 @@ def is_sink(node: IcoOperatorProtocol[Any, Any]) -> bool:
     return form and form.i != "()" and form.o == "()"
 
 
-def is_source(node: IcoOperatorProtocol[Any, Any]) -> bool:
+def is_source(node: IcoOperator[Any, Any]) -> bool:
     """
     Identify whether a node is a Source (root emitter).
 

@@ -1,6 +1,6 @@
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.process import IcoProcess
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.types import IcoNodeType
 
 

@@ -8,10 +8,10 @@ from multiprocessing.context import SpawnProcess
 import pytest
 
 from apriori.ico.channels.mp_queue.channel import MPQueueChannel
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.source import IcoSource
-from apriori.ico.core.runtime.channels.types import IcoRuntimeChannelProtocol
-from apriori.ico.core.types import I, IcoOperatorProtocol, O
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.channel.types import IcoRuntimeChannelProtocol
+from apriori.ico.core.source import IcoSource
+from apriori.ico.core.types import I, IcoOperator, O
 
 # ───────────────────────────────────────────────
 # Helpers
@@ -20,7 +20,7 @@ from apriori.ico.core.types import I, IcoOperatorProtocol, O
 
 def agent(
     channel: IcoRuntimeChannelProtocol[I, O],
-    flow_factory: Callable[[], IcoOperatorProtocol[O, I]],
+    flow_factory: Callable[[], IcoOperator[O, I]],
     n: int = 1,
 ) -> None:
     """Simulated remote process executing receive → flow → send loop."""
@@ -65,7 +65,7 @@ def test_send_receive_roundtrip_flow_basic() -> None:
     process = start_mp_process_agent(channel.make_pair(), flow_identity)
 
     try:
-        flow = channel.send | channel.receive
+        flow = channel.output | channel.input
         result = flow(42)
         assert result == 42
     finally:
@@ -85,7 +85,7 @@ def test_send_receive_roundtrip_transform() -> None:
     process = start_mp_process_agent(channel.make_pair(), flow_double)
 
     try:
-        flow = channel.send | channel.receive
+        flow = channel.output | channel.input
         result = flow(21)
         assert result == 42
     finally:
@@ -106,7 +106,7 @@ def test_send_receive_multiple_items() -> None:
     process = start_mp_process_agent(channel.make_pair(), flow_double, n=num_queries)
 
     try:
-        flow = channel.send | channel.receive
+        flow = channel.output | channel.input
         results = [flow(i) for i in range(num_queries)]
         assert results == [i * 2 for i in range(num_queries)]
     finally:
@@ -122,7 +122,7 @@ def test_send_receive_stream() -> None:
 
     try:
         src = IcoSource(lambda _: iter(range(num_queries)))
-        flow = src | (channel.send | channel.receive).map()
+        flow = src | (channel.output | channel.input).map()
         results = list(flow(None))
         assert results == [i * 2 for i in range(num_queries)]
     finally:

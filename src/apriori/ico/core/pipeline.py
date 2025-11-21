@@ -3,15 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Generic, final
 
-from apriori.ico.core.dsl.operator import (
-    IcoOperator,
-)
-from apriori.ico.core.types import (
+from apriori.ico.core.operator import (
     C,
     I,
-    IcoNodeProtocol,
-    IcoNodeType,
+    IcoOperator,
     O,
+    wrap_operator,
 )
 
 
@@ -59,9 +56,9 @@ class IcoPipeline(
 
     __slots__ = ("context", "body", "output")
 
-    context: Callable[[I], C]
-    body: Sequence[Callable[[C], C]]
-    output: Callable[[C], O]
+    context: IcoOperator[I, C]
+    body: Sequence[IcoOperator[C, C]]
+    output: IcoOperator[C, O]
 
     def __init__(
         self,
@@ -74,28 +71,18 @@ class IcoPipeline(
         body_fn = body
         output_fn = output
 
-        # Collect children for ICO structure
-        children: list[IcoNodeProtocol] = []
-
-        if isinstance(context, IcoNodeProtocol):
-            children.append(context)
-
-        for step in body:
-            if isinstance(step, IcoNodeProtocol):
-                children.append(step)
-
-        if isinstance(output, IcoNodeProtocol):
-            children.append(output)
+        context = wrap_operator(context_fn)
+        body = [wrap_operator(step) for step in body_fn]
+        output = wrap_operator(output_fn)
 
         super().__init__(
             fn=self._run_pipeline,
-            name=name,
-            node_type=IcoNodeType.pipeline,
-            children=children,
+            name=name or "pipeline",
+            children=[context] + body + [output],
         )
-        self.context = context_fn
-        self.body = body_fn
-        self.output = output_fn
+        self.context = context
+        self.body = body
+        self.output = output
 
     def _run_pipeline(self, item: I) -> O:
         ctx = self.context(item)

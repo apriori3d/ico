@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from typing import Generic, final
 
-from apriori.ico.core.dsl.operator import (
+from apriori.ico.core.operator import (
+    I,
     IcoOperator,
+    O,
     wrap_operator,
 )
-from apriori.ico.core.types import I, IcoNodeType, IcoOperatorProtocol, O
 
 
 @final
@@ -29,7 +30,7 @@ class IcoStream(
 
     __slots__ = ("body",)
 
-    body: IcoOperatorProtocol[I, O]
+    body: IcoOperator[I, O]
 
     def __init__(
         self,
@@ -42,7 +43,6 @@ class IcoStream(
         super().__init__(
             fn=self._stream_fn,
             name=name,
-            node_type=IcoNodeType.stream,
             children=[body_op],
         )
         self.body = body_op

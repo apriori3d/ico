@@ -1,5 +1,5 @@
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.pipeline import IcoPipeline
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.pipeline import IcoPipeline
 
 IntPipeline = IcoPipeline[int, int, int]
 IntOperator = IcoOperator[int, int]

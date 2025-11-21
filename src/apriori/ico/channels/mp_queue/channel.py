@@ -3,18 +3,21 @@ from __future__ import annotations
 
 from multiprocessing import Queue
 from multiprocessing.context import SpawnContext
-from typing import TYPE_CHECKING, Generic, final
+from typing import TYPE_CHECKING, Generic, cast, final
 
 from apriori.ico.channels.mp_queue.receive_endpoint import (
     MPQueueReceiveEndpoint,
 )
 from apriori.ico.channels.mp_queue.send_endpoint import MPQueueSendEndpoint
-from apriori.ico.core.runtime.channels.channel import IcoRuntimeChannel
-from apriori.ico.core.runtime.channels.messages import (
+from apriori.ico.core.operator import I, O
+from apriori.ico.core.runtime.channel.channel import (
+    IcoReceiveEndpoint,
+    IcoRuntimeChannel,
+    IcoSendEndpoint,
+)
+from apriori.ico.core.runtime.channel.messages import (
     ChannelMessage,
 )
-from apriori.ico.core.runtime.types import IcoRuntimeCommandType
-from apriori.ico.core.types import I, O
 
 if TYPE_CHECKING:
     ChannelQueue = Queue[ChannelMessage]
@@ -28,92 +31,80 @@ class MPQueueChannel(
     IcoRuntimeChannel[I, O],
 ):
     __slots__ = (
-        "mp_context",
-        "_send",
-        "_receive",
-        "_in_queue",
-        "_out_queue",
-        "_in_ack_queue",
-        "_out_ack_queue",
+        "_mp_context",
+        "output",
+        "input",
         "_queues_owned",
+        "_input_queue",
+        "_output_queue",
+        "_input_ack_queue",
+        "_output_ack_queue",
     )
 
-    mp_context: SpawnContext
-    _send: MPQueueSendEndpoint[I]
-    _receive: MPQueueReceiveEndpoint[O]
+    output: IcoSendEndpoint[I]
+    input: IcoReceiveEndpoint[O]
 
-    _in_queue: ChannelQueue
-    _out_queue: ChannelQueue
-    _in_ack_queue: ChannelQueue
-    _out_ack_queue: ChannelQueue
+    _mp_context: SpawnContext
+    _input_queue: ChannelQueue
+    _input_ack_queue: ChannelQueue
+    _output_queue: ChannelQueue
+    _output_ack_queue: ChannelQueue
     _queues_owned: bool
 
     def __init__(
         self,
         mp_context: SpawnContext,
-        in_queue: ChannelQueue | None = None,
-        out_queue: ChannelQueue | None = None,
-        in_ack_queue: ChannelQueue | None = None,
-        out_ack_queue: ChannelQueue | None = None,
-        queues_owned: bool = True,
-        name: str | None = None,
+        input_queue: ChannelQueue | None = None,
+        input_ack_queue: ChannelQueue | None = None,
+        output_queue: ChannelQueue | None = None,
+        output_ack_queue: ChannelQueue | None = None,
     ) -> None:
-        in_queue = in_queue or mp_context.Queue()
-        out_queue = out_queue or mp_context.Queue()
-        in_ack_queue = in_ack_queue or mp_context.Queue()
-        out_ack_queue = out_ack_queue or mp_context.Queue()
+        if input_queue and output_queue and input_ack_queue and output_ack_queue:
+            self._input_queue = input_queue
+            self._output_queue = output_queue
+            self._input_ack_queue = input_ack_queue
+            self._output_ack_queue = output_ack_queue
+            self._queues_owned = False
+        elif (
+            not input_queue
+            and not output_queue
+            and not input_ack_queue
+            and not output_ack_queue
+        ):
+            self._input_queue = cast(ChannelQueue, mp_context.Queue())
+            self._output_queue = cast(ChannelQueue, mp_context.Queue())
+            self._input_ack_queue = cast(ChannelQueue, mp_context.Queue())
+            self._output_ack_queue = cast(ChannelQueue, mp_context.Queue())
+            self._queues_owned = True
+        else:
+            raise ValueError(
+                "Either provide all queues or none when initializing MPQueueChannel."
+            )
 
         # Define endpoints
-        send = MPQueueSendEndpoint[I](
-            main_queue=out_queue,
-            ack_queue=out_ack_queue,
-            name=f"{name}_send_endpoint" if name else None,
-        )
+        self.output = MPQueueSendEndpoint[I](self._output_queue, self._output_ack_queue)
+        self.input = MPQueueReceiveEndpoint[O](self._input_queue, self._input_ack_queue)
+        self._mp_context = mp_context
 
-        receive = MPQueueReceiveEndpoint[O](
-            main_queue=in_queue,
-            ack_queue=in_ack_queue,
-            name=f"{name}_receive_endpoint" if name else None,
-        )
-
-        super().__init__(
-            send=send,
-            receive=receive,
-            name=name or "mp_queue_channel",
-        )
-        self.mp_context = mp_context
-        self._send = send
-        self._receive = receive
-        self._in_queue = in_queue
-        self._out_queue = out_queue
-        self._in_ack_queue = in_ack_queue
-        self._out_ack_queue = out_ack_queue
-        self._queues_owned = queues_owned
-
-    def on_command(self, command: IcoRuntimeCommandType) -> None:
-        super().on_command(command)
-
-        # Handle close command, if queues were created by this channel,
-        # the opposite case is the detached copy used in another process
-        if command == IcoRuntimeCommandType.deactivate and self._queues_owned:
-            self._in_queue.close()
-            self._in_queue.join_thread()
-            self._out_queue.close()
-            self._out_queue.join_thread()
-            self._in_ack_queue.close()
-            self._in_ack_queue.join_thread()
-            self._out_ack_queue.close()
-            self._out_ack_queue.join_thread()
+    def close(self) -> None:
+        """Close owned queues."""
+        if self._queues_owned:
+            self._input_queue.close()
+            self._input_queue.join_thread()
+            self._output_queue.close()
+            self._output_queue.join_thread()
+            self._input_ack_queue.close()
+            self._input_ack_queue.join_thread()
+            self._output_ack_queue.close()
+            self._output_ack_queue.join_thread()
 
     def make_pair(self) -> MPQueueChannel[O, I]:
         """Create a paired channel for the opposite endpoint roles."""
 
         return MPQueueChannel[O, I](
-            mp_context=self.mp_context,
-            in_queue=self._out_queue,
-            out_queue=self._in_queue,
-            in_ack_queue=self._out_ack_queue,
-            out_ack_queue=self._in_ack_queue,
-            queues_owned=False,
-            name=f"{self.name}_pair",
+            mp_context=self._mp_context,
+            input_queue=self._output_queue,
+            input_ack_queue=self._output_ack_queue,
+            output_queue=self._input_queue,
+            output_ack_queue=self._input_ack_queue,
         )

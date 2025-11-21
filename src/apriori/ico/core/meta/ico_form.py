@@ -13,11 +13,11 @@ from typing import (
     get_type_hints,
 )
 
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.pipeline import IcoPipeline
-from apriori.ico.core.dsl.process import IcoProcess
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.pipeline import IcoPipeline
+from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.types import (
-    IcoNodeProtocol,
+    IcoNode,
     IcoNodeType,
 )
 
@@ -39,7 +39,7 @@ class IcoForm:
             return f"{self.i} → {self.c} → {self.o}"
 
     @staticmethod
-    def from_operator(operator: IcoNodeProtocol) -> IcoForm:
+    def from_operator(operator: IcoNode) -> IcoForm:
         return infer_ico_form(operator)
 
 
@@ -56,7 +56,7 @@ def infer_ico_form(obj: Any) -> IcoForm:
     """
 
     # 1) Try match by structural node type first (map, stream, pipeline, etc.)
-    if isinstance(obj, IcoNodeProtocol):
+    if isinstance(obj, IcoNode):
         ico_form = infer_ico_form_by_node_type(obj)
         if ico_form:
             return ico_form
@@ -83,7 +83,7 @@ def infer_ico_form(obj: Any) -> IcoForm:
 # ──── Generic inference helper ────
 
 
-def infer_ico_form_by_node_type(operator: IcoNodeProtocol) -> IcoForm | None:
+def infer_ico_form_by_node_type(operator: IcoNode) -> IcoForm | None:
     match operator.node_type:
         # Structural composition nodes
 

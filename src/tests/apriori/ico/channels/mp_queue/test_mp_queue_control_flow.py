@@ -9,13 +9,13 @@ from typing import Any
 import pytest
 
 from apriori.ico.channels.mp_queue.channel import MPQueueChannel
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
+from apriori.ico.core.runtime.operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
-    IcoRuntimeEventProtocol,
+    IcoRuntimeEvent,
 )
 
 # ───────────────────────────────────────────────
@@ -27,7 +27,7 @@ class ControlFlowTestingRuntime(IcoRuntimeOperator):
     """Runtime that records received commands and events for testing."""
 
     commands_received: list[IcoRuntimeCommandType]
-    events_received: list[IcoRuntimeEventProtocol]
+    events_received: list[IcoRuntimeEvent]
 
     def __init__(self):
         super().__init__()
@@ -38,7 +38,7 @@ class ControlFlowTestingRuntime(IcoRuntimeOperator):
         # Echo command back through send endpoint
         self.commands_received.append(command)
 
-    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> None:
         self.events_received.append(event)
 
 
@@ -70,7 +70,7 @@ def recording_agent(
 
     # Create agent flow to record and report commands/events
     reporting_operator = IcoOperator[str, dict[str, Any]](reporting_fn)
-    closure = channel.receive | reporting_operator | channel.send
+    closure = channel.input | reporting_operator | channel.output
 
     # Execute the agent closure
     run_num = 1
@@ -80,7 +80,7 @@ def recording_agent(
             run_num += 1
         except IcoRuntimeError as e:
             # Send exception event back to host runtime
-            channel.send.on_event(IcoRuntimeEvent.exception(e))
+            channel.output.on_event(IcoRuntimeEvent.exception(e))
 
 
 # ───────────────────────────────────────────────
@@ -121,7 +121,7 @@ def test_runtime_flow_propagation() -> None:
         host_runtime.activate().pause().resume()
 
         # Send 'report' to agent to get back recorded commands and events
-        flow = channel.send | channel.receive
+        flow = channel.output | channel.input
 
         # ──── Check commands and events propagation ────
 

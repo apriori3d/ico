@@ -2,12 +2,8 @@ import asyncio
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Generic, TypeVar, final
 
-from apriori.ico.core.dsl.async_operator import IcoAsyncOperator
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.types import (
-    I,
-    O,
-)
+from apriori.ico.core.async_operator import IcoAsyncOperator
+from apriori.ico.core.operator import I, IcoOperator, O
 
 
 @final

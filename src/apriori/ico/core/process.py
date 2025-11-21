@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Generic, final
 
-from apriori.ico.core.dsl.operator import (
+from apriori.ico.core.operator import (
+    C,
     IcoOperator,
+    wrap_operator,
 )
-from apriori.ico.core.types import C, IcoNodeProtocol, IcoNodeType
 
 
 @final
@@ -37,8 +38,8 @@ class IcoProcess(
 
     __slots__ = ("num_iterations", "body")
 
-    body: Callable[[C], C]
     num_iterations: int
+    body: Callable[[C], C]
 
     def __init__(
         self,
@@ -47,17 +48,17 @@ class IcoProcess(
         name: str | None = None,
     ):
         body_fn = body
+        body = wrap_operator(body)
 
         super().__init__(
-            fn=body,
-            name=name,
-            node_type=IcoNodeType.process,
-            children=[body] if isinstance(body, IcoNodeProtocol) else [],
+            fn=self._process_fn,
+            name=name or "process",
+            children=[body],
         )
         self.body = body_fn
         self.num_iterations = num_iterations
 
-    def __call__(self, context: C) -> C:
+    def _process_fn(self, context: C) -> C:
         for _ in range(self.num_iterations):
-            context = self.fn(context)
+            context = self.body(context)
         return context

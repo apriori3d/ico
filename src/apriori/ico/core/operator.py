@@ -1,22 +1,31 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import Generic, overload
+from typing import Generic, TypeVar, overload
 
-from apriori.ico.core.types import (
-    O2,
-    I,
-    IcoNodeProtocol,
-    IcoNodeType,
-    O,
-)
+from apriori.ico.core.node import IcoNode
+from apriori.ico.core.runtime.contour import IcoRuntimeContour
+
+# ────────────────────────────────────────────────
+# Generic type variables for ICO model
+# ────────────────────────────────────────────────
+
+I = TypeVar("I")  # noqa: E741
+C = TypeVar("C")
+O = TypeVar("O")  # noqa: E741
+
+
+# variables for composition
+I2 = TypeVar("I2")
+O2 = TypeVar("O2")
+
 
 # ────────────────────────────────────────────────
 # Operator Class
 # ────────────────────────────────────────────────
 
 
-class IcoOperator(Generic[I, O]):
+class IcoOperator(Generic[I, O], IcoNode):
     """
     An atomic transformation unit following the ICO convention.
 
@@ -60,89 +69,60 @@ class IcoOperator(Generic[I, O]):
 
     fn: Callable[[I], O]
 
-    # IcoNodeProtocol attributes
-    name: str
-    node_type: IcoNodeType
-    _parent: IcoNodeProtocol | None
-    children: Sequence[IcoNodeProtocol]
-
     def __init__(
         self,
         fn: Callable[[I], O],
         *,
         name: str | None = None,
-        node_type: IcoNodeType = IcoNodeType.operator,
-        children: Sequence[IcoNodeProtocol] | None = None,
+        parent: IcoNode | None = None,
+        children: Sequence[IcoNode] | None = None,
     ):
-        super().__init__()
+        super().__init__(
+            name=name,
+            parent=parent,
+            children=children,
+        )
         self.fn = fn
 
-        self.name = (
-            name or self.fn.__name__
-            if hasattr(self.fn, "__name__")
-            else fn.__class__.__name__
-        )
-        self.node_type = node_type
-        self._parent = None
-        self.children = children or []
-        for child in self.children:
-            child.parent = self
+        if name is None and hasattr(fn, "__name__"):
+            self.name = fn.__name__
 
     def __str__(self) -> str:
         return self.name
 
-    # ────────────────────────────────────────────────
-    # IcoTree Protocol
-    # ────────────────────────────────────────────────
-
-    @property
-    def parent(self) -> IcoNodeProtocol | None:
-        return self._parent
-
-    @parent.setter
-    def parent(self, value: IcoNodeProtocol | None) -> None:
-        self._parent = value
-
-    # ────────────────────────────────────────────────
-    # Computation Protocols
-    # ────────────────────────────────────────────────
-
     def __call__(self, item: I) -> O:
         return self.fn(item)
 
+    # ──── Runtime API interface ────
+
+    def runtime(self) -> IcoRuntimeContour:
+        """Create a runtime contour wrapping this operator as a closure."""
+        from apriori.ico.core.runtime.contour import IcoRuntimeContour
+
+        # TODO: check ICO form compatibility
+        return IcoRuntimeContour(closure=self)  # pyright: ignore[reportArgumentType]
+
+    # ────────────────────────────────────────────────
+    # Compositions Protocols
+    # ────────────────────────────────────────────────
+
     def chain(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
         """Function chaining: (I → O, O → O2) == I → O2."""
+        from apriori.ico.core.chain import chain
 
-        def chained_fn(x: I) -> O2:
-            output = self(x)
-            return other(output)
-
-        return IcoOperator[I, O2](
-            fn=chained_fn,
-            name="chain",
-            node_type=IcoNodeType.chain,
-            children=[self, other],
-        )
+        return chain(self, other)
 
     def __or__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
         """Pipe composition: a | b == a.chain(b)."""
         return self.chain(other)
 
-    def map(self) -> IcoOperator[Iterator[I], Iterator[O]]:
+    def iterate(self) -> IcoOperator[Iterator[I], Iterator[O]]:
         """Apply this operator elementwise over an iterable (lazy generator):
         Iterable[I] → Iterable[O]
         """
+        from apriori.ico.core.iterate import iterate
 
-        return IcoOperator[Iterator[I], Iterator[O]](
-            fn=self._map_fn,
-            name="map",
-            node_type=IcoNodeType.map,
-            children=[self],
-        )
-
-    def _map_fn(self, items: Iterator[I]) -> Iterator[O]:
-        for item in items:
-            yield self(item)
+        return iterate(self)
 
 
 # ────────────────────────────────────────────────

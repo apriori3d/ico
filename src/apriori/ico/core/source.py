@@ -1,8 +1,10 @@
 from collections.abc import Callable, Iterator
 from typing import Generic, final
 
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.types import IcoNodeType, O
+from apriori.ico.core.operator import (
+    IcoOperator,
+    O,
+)
 
 
 @final
@@ -35,9 +37,8 @@ class IcoSource(
         super().__init__(
             fn=generator,
             name=name,
-            node_type=IcoNodeType.source,
             children=[],
         )
 
-    def __call__(self, item: None = None) -> Iterator[O]:
+    def __call__(self, _: None = None) -> Iterator[O]:
         yield from self.fn(None)

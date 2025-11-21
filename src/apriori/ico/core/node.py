@@ -1,12 +1,28 @@
-# ────────────────────────────────────────────────
-# Tree traversal Utilities
-# ────────────────────────────────────────────────
+from __future__ import annotations
 
-
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any
 
-from apriori.ico.core.types import IcoNodeProtocol
+
+class IcoNode:
+    """Structural attributes for graph representation of ICO operators."""
+
+    name: str
+    parent: IcoNode | None
+    children: Sequence[IcoNode]
+
+    def __init__(
+        self,
+        name: str | None = None,
+        parent: IcoNode | None = None,
+        children: Sequence[IcoNode] | None = None,
+    ) -> None:
+        self.name = name or self.__class__.__name__
+        self.parent = parent
+        self.children = children or []
+
+        for child in self.children:
+            child.parent = self
 
 
 class IcoTypeInfo:
@@ -22,15 +38,14 @@ class IcoTypeInfo:
         *args: Any,
         **kwargs: Any,
     ):
-        super().__init__(*args, **kwargs)
         self.ico_input = i
         self.ico_context = c
         self.ico_output = o
 
 
 def iterate_nodes(
-    node: IcoNodeProtocol,
-) -> Iterator[IcoNodeProtocol]:
+    node: IcoNode,
+) -> Iterator[IcoNode]:
     """Recursively yield all children operators in the flow tree."""
     yield node
     for c in node.children:
@@ -38,8 +53,8 @@ def iterate_nodes(
 
 
 def iterate_parents(
-    node: IcoNodeProtocol,
-) -> Iterator[IcoNodeProtocol]:
+    node: IcoNode,
+) -> Iterator[IcoNode]:
     """Recursively yield all parent operators in the flow tree."""
     if node.parent is None:
         return

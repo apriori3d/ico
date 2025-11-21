@@ -1,21 +1,28 @@
 from __future__ import annotations
 
 import traceback
-from typing import Any
+from enum import Enum, auto
 
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.types import IcoRuntimeEventType
+
+# ──── Event types for runtime signaling ────
+
+
+class IcoRuntimeEventType(Enum):
+    fault = auto()
+    heartbeat = auto()
 
 
 class IcoRuntimeEvent:
     __slots__ = ("type", "meta")
+
     type: IcoRuntimeEventType
-    meta: dict[Any, Any]
+    meta: dict[str, str]
 
     def __init__(
         self,
         type: IcoRuntimeEventType,
-        meta: dict[Any, Any] | None = None,
+        meta: dict[str, str] | None = None,
     ) -> None:
         self.type = type
         self.meta = meta or {}

@@ -4,11 +4,11 @@ from collections.abc import Iterator
 from typing import final
 
 from apriori.ico.core.meta.ico_form import IcoForm
+from apriori.ico.core.node import IcoNodeType, IcoOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeOperatorProtocol,
     IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoNodeProtocol, IcoNodeType, IcoOperatorProtocol
 
 
 @final
@@ -65,14 +65,14 @@ class IcoFlowMeta:
     # ─── Factory helpers ───
 
     @staticmethod
-    def from_operator(operator: IcoNodeProtocol) -> IcoFlowMeta:
+    def from_operator(operator: IcoNode) -> IcoFlowMeta:
         """Recursively build an IcoFlow from an operator tree."""
         runtime_state = (
             operator.state if isinstance(operator, IcoRuntimeOperatorProtocol) else None
         )
         ico_form = IcoForm.from_operator(operator)
 
-        if not isinstance(operator, IcoOperatorProtocol):
+        if not isinstance(operator, IcoOperator):
             return IcoFlowMeta(
                 name=operator.name,
                 node_type=IcoNodeType.unknown,

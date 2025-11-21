@@ -5,10 +5,8 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any, ClassVar
 
-from apriori.ico.core.runtime.types import (
-    IcoRuntimeCommandType,
-    IcoRuntimeEventProtocol,
-)
+from apriori.ico.core.runtime.command import IcoRuntimeCommand
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 
 # ──────────────────────────────────────────────────────────────
 # Message categories
@@ -79,7 +77,7 @@ class InputPayload(ChannelMessagePayload):
 class RuntimeCommandPayload(ChannelMessagePayload):
     """Payload carrying a runtime command (activate/reset/stop)."""
 
-    command: IcoRuntimeCommandType
+    command: IcoRuntimeCommand
 
 
 @message(ChannelMessageType.runtime_event)
@@ -87,7 +85,7 @@ class RuntimeCommandPayload(ChannelMessagePayload):
 class RuntimeEventPayload(ChannelMessagePayload):
     """Payload carrying runtime events (faults, progress, etc.)."""
 
-    event: IcoRuntimeEventProtocol
+    event: IcoRuntimeEvent
 
 
 @message(ChannelMessageType.acknowledge)
@@ -96,14 +94,6 @@ class AcknowledgePayload(ChannelMessagePayload):
     """Acknowledgment of a received message."""
 
     ack_message_type: ChannelMessageType
-
-
-# @message(ChannelMessageType.error)
-# @dataclass(slots=True)
-# class ErrorPayload(ChannelMessagePayload):
-#     """Error payload for propagating runtime exceptions."""
-
-#     error: str
 
 
 # ──────────────────────────────────────────────────────────────

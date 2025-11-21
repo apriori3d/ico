@@ -8,10 +8,10 @@ from multiprocessing.context import SpawnProcess
 import pytest
 
 from apriori.ico.channels.mp_queue.channel import MPQueueChannel
-from apriori.ico.core.dsl.async_stream import IcoAsyncStream
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.source import IcoSource
-from apriori.ico.core.runtime.channels.channel import IcoRuntimeChannel
+from apriori.ico.core.async_stream import IcoAsyncStream
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.channel.channel import IcoRuntimeChannel
+from apriori.ico.core.source import IcoSource
 from apriori.ico.core.types import I, O
 
 # ───────────────────────────────────────────────
@@ -26,7 +26,7 @@ def agent(
 ) -> None:
     """Simulated remote process executing receive → flow → send loop."""
     flow = flow_factory()
-    closure = channel.receive | flow | channel.send
+    closure = channel.input | flow | channel.output
     count = 0
     while count < n:
         closure(None)
@@ -73,7 +73,7 @@ def test_single_mp_process_round_trip() -> None:
     process = start_mp_process_agent(channel.make_pair(), flow_double, n=num)
     data = list(range(1, num + 1))
     try:
-        mp_flow = channel.send | channel.receive
+        mp_flow = channel.output | channel.input
         source = IcoSource(lambda _: iter(data))
         flow = source | IcoAsyncStream([mp_flow])
         result = list(flow(None))
@@ -94,7 +94,7 @@ def create_mp_process(
     for flow in flows:
         channel = MPQueueChannel[I, O](get_context("spawn"))
         process = start_mp_process_agent(channel.make_pair(), flow, n=num)
-        mp_flow = channel.send | channel.receive
+        mp_flow = channel.output | channel.input
         mp_processes.append(process)
         mp_flows.append(mp_flow)
 

@@ -5,10 +5,10 @@ from collections.abc import Iterable
 
 import pytest
 
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.sink import IcoSink
-from apriori.ico.core.dsl.source import IcoSource
-from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.operator import IcoRuntimeOperator
+from apriori.ico.core.sink import IcoSink
+from apriori.ico.core.source import IcoSource
 from apriori.ico.core.types import I
 
 

@@ -1,21 +1,20 @@
-# tests/test_mp_process_agent.py
 from __future__ import annotations
 
 import time
 
 import pytest
 
-from apriori.ico.agents.mp_process.agent_host import (
-    MPProcessAgentHost,
+from apriori.ico.agents.mp_process.mp_process import (
+    MPProcess,
     mp_process,
 )
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
+from apriori.ico.core.runtime.operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
-    IcoRuntimeEventProtocol,
+    IcoRuntimeEvent,
     IcoRuntimeEventType,
 )
 
@@ -36,15 +35,16 @@ def op_double() -> FloatOperator:
     return FloatOperator(lambda x: x * 2)
 
 
-def op_fail_on(value_to_fail: float) -> FloatOperator:
-    """Fail when receiving the specified value."""
+def op_fail_factory() -> FloatOperator:
+    """Fail when receiving the value three."""
+    return FloatOperator(op_fail_on_three)
 
-    def fail_on_fn(x: float) -> float:
-        if x == value_to_fail:
-            raise IcoRuntimeError("boom")
-        return x
 
-    return FloatOperator(fail_on_fn)
+def op_fail_on_three(x: float) -> float:
+    """Fail when receiving the value three."""
+    if x == 3:
+        raise IcoRuntimeError("boom")
+    return x
 
 
 # ───────────────────────────────────────────────
@@ -66,7 +66,7 @@ class RecordingRuntime(IcoRuntimeOperator):
     def on_command(self, command: IcoRuntimeCommandType) -> None:
         self.commands.append(command)
 
-    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> None:
         self.events.append(event.type)
 
 
@@ -78,10 +78,10 @@ class RecordingRuntime(IcoRuntimeOperator):
 def test_agent_basic_roundtrip() -> None:
     """Agent spawned by MPProcessAgentHost should process data using remote flow."""
 
-    host = MPProcessAgentHost[float, float].create(op_double)
-    host.activate()  # spawn agent process
+    host = MPProcess[float, float].create(op_double)
+    host.activate()
 
-    flow = host.channel.send | host.channel.receive
+    flow = host._channel.output | host._channel.receive
     result = flow(21)
     assert result == 42
     host.deactivate()  # must stop remote agent
@@ -95,15 +95,15 @@ def test_agent_basic_roundtrip() -> None:
 def test_agent_multiple_items():
     """Agent should correctly process multiple items in sequence."""
 
-    host = MPProcessAgentHost[float, float].create(op_double)
+    host = MPProcess[float, float].create(op_double)
     host.activate()
 
     try:
-        flow = host.channel.send | host.channel.receive
+        flow = host._channel.output | host._channel.receive
         results = [flow(i) for i in range(5)]
         assert results == [i * 2 for i in range(5)]
     finally:
-        host.deactivate()
+        host._channel.deactivate()
 
 
 # ───────────────────────────────────────────────
@@ -114,9 +114,9 @@ def test_agent_multiple_items():
 def test_agent_exception_propagation():
     """If agent raises IcoRuntimeError, host should receive corresponding runtime event."""
 
-    host = MPProcessAgentHost[float, float].create(lambda: op_fail_on(3))
+    host = MPProcess[float, float].create(op_fail_factory)
     host.activate()
-    flow = host.channel.send | host.channel.receive
+    flow = host._channel.output | host._channel.receive
 
     # normal items ok
     assert flow(1) == 1
@@ -138,21 +138,20 @@ def test_agent_command_propagation():
     """activate/pause/resume/deactivate should propagate to agent runtime."""
 
     # Attach recording runtime to channel
-    host_runtime = RecordingRuntime()
+    end_runtime = RecordingRuntime()
 
-    host = MPProcessAgentHost[float, float].create(op_identity)
-    host.channel.connect_runtime(host_runtime)
+    host = MPProcess[float, float].create(op_identity)
+    host.connect_runtime(end_runtime)
 
-    host.activate()
-    host.pause()
-    host.resume()
-    host.deactivate()
+    # channel is a parent runtime of the agent host runtime
+    host._channel.activate().pause().resume().deactivate()
 
     # Agent receives commands in same order
-    assert host_runtime.commands[:3] == [
+    assert end_runtime.commands == [
         IcoRuntimeCommandType.activate,
         IcoRuntimeCommandType.pause,
         IcoRuntimeCommandType.resume,
+        IcoRuntimeCommandType.deactivate,
     ]
 
 
@@ -164,20 +163,20 @@ def test_agent_command_propagation():
 def test_agent_event_propagation():
     """Agent should bubble events back to host runtime."""
 
-    host_runtime = RecordingRuntime()
-    host = MPProcessAgentHost[float, float].create(op_identity)
-    host_runtime.connect_runtime(host)
+    first_runtime = RecordingRuntime()
+    host = MPProcess[float, float].create(op_identity)
+    first_runtime.connect_runtime(host._channel)
 
-    host.activate()
+    first_runtime.activate()
     # flow = host.channel.send | host.channel.receive
 
     # Agent echoes heartbeat event manually
-    host.channel.bubble_event(IcoRuntimeEvent.heartbeat())
+    host._channel.bubble_event(IcoRuntimeEvent.heartbeat())
 
     # produce/consume one item to flush internal queues
     # flow(123)
 
-    assert IcoRuntimeEvent.heartbeat().type in host_runtime.events
+    assert IcoRuntimeEvent.heartbeat().type in first_runtime.events
 
     host.deactivate()
 
@@ -190,13 +189,19 @@ def test_agent_event_propagation():
 def test_agent_mp_process_end_to_end():
     """Portal wiring must allow transparent remote computation."""
 
+    collected: list[str] = []
+
+    def collect_output(x: float) -> None:
+        collected.append(f"Received {x}")
+
     src = IcoOperator[None, float](lambda _: 7)
-    dst = IcoOperator[float, str](lambda x: f"Received {x}")
+    dst = IcoOperator[float, None](collect_output)
 
     flow = src | mp_process(op_double) | dst
-    result = flow(None)
+    runtime = IcoRuntimeOperator(flow)
+    runtime.activate().run().deactivate()
 
-    assert result == "Received 14"
+    assert collected == ["Received 14"]
 
 
 # ───────────────────────────────────────────────
@@ -207,18 +212,18 @@ def test_agent_mp_process_end_to_end():
 def test_agent_clean_shutdown():
     """Agent spawned by host should terminate on deactivate."""
 
-    host = MPProcessAgentHost[float, float].create(op_identity)
+    host = MPProcess[float, float].create(op_identity)
     host.activate()
 
-    assert host.agent_process is not None
-    assert host.agent_process.is_alive()
+    assert host._agent_process is not None
+    assert host._agent_process.is_alive()
 
     host.deactivate()
 
     # give process time to shut down
     time.sleep(0.1)
 
-    assert not host.agent_process.is_alive(), "Agent process did not exit cleanly"
+    assert not host._agent_process.is_alive(), "Agent process did not exit cleanly"
 
 
 if __name__ == "__main__":

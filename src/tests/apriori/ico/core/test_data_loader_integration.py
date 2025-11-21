@@ -1,10 +1,10 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.dsl.operator import IcoOperator
-from apriori.ico.core.dsl.pipeline import IcoPipeline
-from apriori.ico.core.dsl.source import IcoSource
-from apriori.ico.core.dsl.stream import IcoStream
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.pipeline import IcoPipeline
+from apriori.ico.core.source import IcoSource
+from apriori.ico.core.stream import IcoStream
 from apriori.ico.core.types import IcoNodeType
 
 Batch = Iterator[int]

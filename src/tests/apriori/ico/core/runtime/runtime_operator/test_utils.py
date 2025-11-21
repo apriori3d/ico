@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from apriori.ico.core.runtime.runtime_operator import IcoRuntimeOperator
+from apriori.ico.core.runtime.operator import IcoRuntimeOperator
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
-    IcoRuntimeEventProtocol,
+    IcoRuntimeEvent,
     IcoRuntimeStateType,
 )
-from apriori.ico.core.types import IcoNodeProtocol
 
 
 class StateRecordingRuntime(IcoRuntimeOperator):
@@ -18,7 +17,7 @@ class StateRecordingRuntime(IcoRuntimeOperator):
         self,
         fn: Callable[[None], None],
         *,
-        children: Sequence[IcoNodeProtocol] | None = None,
+        children: Sequence[IcoNode] | None = None,
         name: str | None = None,
     ) -> None:
         self.states = []
@@ -46,12 +45,12 @@ class ControlRecordingRuntime(IcoRuntimeOperator):
             name=name,
         )
         self.received_commands: list[IcoRuntimeCommandType] = []
-        self.received_events: list[IcoRuntimeEventProtocol] = []
+        self.received_events: list[IcoRuntimeEvent] = []
 
     def on_command(self, command: IcoRuntimeCommandType) -> None:
         super().on_command(command)
         self.received_commands.append(command)
 
-    def on_event(self, event: IcoRuntimeEventProtocol) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> None:
         super().on_event(event)
         self.received_events.append(event)
