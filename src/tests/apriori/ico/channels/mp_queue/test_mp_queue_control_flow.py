@@ -8,7 +8,6 @@ from typing import Any
 
 import pytest
 
-from apriori.ico.channels.mp_queue.channel import MPQueueChannel
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
@@ -17,6 +16,7 @@ from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
     IcoRuntimeEvent,
 )
+from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 # ───────────────────────────────────────────────
 #  Helpers

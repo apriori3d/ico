@@ -4,12 +4,12 @@ from collections.abc import Callable
 from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Generic, final
 
-from apriori.ico.channels.mp_queue.channel import MPQueueChannel
 from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
+from apriori.ico.core.runtime.channel.utils import wait_for_output
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
+from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 
 @final
@@ -53,41 +53,33 @@ class MPProcessAgent(
             - reset
             - deactivate
         """
+
         while True:
             try:
-                # Execute the contour (receive → flow → send)
                 # Blocks internally until new input arrives in the input channel.
 
-                # Block until new input item is available
-                self._set_state(IcoRuntimeState.waiting)
-                input = self._channel.input.receive()
-
-                self._set_state(IcoRuntimeState.running)
-
-                if isinstance(input, IcoRuntimeCommand):
-                    # Handle runtime commands - broadcast to downstream nodes
-                    self.on_command(input)
-
-                    if input.type == IcoRuntimeCommandType.deactivate:
-                        return  # Exit loop on deactivate command
-
-                    continue  # Wait for actual input item
-
-                if isinstance(input, IcoRuntimeEvent):
-                    raise RuntimeError(
-                        f"Runtime events ({input}) can not be send to agent runtime ({self.name})"
-                    )
+                result = wait_for_output(
+                    self,
+                    self._channel.input,
+                    accept_events=False,
+                )
+                if result is None:
+                    break  # Exit loop on deactivate command
 
                 # Process input item through flow
-                output = self._flow(input)
+                self.state = IcoRuntimeState.running
+                output = self._flow(result)
 
                 # Send output item upstream
+                self.state = IcoRuntimeState.sending
                 self._channel.output.send(output)
-                self._set_state(IcoRuntimeState.ready)
+
+                # Ready for the next item
+                self.state = IcoRuntimeState.ready
 
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
-                self._set_state(IcoRuntimeState.error)
+                self.state = IcoRuntimeState.fault
                 self.bubble_event(IcoRuntimeEvent.exception(e))
                 break
 

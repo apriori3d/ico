@@ -71,9 +71,9 @@ class IcoRuntimeContour(
 
     def run(self) -> IcoRuntimeContour:
         """Execute the entire runtime contour."""
-        self._set_state(IcoRuntimeState.running)
+        self.state = IcoRuntimeState.running
         self._contour_fn(None)
-        self._set_state(IcoRuntimeState.ready)
+        self.state = IcoRuntimeState.ready
         return self
 
     def _contour_fn(self, _: None) -> None:

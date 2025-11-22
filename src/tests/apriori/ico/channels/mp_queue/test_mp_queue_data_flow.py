@@ -7,11 +7,11 @@ from multiprocessing.context import SpawnProcess
 
 import pytest
 
-from apriori.ico.channels.mp_queue.channel import MPQueueChannel
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.channel.types import IcoRuntimeChannelProtocol
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.types import I, IcoOperator, O
+from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 # ───────────────────────────────────────────────
 # Helpers

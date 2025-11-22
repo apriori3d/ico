@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apriori.ico.core.runtime.events import IcoRuntimeEvent
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
 )

@@ -30,8 +30,9 @@ class IcoRuntimeState(Enum):
     ready = auto()
     waiting = auto()
     running = auto()
+    sending = auto()
     paused = auto()
-    error = auto()
+    fault = auto()
 
 
 COMMAND_TO_STATE = {
@@ -64,7 +65,7 @@ class IcoRuntimeNode(ABC):
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
     ) -> None:
         self.name = name or self.__class__.__name__
-        self._set_state(IcoRuntimeState.inactive)
+        self.state = IcoRuntimeState.inactive
         self._runtime_parent = runtime_parent
         self._runtime_children = (
             list(runtime_children) if runtime_children is not None else []
@@ -92,7 +93,8 @@ class IcoRuntimeNode(ABC):
         """Current runtime state of the operator."""
         return self._state
 
-    def _set_state(self, state: IcoRuntimeState) -> None:
+    @state.setter
+    def state(self, state: IcoRuntimeState) -> None:
         self._state = state
 
     @property
@@ -116,7 +118,7 @@ class IcoRuntimeNode(ABC):
         Subclasses may override to implement additional behavior
         (e.g., resource allocation, reset hooks, or teardown logic).
         """
-        self._set_state(COMMAND_TO_STATE.get(command.type, self._state))
+        self.state = COMMAND_TO_STATE.get(command.type, self._state)
         self._last_command = command
 
     def broadcast_command(

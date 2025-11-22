@@ -5,13 +5,14 @@ from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Generic, final
 
-from apriori.ico.agents.mp_process.mp_process_agent import MPProcessAgent
-from apriori.ico.channels.mp_queue.channel import MPQueueChannel
 from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.runtime.channel.utils import wait_for_output
 from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
+from apriori.ico.runtime.agents.mp_process.mp_process_agent import MPProcessAgent
+from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 
 @final
@@ -22,7 +23,7 @@ class MPProcess(
     ProgressMixin,
 ):
     flow_factory: Callable[[], IcoOperator[O, I]]
-    _channel: MPQueueChannel[I, O]
+    _channel: MPQueueChannel[I, O] | None
     _mp_context: SpawnContext
     _agent_process: SpawnProcess | None
 
@@ -32,10 +33,6 @@ class MPProcess(
         *,
         name: str | None = None,
     ) -> None:
-        mp_context = get_context("spawn")
-
-        channel = MPQueueChannel[I, O](mp_context)
-
         IcoRuntimeNode.__init__(self, name=name or "mp_process")
         IcoOperator[I, O].__init__(
             self,
@@ -46,45 +43,31 @@ class MPProcess(
         ProgressMixin.__init__(self)
 
         self.flow_factory = flow_factory
-        self._channel = channel
-        self._mp_context = mp_context
+        self._mp_context = get_context("spawn")
+        self._channel = None
         self._agent_process = None
 
-        # Connect to runtime port to enable event handling from downstream remote runtime
-        self._channel.input.runtime_port = self
-
-    def _portal_fn(self, item: I) -> O:
-        if self._state != IcoRuntimeState.ready:
-            raise RuntimeError(
-                "MPProcess agent is not ready. Call activate on runtime."
-            )
+    def _portal_fn(self, input: I) -> O:
+        assert self._state is IcoRuntimeState.ready
+        assert self._channel is not None
 
         try:
             # Send item to agent process
-            self._set_state(IcoRuntimeState.running)
-            self._channel.output.send(item)
+            self.state = IcoRuntimeState.running
+            self._channel.output.send(input)
 
             # Wait for result from agent process
-            self._set_state(IcoRuntimeState.waiting)
-            while True:
-                result = self._channel.input.receive()
-
-                # Process runtime commands/events
-                if isinstance(result, IcoRuntimeCommand):
-                    raise RuntimeError(
-                        f"Runtime commands ({result}) can not be send to agent host ({self.name}) runtime."
-                    )
-                if isinstance(result, IcoRuntimeEvent):
-                    self.bubble_event(result)
-                    continue  # Wait for actual result item
-
-                break  # Exit loop on valid result item
-
-            self._set_state(IcoRuntimeState.ready)
-            return result
+            output = wait_for_output(
+                self,
+                self._channel.input,
+                accept_commands=False,
+            )
+            # MPProcess should always receive an output here
+            assert output is not None
+            return output
 
         except Exception:
-            self._set_state(IcoRuntimeState.error)
+            self.state = IcoRuntimeState.fault
             raise
 
     def on_command(self, command: IcoRuntimeCommand) -> None:
@@ -92,20 +75,35 @@ class MPProcess(
 
         match command.type:
             case IcoRuntimeCommandType.activate:
+                assert self._channel is None
+
+                self._channel = MPQueueChannel[I, O](self._mp_context)
+                # Connect to runtime port to enable event handling from downstream remote runtime
+                self._channel.input.runtime_port = self
+
                 # Spawn agent before sending a command downstream
                 self._spawn_agent()
                 self._channel.output.send(command)
 
             case IcoRuntimeCommandType.deactivate:
-                # Send deactivate command downstream before shutting down agent
+                assert self._channel is not None
+
+                # Send deactivate command downstream before shutting down an agent
                 self._channel.output.send(command)
                 self._shutdown_agent()
+
+                # Close channel queues
+                self._channel.close()
+                self._channel = None
+
             case _:
                 pass
 
     # ─── Agent process management ───
 
     def _spawn_agent(self) -> None:
+        assert self._channel is not None
+
         self._agent_process = MPProcessAgent[O, I].spawn(
             channel=self._channel.make_pair(),  # Invert channel for agent
             flow_factory=self.flow_factory,
@@ -113,8 +111,8 @@ class MPProcess(
         )
 
     def _shutdown_agent(self) -> None:
-        if self._agent_process is None:
-            return
+        assert self._agent_process is not None
+
         try:
             # Gracefully join the worker process
             if self._agent_process.is_alive():

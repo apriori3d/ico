@@ -4,10 +4,6 @@ import time
 
 import pytest
 
-from apriori.ico.agents.mp_process.mp_process import (
-    MPProcess,
-    mp_process,
-)
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
@@ -16,6 +12,10 @@ from apriori.ico.core.runtime.types import (
     IcoRuntimeCommandType,
     IcoRuntimeEvent,
     IcoRuntimeEventType,
+)
+from apriori.ico.runtime.agents.mp_process.mp_process import (
+    MPProcess,
+    mp_process,
 )
 
 # ───────────────────────────────────────────────

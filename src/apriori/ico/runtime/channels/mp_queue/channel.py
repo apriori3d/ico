@@ -5,10 +5,6 @@ from multiprocessing import Queue
 from multiprocessing.context import SpawnContext
 from typing import Generic, final
 
-from apriori.ico.channels.mp_queue.receive_endpoint import (
-    MPQueueReceiveEndpoint,
-)
-from apriori.ico.channels.mp_queue.send_endpoint import MPQueueSendEndpoint
 from apriori.ico.core.operator import I, O
 from apriori.ico.core.runtime.channel.channel import (
     IcoReceiveEndpoint,
@@ -21,6 +17,10 @@ from apriori.ico.core.runtime.channel.messages import (
 )
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.runtime.channels.mp_queue.receive_endpoint import (
+    MPQueueReceiveEndpoint,
+)
+from apriori.ico.runtime.channels.mp_queue.send_endpoint import MPQueueSendEndpoint
 
 
 @final
@@ -47,7 +47,6 @@ class MPQueueChannel(
     _output_ack_queue: Queue[AcknowledgeChannelMessage]
     _input_queue: Queue[ChannelMessage[O | IcoRuntimeCommand | IcoRuntimeEvent]]
     _input_ack_queue: Queue[AcknowledgeChannelMessage]
-    _queues_owned: bool
 
     def __init__(
         self,
@@ -64,7 +63,6 @@ class MPQueueChannel(
             self._output_ack_queue = output_ack_queue
             self._input_queue = input_queue
             self._input_ack_queue = input_ack_queue
-            self._queues_owned = False
         elif (
             not input_queue
             and not output_queue
@@ -75,7 +73,6 @@ class MPQueueChannel(
             self._output_ack_queue = mp_context.Queue()
             self._input_queue = mp_context.Queue()
             self._input_ack_queue = mp_context.Queue()
-            self._queues_owned = True
         else:
             raise ValueError(
                 "Either provide all queues or none when initializing MPQueueChannel."
@@ -88,15 +85,15 @@ class MPQueueChannel(
 
     def close(self) -> None:
         """Close owned queues."""
-        if self._queues_owned:
-            self._input_queue.close()
-            self._input_queue.join_thread()
-            self._output_queue.close()
-            self._output_queue.join_thread()
-            self._input_ack_queue.close()
-            self._input_ack_queue.join_thread()
-            self._output_ack_queue.close()
-            self._output_ack_queue.join_thread()
+
+        self._input_queue.close()
+        self._input_queue.join_thread()
+        self._output_queue.close()
+        self._output_queue.join_thread()
+        self._input_ack_queue.close()
+        self._input_ack_queue.join_thread()
+        self._output_ack_queue.close()
+        self._output_ack_queue.join_thread()
 
     def make_pair(self) -> MPQueueChannel[O, I]:
         """Create a paired channel for the opposite endpoint roles."""
