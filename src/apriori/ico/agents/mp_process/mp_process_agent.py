@@ -6,9 +6,8 @@ from typing import Generic, final
 
 from apriori.ico.channels.mp_queue.channel import MPQueueChannel
 from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
+from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.exceptions import IcoStopExecutionSignal
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 
@@ -69,8 +68,7 @@ class MPProcessAgent(
                     # Handle runtime commands - broadcast to downstream nodes
                     self.on_command(input)
 
-                    if input == IcoRuntimeCommand.deactivate:
-                        self._set_state(IcoRuntimeState.inactive)
+                    if input.type == IcoRuntimeCommandType.deactivate:
                         return  # Exit loop on deactivate command
 
                     continue  # Wait for actual input item
@@ -84,13 +82,8 @@ class MPProcessAgent(
                 output = self._flow(input)
 
                 # Send output item upstream
-                self._channel.output.send_item(output)
+                self._channel.output.send(output)
                 self._set_state(IcoRuntimeState.ready)
-
-            except IcoStopExecutionSignal:
-                # Flow has completed naturally via runtime command deactivate
-                self._set_state(IcoRuntimeState.inactive)
-                break
 
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
@@ -101,8 +94,8 @@ class MPProcessAgent(
     def on_event(self, event: IcoRuntimeEvent) -> None:
         super().on_event(event)
 
-        # Forward event upstream
-        self._channel.output.send_event(event)
+        # Send event to upstream runtime
+        self._channel.output.send(event)
 
     @staticmethod
     def spawn(

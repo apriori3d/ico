@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from multiprocessing import Queue
 from multiprocessing.context import SpawnContext
-from typing import TYPE_CHECKING, Generic, cast, final
+from typing import Generic, final
 
 from apriori.ico.channels.mp_queue.receive_endpoint import (
     MPQueueReceiveEndpoint,
@@ -16,13 +16,11 @@ from apriori.ico.core.runtime.channel.channel import (
     IcoSendEndpoint,
 )
 from apriori.ico.core.runtime.channel.messages import (
+    AcknowledgeChannelMessage,
     ChannelMessage,
 )
-
-if TYPE_CHECKING:
-    ChannelQueue = Queue[ChannelMessage]
-else:
-    ChannelQueue = Queue  # noqa: F401
+from apriori.ico.core.runtime.command import IcoRuntimeCommand
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 
 
 @final
@@ -45,25 +43,27 @@ class MPQueueChannel(
     input: IcoReceiveEndpoint[O]
 
     _mp_context: SpawnContext
-    _input_queue: ChannelQueue
-    _input_ack_queue: ChannelQueue
-    _output_queue: ChannelQueue
-    _output_ack_queue: ChannelQueue
+    _output_queue: Queue[ChannelMessage[I | IcoRuntimeCommand | IcoRuntimeEvent]]
+    _output_ack_queue: Queue[AcknowledgeChannelMessage]
+    _input_queue: Queue[ChannelMessage[O | IcoRuntimeCommand | IcoRuntimeEvent]]
+    _input_ack_queue: Queue[AcknowledgeChannelMessage]
     _queues_owned: bool
 
     def __init__(
         self,
         mp_context: SpawnContext,
-        input_queue: ChannelQueue | None = None,
-        input_ack_queue: ChannelQueue | None = None,
-        output_queue: ChannelQueue | None = None,
-        output_ack_queue: ChannelQueue | None = None,
+        output_queue: Queue[ChannelMessage[I | IcoRuntimeCommand | IcoRuntimeEvent]]
+        | None = None,
+        output_ack_queue: Queue[AcknowledgeChannelMessage] | None = None,
+        input_queue: Queue[ChannelMessage[O | IcoRuntimeCommand | IcoRuntimeEvent]]
+        | None = None,
+        input_ack_queue: Queue[AcknowledgeChannelMessage] | None = None,
     ) -> None:
         if input_queue and output_queue and input_ack_queue and output_ack_queue:
-            self._input_queue = input_queue
             self._output_queue = output_queue
-            self._input_ack_queue = input_ack_queue
             self._output_ack_queue = output_ack_queue
+            self._input_queue = input_queue
+            self._input_ack_queue = input_ack_queue
             self._queues_owned = False
         elif (
             not input_queue
@@ -71,10 +71,10 @@ class MPQueueChannel(
             and not input_ack_queue
             and not output_ack_queue
         ):
-            self._input_queue = cast(ChannelQueue, mp_context.Queue())
-            self._output_queue = cast(ChannelQueue, mp_context.Queue())
-            self._input_ack_queue = cast(ChannelQueue, mp_context.Queue())
-            self._output_ack_queue = cast(ChannelQueue, mp_context.Queue())
+            self._output_queue = mp_context.Queue()
+            self._output_ack_queue = mp_context.Queue()
+            self._input_queue = mp_context.Queue()
+            self._input_ack_queue = mp_context.Queue()
             self._queues_owned = True
         else:
             raise ValueError(

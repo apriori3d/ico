@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, ClassVar
+from typing import Generic, TypeVar
 
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
@@ -13,105 +12,61 @@ from apriori.ico.core.runtime.event import IcoRuntimeEvent
 # ──────────────────────────────────────────────────────────────
 
 
-class ChannelMessageType(Enum):
-    """Categories of messages exchanged between runtime endpoints."""
+class MessageType(Enum):
+    """Categories of messages exchanged between runtime endpoints.
+    Used to acknowladge receipt of specific message types."""
 
     input = auto()
     runtime_command = auto()
     runtime_event = auto()
     acknowledge = auto()
-    # error = auto()
-    # system = auto()
 
 
 # ──────────────────────────────────────────────────────────────
-# Decorator for assigning message types
+# Channel Message class
 # ──────────────────────────────────────────────────────────────
 
-
-def message(t: ChannelMessageType) -> Callable[[type[Any]], type[Any]]:
-    """Decorator that assigns a ChannelMessageType to a payload class."""
-
-    def decorator(cls: type[Any]) -> type[Any]:
-        cls.__message_type__ = t
-        return cls
-
-    return decorator
-
-
-# ──────────────────────────────────────────────────────────────
-# Base payload
-# ──────────────────────────────────────────────────────────────
+# Type variable for payloads
+P = TypeVar("P", covariant=True)
 
 
 @dataclass(slots=True)
-class ChannelMessagePayload:
-    """Base class for all message payloads."""
-
-    __message_type__: ClassVar[ChannelMessageType]
-
-    @property
-    def message_type(self) -> ChannelMessageType:
-        return self.__message_type__
-
-    def wrap(self) -> ChannelMessage:
-        """Wrap this payload instance into a ChannelMessage."""
-        return ChannelMessage(self.message_type, self)
-
-
-# ──────────────────────────────────────────────────────────────
-# Concrete payloads
-# ──────────────────────────────────────────────────────────────
-
-
-@message(ChannelMessageType.input)
-@dataclass(slots=True)
-class InputPayload(ChannelMessagePayload):
-    """Data payload carrying one input item."""
-
-    input: Any
-
-
-@message(ChannelMessageType.runtime_command)
-@dataclass(slots=True)
-class RuntimeCommandPayload(ChannelMessagePayload):
-    """Payload carrying a runtime command (activate/reset/stop)."""
-
-    command: IcoRuntimeCommand
-
-
-@message(ChannelMessageType.runtime_event)
-@dataclass(slots=True)
-class RuntimeEventPayload(ChannelMessagePayload):
-    """Payload carrying runtime events (faults, progress, etc.)."""
-
-    event: IcoRuntimeEvent
-
-
-@message(ChannelMessageType.acknowledge)
-@dataclass(slots=True)
-class AcknowledgePayload(ChannelMessagePayload):
-    """Acknowledgment of a received message."""
-
-    ack_message_type: ChannelMessageType
-
-
-# ──────────────────────────────────────────────────────────────
-# Message wrapper
-# ──────────────────────────────────────────────────────────────
-
-
-@dataclass(slots=True)
-class ChannelMessage:
+class ChannelMessage(Generic[P]):
     """Unified envelope exchanged between runtime endpoints."""
 
-    message_type: ChannelMessageType
-    payload: ChannelMessagePayload
+    __message_type__: MessageType
+    payload: P
 
-    def unwrap(self) -> ChannelMessagePayload:
-        """Safely access payload of the expected type."""
-        if self.message_type != self.payload.message_type:
-            raise TypeError(
-                f"Expected {self.payload.message_type}, got {self.message_type}"
-            )
-        return self.payload
+    def __init__(self, payload: P) -> None:
+        self.payload = payload
+
+    @property
+    def message_type(self) -> MessageType:
+        return self.__message_type__
+
+
+class InputChannelMessage(ChannelMessage[P]):
+    __message_type__: MessageType = MessageType.input
+
+
+class CommandChannelMessage(ChannelMessage[IcoRuntimeCommand]):
+    __message_type__: MessageType = MessageType.runtime_command
+
+
+class EventChannelMessage(ChannelMessage[IcoRuntimeEvent]):
+    __message_type__: MessageType = MessageType.runtime_event
+
+
+class AcknowledgeChannelMessage(ChannelMessage[MessageType]):
+    __message_type__: MessageType = MessageType.acknowledge
+
+
+def wrap_payload(
+    payload: P | IcoRuntimeCommand | IcoRuntimeEvent,
+) -> ChannelMessage[P | IcoRuntimeCommand | IcoRuntimeEvent]:
+    if isinstance(payload, IcoRuntimeCommand):
+        return CommandChannelMessage(payload)
+    elif isinstance(payload, IcoRuntimeEvent):
+        return EventChannelMessage(payload)
+    else:
+        return InputChannelMessage(payload)

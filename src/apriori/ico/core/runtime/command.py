@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from enum import Enum, auto
 
 
@@ -29,12 +30,12 @@ class IcoRuntimeCommand:
     __slots__ = ("type", "meta")
 
     type: IcoRuntimeCommandType
-    meta: dict[str, str]
+    meta: Mapping[str, object]
 
     def __init__(
         self,
         type: IcoRuntimeCommandType,
-        meta: dict[str, str] | None = None,
+        meta: Mapping[str, object] | None = None,
     ) -> None:
         self.type = type
         self.meta = meta or {}

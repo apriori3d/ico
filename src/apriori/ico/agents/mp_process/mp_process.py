@@ -62,7 +62,7 @@ class MPProcess(
         try:
             # Send item to agent process
             self._set_state(IcoRuntimeState.running)
-            self._channel.output.send_item(item)
+            self._channel.output.send(item)
 
             # Wait for result from agent process
             self._set_state(IcoRuntimeState.waiting)
@@ -92,9 +92,13 @@ class MPProcess(
 
         match command.type:
             case IcoRuntimeCommandType.activate:
+                # Spawn agent before sending a command downstream
                 self._spawn_agent()
+                self._channel.output.send(command)
 
             case IcoRuntimeCommandType.deactivate:
+                # Send deactivate command downstream before shutting down agent
+                self._channel.output.send(command)
                 self._shutdown_agent()
             case _:
                 pass

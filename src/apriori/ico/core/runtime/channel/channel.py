@@ -4,20 +4,14 @@ from abc import ABC, abstractmethod
 from typing import Generic
 
 from apriori.ico.core.operator import I, O
-from apriori.ico.core.runtime.channel.messages import (
-    ChannelMessage,
-    InputPayload,
-    RuntimeCommandPayload,
-    RuntimeEventPayload,
-)
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
-class IcoRuntimeChannel(
-    Generic[I, O],
-):
+class IcoRuntimeChannel(Generic[I, O], ABC):
+    __slots__ = ("output", "input")
+
     output: IcoSendEndpoint[I]
     input: IcoReceiveEndpoint[O]
 
@@ -31,30 +25,15 @@ class IcoRuntimeChannel(
 
 
 class IcoSendEndpoint(Generic[I], ABC):
+    __slots__ = ()
+
     @abstractmethod
-    def _send(self, message: ChannelMessage) -> None: ...
-
-    # ────────────────────────────────
-    # Send functions
-    # ────────────────────────────────
-
-    def send_item(self, item: I) -> None:
-        """Handle sending of data items."""
-        payload = InputPayload(item)
-        self._send(payload.wrap())
-
-    def send_command(self, command: IcoRuntimeCommand) -> None:
-        """Handle sending of runtime commands."""
-        payload = RuntimeCommandPayload(command)
-        self._send(payload.wrap())
-
-    def send_event(self, event: IcoRuntimeEvent) -> None:
-        """Handle sending of runtime events."""
-        payload = RuntimeEventPayload(event)
-        self._send(payload.wrap())
+    def send(self, payload: I | IcoRuntimeCommand | IcoRuntimeEvent) -> None: ...
 
 
 class IcoReceiveEndpoint(Generic[O], ABC):
+    __slots__ = ("runtime_port",)
+
     runtime_port: IcoRuntimeNode
 
     @abstractmethod

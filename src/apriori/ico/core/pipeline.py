@@ -67,22 +67,19 @@ class IcoPipeline(
         output: Callable[[C], O],
         name: str | None = None,
     ):
-        context_fn = context
-        body_fn = body
-        output_fn = output
+        context_op = wrap_operator(context)
+        body_ops = [wrap_operator(step) for step in body]
+        output_op = wrap_operator(output)
 
-        context = wrap_operator(context_fn)
-        body = [wrap_operator(step) for step in body_fn]
-        output = wrap_operator(output_fn)
-
+        children = [context_op] + body_ops + [output_op]
         super().__init__(
             fn=self._run_pipeline,
             name=name or "pipeline",
-            children=[context] + body + [output],
+            children=children,
         )
-        self.context = context
-        self.body = body
-        self.output = output
+        self.context = context_op
+        self.body = body_ops
+        self.output = output_op
 
     def _run_pipeline(self, item: I) -> O:
         ctx = self.context(item)

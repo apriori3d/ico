@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-
-from typing_extensions import final
+from typing import final
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator

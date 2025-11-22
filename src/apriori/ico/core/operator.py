@@ -100,7 +100,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         from apriori.ico.core.runtime.contour import IcoRuntimeContour
 
         # TODO: check ICO form compatibility
-        return IcoRuntimeContour(closure=self)  # pyright: ignore[reportArgumentType]
+        return IcoRuntimeContour(closure=self)  # type: ignore
 
     # ────────────────────────────────────────────────
     # Compositions Protocols

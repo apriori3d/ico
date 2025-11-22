@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine, Sequence
-from typing import Any, Generic
+from collections.abc import Awaitable, Callable, Sequence
+from typing import Generic
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import (
@@ -15,11 +15,11 @@ from apriori.ico.core.operator import (
 
 
 class IcoAsyncOperator(Generic[I, O], IcoNode):
-    fn: Callable[[I], Coroutine[Any, Any, O]]
+    fn: Callable[[I], Awaitable[O]]
 
     def __init__(
         self,
-        fn: Callable[[I], Coroutine[Any, Any, O]],
+        fn: Callable[[I], Awaitable[O]],
         *,
         name: str | None = None,
         children: Sequence[IcoNode] | None = None,

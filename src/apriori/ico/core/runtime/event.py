@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+from collections.abc import Mapping
 from enum import Enum, auto
 
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
@@ -17,12 +18,12 @@ class IcoRuntimeEvent:
     __slots__ = ("type", "meta")
 
     type: IcoRuntimeEventType
-    meta: dict[str, str]
+    meta: Mapping[str, object]
 
     def __init__(
         self,
         type: IcoRuntimeEventType,
-        meta: dict[str, str] | None = None,
+        meta: Mapping[str, object] | None = None,
     ) -> None:
         self.type = type
         self.meta = meta or {}
