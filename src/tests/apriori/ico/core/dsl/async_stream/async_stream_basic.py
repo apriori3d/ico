@@ -256,11 +256,14 @@ def test_parallel_stream_mixed_sync_async() -> None:
 
     # Mix of sync and async workers.
     # Asssume async_double_slow should get only first item, second operator the rest.
-    ops = [IcoAsyncOperator(async_double_slow), IcoOperator(sync_triple)]
-    stream = IcoAsyncStream(ops)
+    ops: list[IcoAsyncOperator[int, int] | IcoOperator[int, int]] = [
+        IcoAsyncOperator(async_double_slow),
+        IcoOperator(sync_triple),
+    ]
+    stream = IcoAsyncStream[int, int](ops)
 
     data = [1, 2, 3, 4]
-    result = sorted(list(stream(iter(data))))  # type: ignore
+    result = sorted(list(stream(iter(data))))
     expected = sorted([x * 2 for x in data[:1]] + [x * 3 for x in data[1:]])
 
     assert result == expected

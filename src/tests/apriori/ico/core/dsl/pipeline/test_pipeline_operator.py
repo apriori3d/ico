@@ -7,6 +7,13 @@ FloatPipeline = IcoPipeline[float, float, float]
 FloatOperator = IcoOperator[float, float]
 
 
+def sum(iterable: Iterator[float]) -> float:
+    """Wrapper for mypy Any issues."""
+    import builtins
+
+    return builtins.sum(iterable)
+
+
 def test_operator_wraps_pipeline() -> None:
     # Basic pipeline: float → float
     p = FloatPipeline(

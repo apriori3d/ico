@@ -13,7 +13,7 @@ from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.channel import IcoRuntimeChannel
 from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
+from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 
 # ───────────────────────────────────────────────
 # Helpers
@@ -65,13 +65,24 @@ def start_mp_process_agent(
     """Launch isolated process that runs an agent closure."""
     p = channel.mp_context.Process(target=agent, args=(channel, flow_factory, n))
     p.start()
-    time.sleep(0.05)
     return p
 
 
-# ───────────────────────────────────────────────
-#  Test: Basic roundtrip
-# ───────────────────────────────────────────────
+def create_mp_process(
+    flows: list[Callable[[], IcoOperator[O, I]]],
+    num: int,
+) -> tuple[list[SpawnProcess], list[IcoOperator[I, O]]]:
+    mp_flows: list[IcoOperator[I, O]] = []
+    mp_processes: list[SpawnProcess] = []
+
+    for flow in flows:
+        channel = MPQueueChannel[I, O](get_context("spawn"))
+        process = start_mp_process_agent(channel.make_pair(), flow, n=num)
+        mp_process_mock = MPProcessMock(channel)
+        mp_processes.append(process)
+        mp_flows.append(mp_process_mock)
+
+    return mp_processes, mp_flows
 
 
 class MPProcessMock(Generic[I, O], IcoOperator[I, O]):
@@ -96,6 +107,11 @@ class MPProcessMock(Generic[I, O], IcoOperator[I, O]):
         return item
 
 
+# ───────────────────────────────────────────────
+#  Test: Basic roundtrip
+# ───────────────────────────────────────────────
+
+
 def test_single_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
@@ -114,31 +130,13 @@ def test_single_mp_process_round_trip() -> None:
     assert not process.is_alive(), "Agent process did not exit cleanly"
 
 
-def create_mp_process(
-    flows: list[Callable[[], IcoOperator[O, I]]],
-    num: int,
-) -> tuple[list[SpawnProcess], list[IcoOperator[I, O]]]:
-    mp_flows: list[IcoOperator[I, O]] = []
-    mp_processes: list[SpawnProcess] = []
-
-    for flow in flows:
-        channel = MPQueueChannel[I, O](get_context("spawn"))
-        process = start_mp_process_agent(channel.make_pair(), flow, n=num)
-        mp_process_mock = MPProcessMock(channel)
-        mp_processes.append(process)
-        mp_flows.append(mp_process_mock)
-
-    return mp_processes, mp_flows
-
-
 def test_slow_then_fast_unordered_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
-    num = 2
     processes, flows = create_mp_process([flow_slow_tripple, flow_double], num=1)
-    data = list(range(1, num + 1))
+    data = [1, 2]
     try:
         source = IcoSource(lambda _: iter(data))
-        flow = source | IcoAsyncStream(flows)
+        flow = source | IcoAsyncStream(flows, ordered=False)
         result = list(flow(None))
         assert result == [4, 3]
 

@@ -4,20 +4,19 @@
 import time
 from multiprocessing import get_context
 from multiprocessing.context import SpawnProcess
-from typing import Any
 
 import pytest
 
 from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
-from tests.apriori.ico.channels.mp_queue.utils import MPProcessMock
+from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
+from tests.apriori.ico.channel.mp_queue.utils import MPProcessMock
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
 
 
 def recording_agent(
-    channel: MPQueueChannel[dict[str, Any], str],
+    channel: MPQueueChannel[dict[str, object], str],
     runs_num: int = 1,
 ) -> None:
     """Agent process that records received commands and sends back acknowledgements."""
@@ -41,7 +40,7 @@ def recording_agent(
 
             if item == "report":
                 # Return recorded commands and events
-                report = {
+                report: dict[str, object] = {
                     "commands": recording_node.recorded_commands,
                     "events": recording_node.recorded_events,
                 }
@@ -75,7 +74,7 @@ def test_runtime_flow_propagation() -> None:
 
     # Create communication channel between host and agent
     ctx = get_context("spawn")
-    channel = MPQueueChannel[str, dict[str, Any]](ctx)
+    channel = MPQueueChannel[str, dict[str, object]](ctx)
 
     # Create host runtime to aggregate bubble-up events via channel
     host_runtime = RecordingRuntimeNode(name="host_runtime")

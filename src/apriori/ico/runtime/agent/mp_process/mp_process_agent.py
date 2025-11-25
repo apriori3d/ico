@@ -9,7 +9,7 @@ from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
-from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
+from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 
 
 @final
@@ -72,6 +72,7 @@ class MPProcessAgent(
 
                 # Send output item upstream
                 self.state = IcoRuntimeState.sending
+                print(f"Agent {self.name} sending output: {output}")
                 self._channel.output.send(output)
 
                 # Ready for the next item

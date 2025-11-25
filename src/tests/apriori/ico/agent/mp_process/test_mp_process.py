@@ -9,7 +9,7 @@ from apriori.ico.core.runtime.command import IcoRuntimeCommandType
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.agents.mp_process.mp_process import (
+from apriori.ico.runtime.agent.mp_process.mp_process import (
     MPProcess,
 )
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
@@ -64,7 +64,7 @@ def test_agent_basic_roundtrip() -> None:
 # ───────────────────────────────────────────────
 
 
-def test_agent_multiple_items():
+def test_agent_multiple_items() -> None:
     """Agent should correctly process multiple items in sequence."""
 
     mp_process = MPProcess(op_double)
@@ -82,7 +82,7 @@ def test_agent_multiple_items():
 # ───────────────────────────────────────────────
 
 
-def test_agent_exception_propagation():
+def test_agent_exception_propagation() -> None:
     """If agent raises IcoRuntimeError, host should receive corresponding runtime event."""
 
     mp_process = MPProcess(op_fail_factory)
@@ -104,7 +104,7 @@ def test_agent_exception_propagation():
 # ───────────────────────────────────────────────
 
 
-def test_agent_command_propagation():
+def test_agent_command_propagation() -> None:
     """activate/pause/resume/deactivate should propagate to agent runtime."""
 
     # Attach recording runtime to channel
@@ -130,7 +130,7 @@ def test_agent_command_propagation():
 # ───────────────────────────────────────────────
 
 
-def test_agent_event_propagation():
+def test_agent_event_propagation() -> None:
     """Agent should bubble events back to host runtime."""
 
     main_runtime = RecordingRuntimeNode()
@@ -156,7 +156,7 @@ def test_agent_event_propagation():
 # ───────────────────────────────────────────────
 
 
-def test_agent_mp_process_end_to_end():
+def test_agent_mp_process_end_to_end() -> None:
     """Portal wiring must allow transparent remote computation."""
 
     collected: list[str] = []
@@ -180,26 +180,23 @@ def test_agent_mp_process_end_to_end():
 # ───────────────────────────────────────────────
 
 
-def test_agent_clean_shutdown():
+def test_agent_clean_shutdown() -> None:
     """Agent spawned by host should terminate on deactivate."""
 
     mp_process = MPProcess(op_identity)
     mp_process.activate()
 
-    assert mp_process.agent_process is not None
-    assert mp_process.agent_process.is_alive()
+    assert mp_process.is_alive
 
     mp_process.deactivate()
 
     # give process time to shut down
     time.sleep(0.1)
 
-    assert not mp_process.agent_process.is_alive(), "Agent process did not exit cleanly"
+    assert not mp_process.is_alive, "Agent process did not exit cleanly"
 
 
 if __name__ == "__main__":
-    # test_agent_clean_shutdown()
-
     import sys
 
     sys.exit(pytest.main([__file__]))

@@ -10,8 +10,8 @@ import pytest
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
-from tests.apriori.ico.core.dsl.async_stream.async_stream_mp_process import (
+from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
+from tests.apriori.ico.core.dsl.async_stream.async_stream_mp_queue_process import (
     MPProcessMock,
 )
 
@@ -70,7 +70,7 @@ def start_mp_process_agent(
 def test_send_receive_roundtrip_flow_basic() -> None:
     """Ensure data passes through full MPQueueChannel roundtrip."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    mp_process_mock = MPProcessMock(channel)
+    mp_process_mock = MPProcessMock[int, int](channel)
     agent_process = start_mp_process_agent(channel.make_pair(), flow_identity)
     try:
         result = mp_process_mock(42)
@@ -89,7 +89,7 @@ def test_send_receive_roundtrip_flow_basic() -> None:
 def test_send_receive_roundtrip_transform() -> None:
     """Verify that data transformation inside remote flow works."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    mp_process_mock = MPProcessMock(channel)
+    mp_process_mock = MPProcessMock[int, int](channel)
     agent_process = start_mp_process_agent(channel.make_pair(), flow_double)
 
     try:
@@ -110,7 +110,7 @@ def test_send_receive_multiple_items() -> None:
     """Ensure multiple sequential messages are handled correctly."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
     num_queries = 5
-    mp_process_mock = MPProcessMock(channel)
+    mp_process_mock = MPProcessMock[int, int](channel)
     agent_process = start_mp_process_agent(
         channel.make_pair(), flow_double, n=num_queries
     )
@@ -127,7 +127,7 @@ def test_send_receive_stream() -> None:
     """Ensure multiple sequential messages are handled correctly."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
     num_queries = 5
-    mp_process_mock = MPProcessMock(channel)
+    mp_process_mock = MPProcessMock[int, int](channel)
     agent_process = start_mp_process_agent(
         channel.make_pair(), flow_double, n=num_queries
     )

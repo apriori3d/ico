@@ -7,6 +7,13 @@ from apriori.ico.core.stream import IcoStream
 IntOperator = IcoOperator[int, int]
 
 
+def sum(iterable: Iterator[int]) -> int:
+    """Wrapper for mypy Any issues."""
+    import builtins
+
+    return builtins.sum(iterable)
+
+
 def test_data_produces_iterable() -> None:
     """
     Test that IcoData produces an iterable when called.

@@ -15,10 +15,10 @@ from apriori.ico.core.runtime.channel.messages import (
 )
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.runtime.channels.mp_queue.receive_endpoint import (
+from apriori.ico.runtime.channel.mp_queue.receive_endpoint import (
     MPQueueReceiveEndpoint,
 )
-from apriori.ico.runtime.channels.mp_queue.send_endpoint import MPQueueSendEndpoint
+from apriori.ico.runtime.channel.mp_queue.send_endpoint import MPQueueSendEndpoint
 
 
 @final

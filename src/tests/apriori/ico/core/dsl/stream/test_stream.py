@@ -6,6 +6,13 @@ from apriori.ico.core.stream import IcoStream
 IntOperator = IcoOperator[int, int]
 
 
+def sum(iterable: Iterator[int]) -> int:
+    """Wrapper for mypy Any issues."""
+    import builtins
+
+    return builtins.sum(iterable)
+
+
 def test_stream_maps_operator_over_iterable() -> None:
     """
     Test that IcoStream applies its body operator to each item in an iterable.

@@ -8,10 +8,14 @@ from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
+from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 
 
-class MPProcessMock(Generic[I, O], IcoOperator[I, O], IcoRuntimeNode):
+class MPProcessMock(
+    Generic[I, O],
+    IcoOperator[I, O],
+    IcoRuntimeNode,
+):
     def __init__(
         self,
         channel: MPQueueChannel[I, O],

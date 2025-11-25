@@ -5,6 +5,13 @@ from apriori.ico.core.operator import IcoOperator
 IntOperator = IcoOperator[int, int]
 
 
+def sum(iterable: Iterator[int]) -> int:
+    """Wrapper for mypy Any issues."""
+    import builtins
+
+    return builtins.sum(iterable)
+
+
 def test_map_applies_elementwise() -> None:
     double = IntOperator(lambda x: x * 2)
     mapped = double.iterate()
