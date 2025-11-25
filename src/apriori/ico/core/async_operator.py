@@ -25,7 +25,7 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
         children: Sequence[IcoNode] | None = None,
     ):
         super().__init__(
-            name=name or self.fn.__name__ if hasattr(self.fn, "__name__") else None,
+            name=name or fn.__name__ if hasattr(fn, "__name__") else None,
             children=children,
         )
         self.fn = fn

@@ -8,15 +8,17 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 T = TypeVar("T")
 
 
-def wait_for_output(
-    runtime: IcoRuntimeNode,
+def wait_for_item(
+    *,
     endpoint: IcoReceiveEndpoint[T],
+    runtime_node: IcoRuntimeNode | None = None,
     accept_commands: bool = True,
     accept_events: bool = True,
 ) -> T | None:
     """Blocking wait for an incoming item."""
     while True:
-        runtime.state = IcoRuntimeState.waiting
+        if runtime_node is not None:
+            runtime_node.state = IcoRuntimeState.waiting
         input = endpoint.receive()
 
         # Process runtime commands/events
@@ -24,7 +26,8 @@ def wait_for_output(
             if not accept_commands:
                 raise RuntimeError(f"Runtime commands ({input}) can are not accepted.")
 
-            runtime.on_command(input)
+            if runtime_node is not None:
+                runtime_node.on_command(input)
 
             # Exit loop on deactivate command
             if input.type == IcoRuntimeCommandType.deactivate:
@@ -36,13 +39,15 @@ def wait_for_output(
             if not accept_events:
                 raise RuntimeError(f"Runtime events ({input}) can are not accepted.")
 
-            runtime.bubble_event(input)
+            if runtime_node is not None:
+                runtime_node.bubble_event(input)
 
             continue  # Wait for actual data item
 
         break  # Exit loop on data item
 
     # Ready with data item
-    runtime.state = IcoRuntimeState.ready
+    if runtime_node is not None:
+        runtime_node.state = IcoRuntimeState.ready
 
     return input

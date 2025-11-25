@@ -64,8 +64,9 @@ class IcoRuntimeNode(ABC):
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
     ) -> None:
+        super().__init__()
         self.name = name or self.__class__.__name__
-        self.state = IcoRuntimeState.inactive
+        self._state = IcoRuntimeState.inactive
         self._runtime_parent = runtime_parent
         self._runtime_children = (
             list(runtime_children) if runtime_children is not None else []
@@ -182,6 +183,11 @@ class IcoRuntimeNode(ABC):
     def activate(self) -> Self:
         """Broadcast 'activate' event through the entire flow."""
         self.broadcast_command(IcoRuntimeCommand.activate())
+        return self
+
+    def run(self) -> Self:
+        """Broadcast 'run' event through the entire flow."""
+        self.broadcast_command(IcoRuntimeCommand.run())
         return self
 
     def reset(self) -> Self:

@@ -4,7 +4,6 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
@@ -92,15 +91,6 @@ class IcoOperator(Generic[I, O], IcoNode):
 
     def __call__(self, item: I) -> O:
         return self.fn(item)
-
-    # ──── Runtime API interface ────
-
-    def runtime(self) -> IcoRuntimeContour:
-        """Create a runtime contour wrapping this operator as a closure."""
-        from apriori.ico.core.runtime.contour import IcoRuntimeContour
-
-        # TODO: check ICO form compatibility
-        return IcoRuntimeContour(closure=self)  # type: ignore
 
     # ────────────────────────────────────────────────
     # Compositions Protocols

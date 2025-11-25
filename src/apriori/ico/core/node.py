@@ -17,6 +17,7 @@ class IcoNode:
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ) -> None:
+        super().__init__()
         self.name = name or self.__class__.__name__
         self.parent = parent
         self.children = children or []

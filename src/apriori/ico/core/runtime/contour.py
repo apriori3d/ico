@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import final
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
@@ -13,7 +12,6 @@ from apriori.ico.core.runtime.node import (
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 
 
-@final
 class IcoRuntimeContour(
     IcoRuntimeNode,
     ProgressMixin,
@@ -71,10 +69,14 @@ class IcoRuntimeContour(
 
     def run(self) -> IcoRuntimeContour:
         """Execute the entire runtime contour."""
-        self.state = IcoRuntimeState.running
-        self._contour_fn(None)
-        self.state = IcoRuntimeState.ready
-        return self
+        try:
+            self.state = IcoRuntimeState.running
+            self._contour_fn(None)
+            self.state = IcoRuntimeState.ready
+            return self
+        except Exception as e:
+            self.state = IcoRuntimeState.fault
+            raise e
 
     def _contour_fn(self, _: None) -> None:
         self._closure(None)

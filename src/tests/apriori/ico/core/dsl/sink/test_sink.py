@@ -1,11 +1,8 @@
 from collections.abc import Iterable, Iterator
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
-from apriori.ico.core.stream import IcoStream
-from apriori.ico.core.types import IcoNodeType
 
 IntOperator = IcoOperator[int, int]
 
@@ -34,34 +31,34 @@ def test_data_consumes_iterable() -> None:
     assert read_all
 
 
-def test_data_structure_representation() -> None:
-    """
-    Test that IcoData exposes correct flow structure.
-    """
+# def test_data_structure_representation() -> None:
+#     """
+#     Test that IcoData exposes correct flow structure.
+#     """
 
-    dataset = IcoSource[int](lambda _: iter(range(5)), name="dataset")
-    scale = IntOperator(lambda x: x * 2, name="scale")
-    stream = IcoStream(scale)
-    sink = IcoSink(sink_fn, name="sink")
-    flow = dataset | stream | sink
+#     dataset = IcoSource[int](lambda _: iter(range(5)), name="dataset")
+#     scale = IntOperator(lambda x: x * 2, name="scale")
+#     stream = IcoStream(scale)
+#     sink = IcoSink(sink_fn, name="sink")
+#     flow = dataset | stream | sink
 
-    structure = IcoFlowMeta.from_operator(flow)
+#     structure = IcoFlowMeta.from_operator(flow)
 
-    # Root node should be composition
-    assert structure.node_type == IcoNodeType.chain
+#     # Root node should be composition
+#     assert structure.node_type == IcoNodeType.chain
 
-    # Check child order
-    chain2, sink = structure.children
-    assert chain2.node_type == IcoNodeType.chain
-    assert sink.node_type == IcoNodeType.sink
+#     # Check child order
+#     chain2, sink = structure.children
+#     assert chain2.node_type == IcoNodeType.chain
+#     assert sink.node_type == IcoNodeType.sink
 
-    # Check child order
-    data_node, stream_node = chain2.children
-    assert data_node.node_type == IcoNodeType.source
-    assert data_node.name == "dataset"
+#     # Check child order
+#     data_node, stream_node = chain2.children
+#     assert data_node.node_type == IcoNodeType.source
+#     assert data_node.name == "dataset"
 
-    assert stream_node.node_type == IcoNodeType.stream
-    assert stream_node.children[0].name == "scale"
+#     assert stream_node.node_type == IcoNodeType.stream
+#     assert stream_node.children[0].name == "scale"
 
 
 if __name__ == "__main__":

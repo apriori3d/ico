@@ -1,36 +1,36 @@
 import pytest
 
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.types import IcoRuntimeStateType
+from apriori.ico.core.runtime.node import IcoRuntimeState
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
-from tests.apriori.ico.core.runtime.runtime_operator.test_utils import (
-    StateRecordingRuntime,
-)
+from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingContour
 
 # ──── Test: normal execution ────
 
 
-def clousure(x: None) -> None:
+def clousure_fn(x: None) -> None:
     return None
 
 
 def test_state_transitions_success() -> None:
-    recording_runtime = StateRecordingRuntime(clousure)
+    clousure = IcoOperator(clousure_fn, name="no_op")
+    recording_runtime = RecordingContour(clousure)
+
     # Initially idle
-    assert recording_runtime.state is IcoRuntimeStateType.inactive
+    assert recording_runtime.state is IcoRuntimeState.inactive
 
     # Call operator
     recording_runtime.activate().run().pause().resume().deactivate()
 
-    assert recording_runtime.states == [
-        IcoRuntimeStateType.inactive,
-        IcoRuntimeStateType.ready,
-        IcoRuntimeStateType.running,
-        IcoRuntimeStateType.ready,
-        IcoRuntimeStateType.paused,
-        IcoRuntimeStateType.ready,
-        IcoRuntimeStateType.inactive,
+    assert recording_runtime.recorded_states == [
+        IcoRuntimeState.inactive,
+        IcoRuntimeState.ready,
+        IcoRuntimeState.running,
+        IcoRuntimeState.ready,
+        IcoRuntimeState.paused,
+        IcoRuntimeState.ready,
+        IcoRuntimeState.inactive,
     ]
 
 
@@ -45,21 +45,21 @@ def test_execution_state_transitions_failure() -> None:
     source = IcoSource[int](lambda _: iter([1, 2, 3]), name="data")
     sink = IcoSink[int](lambda items: None if list(items) else None, name="sink")
 
-    flow = source | faulty_op.map() | sink
+    flow = source | faulty_op.iterate() | sink
 
-    runtime = StateRecordingRuntime(flow)
+    runtime = RecordingContour(flow)
 
     with pytest.raises(RuntimeError):
         runtime.activate().run()
 
     runtime.deactivate()
 
-    assert runtime.states == [
-        IcoRuntimeStateType.inactive,
-        IcoRuntimeStateType.ready,
-        IcoRuntimeStateType.running,
-        IcoRuntimeStateType.error,
-        IcoRuntimeStateType.inactive,
+    assert runtime.recorded_states == [
+        IcoRuntimeState.inactive,
+        IcoRuntimeState.ready,
+        IcoRuntimeState.running,
+        IcoRuntimeState.fault,
+        IcoRuntimeState.inactive,
     ]
 
 

@@ -5,7 +5,7 @@ from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.channel.utils import wait_for_output
+from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.runtime.progress.mixin import ProgressMixin
@@ -58,9 +58,9 @@ class MPProcessAgent(
             try:
                 # Blocks internally until new input arrives in the input channel.
 
-                result = wait_for_output(
-                    self,
-                    self._channel.input,
+                result = wait_for_item(
+                    endpoint=self._channel.input,
+                    runtime_node=self,
                     accept_events=False,
                 )
                 if result is None:
@@ -81,7 +81,7 @@ class MPProcessAgent(
                 # Report runtime errors downstream to output channel and terminate
                 self.state = IcoRuntimeState.fault
                 self.bubble_event(IcoRuntimeEvent.exception(e))
-                break
+                continue
 
     def on_event(self, event: IcoRuntimeEvent) -> None:
         super().on_event(event)
@@ -108,7 +108,6 @@ class MPProcessAgent(
     def _process_fn(
         channel: MPQueueChannel[O, I],
         flow_factory: Callable[[], IcoOperator[I, O]],
-        *,
         name: str | None = None,
     ) -> None:
         agent = MPProcessAgent[I, O](

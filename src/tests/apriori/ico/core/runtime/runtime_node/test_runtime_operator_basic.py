@@ -1,18 +1,17 @@
 # tests/core/runtime/test_runtime_contour.py
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 import pytest
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.operator import IcoRuntimeOperator
+from apriori.ico.core.operator import I, IcoOperator
+from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
-from apriori.ico.core.types import I
 
 
-def drain_all(xs: Iterable[I]) -> None:
+def drain_all(xs: Iterator[I]) -> None:
     """Helper sink function that drains all items."""
     list(xs)
     return None
@@ -31,7 +30,7 @@ def test_runtime_contour_executes_source_to_sink() -> None:
 
     output: list[int] = []
 
-    def capture_output(xs: Iterable[int]) -> None:
+    def capture_output(xs: Iterator[int]) -> None:
         nonlocal output
         output += list(xs)
 
@@ -39,8 +38,8 @@ def test_runtime_contour_executes_source_to_sink() -> None:
     sink = IcoSink[int](capture_output, name="capture")
 
     # Compose flow and wrap in contour
-    flow = source | op.map() | sink
-    contour = IcoRuntimeOperator(flow)
+    flow = source | op.iterate() | sink
+    contour = IcoRuntimeContour(flow)
     contour.activate().run().deactivate()
 
     # Capture printed output

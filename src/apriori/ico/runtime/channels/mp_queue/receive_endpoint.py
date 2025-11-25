@@ -43,7 +43,6 @@ class MPQueueReceiveEndpoint(
         *,
         timeout: float = 5.0,
     ) -> None:
-        IcoReceiveEndpoint[O].__init__(self)
         ProgressMixin.__init__(self)
 
         self._main_queue = main_queue

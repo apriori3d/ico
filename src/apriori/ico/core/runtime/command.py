@@ -19,6 +19,7 @@ class IcoRuntimeCommandType(Enum):
     """
 
     activate = auto()
+    run = auto()
     reset = auto()
     deactivate = auto()
     pause = auto()
@@ -43,6 +44,10 @@ class IcoRuntimeCommand:
     @staticmethod
     def activate() -> IcoRuntimeCommand:
         return IcoRuntimeCommand(type=IcoRuntimeCommandType.activate)
+
+    @staticmethod
+    def run() -> IcoRuntimeCommand:
+        return IcoRuntimeCommand(type=IcoRuntimeCommandType.run)
 
     @staticmethod
     def deactivate() -> IcoRuntimeCommand:

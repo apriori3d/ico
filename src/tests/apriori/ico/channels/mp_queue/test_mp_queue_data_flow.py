@@ -7,11 +7,13 @@ from multiprocessing.context import SpawnProcess
 
 import pytest
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.channel.types import IcoRuntimeChannelProtocol
+from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.source import IcoSource
-from apriori.ico.core.types import I, IcoOperator, O
 from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
+from tests.apriori.ico.core.dsl.async_stream.async_stream_mp_process import (
+    MPProcessMock,
+)
 
 # ───────────────────────────────────────────────
 # Helpers
@@ -19,16 +21,22 @@ from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 
 def agent(
-    channel: IcoRuntimeChannelProtocol[I, O],
-    flow_factory: Callable[[], IcoOperator[O, I]],
+    channel: MPQueueChannel[O, I],
+    flow_factory: Callable[[], IcoOperator[I, O]],
     n: int = 1,
 ) -> None:
     """Simulated remote process executing receive → flow → send loop."""
     flow = flow_factory()
-    closure = channel.receive | flow | channel.send
     count = 0
     while count < n:
-        closure(None)
+        item = wait_for_item(
+            endpoint=channel.input,
+            accept_commands=False,
+            accept_events=False,
+        )
+        assert item is not None
+        result = flow(item)
+        channel.output.send(result)
         count += 1
 
 
@@ -62,16 +70,15 @@ def start_mp_process_agent(
 def test_send_receive_roundtrip_flow_basic() -> None:
     """Ensure data passes through full MPQueueChannel roundtrip."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    process = start_mp_process_agent(channel.make_pair(), flow_identity)
-
+    mp_process_mock = MPProcessMock(channel)
+    agent_process = start_mp_process_agent(channel.make_pair(), flow_identity)
     try:
-        flow = channel.output | channel.input
-        result = flow(42)
+        result = mp_process_mock(42)
         assert result == 42
     finally:
-        process.terminate()
-        process.join(timeout=0.5)
-    assert not process.is_alive(), "Agent process did not exit cleanly"
+        agent_process.terminate()
+        agent_process.join(timeout=0.5)
+    assert not agent_process.is_alive(), "Agent process did not exit cleanly"
 
 
 # ───────────────────────────────────────────────
@@ -82,16 +89,16 @@ def test_send_receive_roundtrip_flow_basic() -> None:
 def test_send_receive_roundtrip_transform() -> None:
     """Verify that data transformation inside remote flow works."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
-    process = start_mp_process_agent(channel.make_pair(), flow_double)
+    mp_process_mock = MPProcessMock(channel)
+    agent_process = start_mp_process_agent(channel.make_pair(), flow_double)
 
     try:
-        flow = channel.output | channel.input
-        result = flow(21)
+        result = mp_process_mock(21)
         assert result == 42
     finally:
-        process.terminate()
-        process.join(timeout=0.5)
-    assert not process.is_alive()
+        agent_process.terminate()
+        agent_process.join(timeout=0.5)
+    assert not agent_process.is_alive()
 
 
 # ───────────────────────────────────────────────
@@ -103,34 +110,41 @@ def test_send_receive_multiple_items() -> None:
     """Ensure multiple sequential messages are handled correctly."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
     num_queries = 5
-    process = start_mp_process_agent(channel.make_pair(), flow_double, n=num_queries)
+    mp_process_mock = MPProcessMock(channel)
+    agent_process = start_mp_process_agent(
+        channel.make_pair(), flow_double, n=num_queries
+    )
 
     try:
-        flow = channel.output | channel.input
-        results = [flow(i) for i in range(num_queries)]
+        results = [mp_process_mock(i) for i in range(num_queries)]
         assert results == [i * 2 for i in range(num_queries)]
     finally:
-        process.terminate()
-        process.join(timeout=0.5)
+        agent_process.terminate()
+        agent_process.join(timeout=0.5)
 
 
 def test_send_receive_stream() -> None:
     """Ensure multiple sequential messages are handled correctly."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
     num_queries = 5
-    process = start_mp_process_agent(channel.make_pair(), flow_double, n=num_queries)
+    mp_process_mock = MPProcessMock(channel)
+    agent_process = start_mp_process_agent(
+        channel.make_pair(), flow_double, n=num_queries
+    )
 
     try:
         src = IcoSource(lambda _: iter(range(num_queries)))
-        flow = src | (channel.output | channel.input).map()
+        flow = src | mp_process_mock.iterate()
         results = list(flow(None))
         assert results == [i * 2 for i in range(num_queries)]
     finally:
-        process.terminate()
-        process.join(timeout=0.5)
+        agent_process.terminate()
+        agent_process.join(timeout=0.5)
 
 
 if __name__ == "__main__":
+    # test_send_receive_roundtrip_flow_basic()
+
     import sys
 
     sys.exit(pytest.main([__file__]))

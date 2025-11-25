@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Iterator
 
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
@@ -34,10 +34,10 @@ def test_pipeline_inside_map_operator() -> None:
         output=lambda x: x,
     )
     square_op = IcoOperator(square_pipeline)
-    total_op = IcoOperator[Iterable[float], float](sum)
+    total_op = IcoOperator[Iterator[float], float](sum)
 
-    # Apply map() and reduce-like composition
-    flow = square_op.map() | total_op
+    # Apply iterate() and reduce-like composition
+    flow = square_op.iterate() | total_op
     result = flow(iter([1.0, 2.0, 3.0]))
     assert result == 14  # 1² + 2² + 3²
 

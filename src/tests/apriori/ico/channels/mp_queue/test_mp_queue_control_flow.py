@@ -8,38 +8,12 @@ from typing import Any
 
 import pytest
 
-from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.operator import IcoRuntimeOperator
-from apriori.ico.core.runtime.types import (
-    IcoRuntimeCommandType,
-    IcoRuntimeEvent,
-)
 from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
-
-# ───────────────────────────────────────────────
-#  Helpers
-# ───────────────────────────────────────────────
-
-
-class ControlFlowTestingRuntime(IcoRuntimeOperator):
-    """Runtime that records received commands and events for testing."""
-
-    commands_received: list[IcoRuntimeCommandType]
-    events_received: list[IcoRuntimeEvent]
-
-    def __init__(self):
-        super().__init__()
-        self.commands_received = []
-        self.events_received = []
-
-    def on_command(self, command: IcoRuntimeCommandType) -> None:
-        # Echo command back through send endpoint
-        self.commands_received.append(command)
-
-    def on_event(self, event: IcoRuntimeEvent) -> None:
-        self.events_received.append(event)
+from tests.apriori.ico.channels.mp_queue.utils import MPProcessMock
+from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
 
 
 def recording_agent(
@@ -48,39 +22,42 @@ def recording_agent(
 ) -> None:
     """Agent process that records received commands and sends back acknowledgements."""
 
-    # Create runtime that records commands and events and sends them back
-    runtime = ControlFlowTestingRuntime()
-    # Connect runtime to channel for command/event propagation
-    channel.connect_runtime(runtime)
-
-    def reporting_fn(item: str) -> dict[str, Any]:
-        # Send heartbeat event to host runtime
-        runtime.bubble_event(IcoRuntimeEvent.heartbeat())
-        if item == "report":
-            # Return recorded commands and events
-            return {
-                "commands": runtime.commands_received,
-                "events": runtime.events_received,
-            }
-        elif item == "error":
-            raise IcoRuntimeError("Simulated agent error")
-        else:
-            # Raise error for unknown items to test exception propagation
-            raise ValueError(f"Unknown item: {item}")
-
     # Create agent flow to record and report commands/events
-    reporting_operator = IcoOperator[str, dict[str, Any]](reporting_fn)
-    closure = channel.input | reporting_operator | channel.output
+    recording_node = RecordingRuntimeNode(name="agent_runtime")
 
-    # Execute the agent closure
-    run_num = 1
-    while run_num <= runs_num:
+    run_num = 0
+    while run_num < runs_num:
         try:
-            closure(None)
+            item = wait_for_item(
+                runtime_node=recording_node,
+                endpoint=channel.input,
+                accept_commands=True,
+                accept_events=False,
+            )
+            assert item is not None
+            hearbeat = IcoRuntimeEvent.heartbeat()
+            recording_node.on_event(hearbeat)
+            channel.output.send(hearbeat)
+
+            if item == "report":
+                # Return recorded commands and events
+                report = {
+                    "commands": recording_node.recorded_commands,
+                    "events": recording_node.recorded_events,
+                }
+                channel.output.send(report)
+            elif item == "error":
+                channel.output.send(
+                    IcoRuntimeEvent.exception(IcoRuntimeError("Simulated agent error"))
+                )
+            else:
+                channel.output.send(
+                    IcoRuntimeEvent.exception(IcoRuntimeError("Unknown command"))
+                )
+
             run_num += 1
-        except IcoRuntimeError as e:
-            # Send exception event back to host runtime
-            channel.output.on_event(IcoRuntimeEvent.exception(e))
+        except Exception as e:
+            channel.output.send(IcoRuntimeEvent.exception(e))
 
 
 # ───────────────────────────────────────────────
@@ -101,8 +78,7 @@ def test_runtime_flow_propagation() -> None:
     channel = MPQueueChannel[str, dict[str, Any]](ctx)
 
     # Create host runtime to aggregate bubble-up events via channel
-    host_runtime = ControlFlowTestingRuntime()
-    host_runtime.connect_runtime(channel)  # Setup link for commands/events flow
+    host_runtime = RecordingRuntimeNode(name="host_runtime")
 
     # Strat agent process
     process: SpawnProcess = ctx.Process(
@@ -115,29 +91,26 @@ def test_runtime_flow_propagation() -> None:
     )
     process.start()
     time.sleep(0.05)
+    mp_process_mock = MPProcessMock(channel)
+    host_runtime.connect_runtime(mp_process_mock)
 
     try:
         # Send commands to remote agent
         host_runtime.activate().pause().resume()
 
-        # Send 'report' to agent to get back recorded commands and events
-        flow = channel.output | channel.input
-
         # ──── Check commands and events propagation ────
 
-        agent_runtime_recording = flow("report")
+        agent_runtime_recording = mp_process_mock("report")
 
         # Check that commands were received correctly
-        assert agent_runtime_recording["commands"] == host_runtime.commands_received
+        assert agent_runtime_recording["commands"] == host_runtime.recorded_commands
         # Check that events were received correctly
-        assert [event.type for event in agent_runtime_recording["events"]] == [
-            event.type for event in host_runtime.events_received
-        ]
+        assert agent_runtime_recording["events"] == host_runtime.recorded_events
 
         # ──── Check Exception event propagation ────
 
         with pytest.raises(IcoRuntimeError) as error:
-            flow("error")
+            mp_process_mock("error")
         assert "Simulated agent error" in str(error.value)
 
         # ──── Check for correct deactivation ────

@@ -15,14 +15,6 @@ class IcoRuntimeChannel(Generic[I, O], ABC):
     output: IcoSendEndpoint[I]
     input: IcoReceiveEndpoint[O]
 
-    def __init__(
-        self,
-        output: IcoSendEndpoint[I],
-        input: IcoReceiveEndpoint[O],
-    ) -> None:
-        self.output = output
-        self.input = input
-
 
 class IcoSendEndpoint(Generic[I], ABC):
     __slots__ = ()

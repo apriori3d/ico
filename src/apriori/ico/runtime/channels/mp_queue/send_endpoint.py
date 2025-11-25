@@ -48,7 +48,6 @@ class MPQueueSendEndpoint(
         *,
         timeout: int = 5,
     ) -> None:
-        IcoSendEndpoint[I].__init__(self)
         ProgressMixin.__init__(self)
         self._main_queue = main_queue
         self._ack_queue = ack_queue

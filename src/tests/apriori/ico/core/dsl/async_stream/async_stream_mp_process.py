@@ -4,14 +4,15 @@ import time
 from collections.abc import Callable
 from multiprocessing import get_context
 from multiprocessing.context import SpawnProcess
+from typing import Generic
 
 import pytest
 
 from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.channel import IcoRuntimeChannel
+from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.source import IcoSource
-from apriori.ico.core.types import I, O
 from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 # ───────────────────────────────────────────────
@@ -20,16 +21,23 @@ from apriori.ico.runtime.channels.mp_queue.channel import MPQueueChannel
 
 
 def agent(
-    channel: IcoRuntimeChannel[I, O],
-    flow_factory: Callable[[], IcoOperator[O, I]],
+    channel: IcoRuntimeChannel[O, I],
+    flow_factory: Callable[[], IcoOperator[I, O]],
     n: int = 1,
 ) -> None:
     """Simulated remote process executing receive → flow → send loop."""
     flow = flow_factory()
-    closure = channel.input | flow | channel.output
+
     count = 0
     while count < n:
-        closure(None)
+        input = wait_for_item(
+            endpoint=channel.input,
+            accept_commands=False,
+            accept_events=False,
+        )
+        assert input is not None
+        result = flow(input)
+        channel.output.send(result)
         count += 1
 
 
@@ -66,16 +74,38 @@ def start_mp_process_agent(
 # ───────────────────────────────────────────────
 
 
+class MPProcessMock(Generic[I, O], IcoOperator[I, O]):
+    def __init__(
+        self,
+        channel: MPQueueChannel[I, O],
+    ) -> None:
+        super().__init__(
+            fn=self._portal_fn,
+        )
+        self._channel = channel
+
+    def _portal_fn(self, input: I) -> O:
+        # Send item to agent process
+        self._channel.output.send(input)
+        item = wait_for_item(
+            endpoint=self._channel.input,
+            accept_commands=False,
+            accept_events=False,
+        )
+        assert item is not None
+        return item
+
+
 def test_single_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
     channel = MPQueueChannel[int, int](get_context("spawn"))
     num = 5
     process = start_mp_process_agent(channel.make_pair(), flow_double, n=num)
     data = list(range(1, num + 1))
+    mp_process_mock = MPProcessMock(channel)
     try:
-        mp_flow = channel.output | channel.input
         source = IcoSource(lambda _: iter(data))
-        flow = source | IcoAsyncStream([mp_flow])
+        flow = source | IcoAsyncStream([mp_process_mock])
         result = list(flow(None))
         assert result == [d * 2 for d in data]
     finally:
@@ -94,9 +124,9 @@ def create_mp_process(
     for flow in flows:
         channel = MPQueueChannel[I, O](get_context("spawn"))
         process = start_mp_process_agent(channel.make_pair(), flow, n=num)
-        mp_flow = channel.output | channel.input
+        mp_process_mock = MPProcessMock(channel)
         mp_processes.append(process)
-        mp_flows.append(mp_flow)
+        mp_flows.append(mp_process_mock)
 
     return mp_processes, mp_flows
 
