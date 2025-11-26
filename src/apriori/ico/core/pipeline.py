@@ -67,6 +67,9 @@ class IcoPipeline(
         output: Callable[[C], O],
         name: str | None = None,
     ):
+        if len(body) == 0:
+            raise ValueError("Pipeline body must contain at least one operator.")
+
         context_op = wrap_operator(context)
         body_ops = [wrap_operator(step) for step in body]
         output_op = wrap_operator(output)

@@ -70,7 +70,7 @@ class IcoFlowMeta:
         runtime_state = (
             operator.state if isinstance(operator, IcoRuntimeOperatorProtocol) else None
         )
-        ico_form = IcoForm.from_operator(operator)
+        ico_form = IcoForm.from_node(operator)
 
         if not isinstance(operator, IcoOperator):
             return IcoFlowMeta(

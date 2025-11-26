@@ -48,10 +48,10 @@ def test_infer_form_compose() -> None:
 
 def test_infer_form_map_and_stream() -> None:
     base = IcoOperator[int, float](lambda x: float(x))
-    mapped = base.map()
+    iterate = base.iterate()
     streamed = IcoStream(base)
 
-    assert infer_ico_form(mapped).name == "Iterator[int] → Iterator[float]"
+    assert infer_ico_form(iterate).name == "Iterator[int] → Iterator[float]"
     assert infer_ico_form(streamed).name == "Iterator[int] → Iterator[float]"
 
 

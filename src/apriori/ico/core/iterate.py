@@ -8,7 +8,7 @@ class IcoIterateOperator(
     Generic[I, O],
     IcoOperator[Iterator[I], Iterator[O]],
 ):
-    _operator: IcoOperator[I, O]
+    body: IcoOperator[I, O]
 
     def __init__(
         self,
@@ -19,11 +19,11 @@ class IcoIterateOperator(
             name=f"iterate({operator.name})]",
             children=[operator],
         )
-        self._operator = operator
+        self.body = operator
 
     def _iterate_fn(self, items: Iterator[I]) -> Iterator[O]:
         for item in items:
-            yield self._operator(item)
+            yield self.body(item)
 
 
 def iterate(operator: IcoOperator[I, O]) -> IcoOperator[Iterator[I], Iterator[O]]:
