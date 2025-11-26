@@ -2,7 +2,6 @@ from collections.abc import Iterator
 
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.types import IcoNodeType
 
 
 def test_operator_structure_builds_correct_tree() -> None:
@@ -29,7 +28,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     # 2. Compose operators into a small pipeline
     # ─────────────────────────────
-    pipeline = augment.map() | collate
+    pipeline = augment.iterate() | collate
 
     # ─────────────────────────────
     # 3. Execute the pipeline
@@ -40,10 +39,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     # 4. Retrieve and inspect structural description
     # ─────────────────────────────
-    flow = IcoFlowMeta.from_operator(pipeline)
-
-    # Root node — composition
-    assert flow.node_type == IcoNodeType.chain
+    flow = IcoFlowMeta.from_node(pipeline)
 
     # ─────────────────────────────
     # 5. Validate hierarchy
@@ -51,11 +47,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     assert len(flow.children) == 2
     map_node, collate_node = flow.children
 
-    # Child 1: map
-    assert map_node.node_type == IcoNodeType.map
-
     # Child 2: collate
-    assert collate_node.node_type == IcoNodeType.operator
     assert collate_node.name == "collate"
 
     # ─────────────────────────────
@@ -63,7 +55,6 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     assert len(map_node.children) == 1
     inner_augment = map_node.children[0]
-    assert inner_augment.node_type == IcoNodeType.operator
     assert inner_augment.name == "augment"
 
     # ─────────────────────────────

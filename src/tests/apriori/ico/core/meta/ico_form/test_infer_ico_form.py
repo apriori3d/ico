@@ -27,8 +27,8 @@ def test_infer_form_operator_fn() -> None:
 
 
 def test_infer_form_operator_no_hints() -> None:
-    op = IcoOperator(lambda x: x)  # pyright: ignore[reportUnknownVariableType]
-    assert infer_ico_form(op).name == "Any → Any"  # pyright: ignore[reportUnknownArgumentType]
+    op = IcoOperator(lambda x: x)  # type: ignore
+    assert infer_ico_form(op).name == "Any → Any"  # type: ignore
 
 
 # ─── Composition ───

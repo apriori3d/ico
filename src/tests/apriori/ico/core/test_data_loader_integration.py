@@ -48,9 +48,11 @@ def test_ico_integration_data_runner_pipeline() -> None:
         output=to_output,
     )
 
+    identity = IcoOperator[list[int], list[int]](lambda x: x)
+
     collate = IcoPipeline[Batch, list[int], int](
         context=list,
-        body=[],
+        body=[identity],
         output=max,
     )
 

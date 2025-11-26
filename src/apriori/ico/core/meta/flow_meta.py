@@ -3,12 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import final
 
-from apriori.ico.core.meta.ico_form import IcoForm
-from apriori.ico.core.node import IcoNodeType, IcoOperator
-from apriori.ico.core.runtime.types import (
-    IcoRuntimeOperatorProtocol,
-    IcoRuntimeStateType,
-)
+from apriori.ico.core.meta.ico_form import IcoForm, infer_ico_form
+from apriori.ico.core.node import IcoNode
+from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 
 
 @final
@@ -27,29 +24,25 @@ class IcoFlowMeta:
 
     __slots__ = (
         "name",
-        "node_type",
         "ico_form",
         "runtime_state",
         "children",
     )
 
-    node_type: IcoNodeType
     ico_form: IcoForm
     name: str
-    runtime_state: IcoRuntimeStateType | None
+    runtime_state: IcoRuntimeState | None
     children: list[IcoFlowMeta]
 
     def __init__(
         self,
         *,
         name: str,
-        node_type: IcoNodeType,
         ico_form: IcoForm,
-        runtime_state: IcoRuntimeStateType | None = None,
+        runtime_state: IcoRuntimeState | None = None,
         children: list[IcoFlowMeta] | None = None,
     ) -> None:
         self.name = name
-        self.node_type = node_type
         self.ico_form = ico_form
         self.runtime_state = runtime_state
         self.children = children or []
@@ -65,25 +58,14 @@ class IcoFlowMeta:
     # ─── Factory helpers ───
 
     @staticmethod
-    def from_operator(operator: IcoNode) -> IcoFlowMeta:
-        """Recursively build an IcoFlow from an operator tree."""
-        runtime_state = (
-            operator.state if isinstance(operator, IcoRuntimeOperatorProtocol) else None
-        )
-        ico_form = IcoForm.from_node(operator)
-
-        if not isinstance(operator, IcoOperator):
-            return IcoFlowMeta(
-                name=operator.name,
-                node_type=IcoNodeType.unknown,
-                ico_form=ico_form,
-                runtime_state=runtime_state,
-            )
+    def from_node(node: IcoNode) -> IcoFlowMeta:
+        """Recursively build an IcoFlow from an node tree."""
+        runtime_state = node.state if isinstance(node, IcoRuntimeNode) else None
+        ico_form = infer_ico_form(node)
 
         return IcoFlowMeta(
-            name=operator.name,
-            node_type=operator.node_type,
+            name=node.name,
             ico_form=ico_form,
             runtime_state=runtime_state,
-            children=[IcoFlowMeta.from_operator(c) for c in operator.children],
+            children=[IcoFlowMeta.from_node(c) for c in node.children],
         )

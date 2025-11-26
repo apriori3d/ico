@@ -8,8 +8,8 @@ from rich.tree import Tree
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.runtime.operator import IcoRuntimeOperator
-from apriori.ico.core.runtime.types import IcoRuntimeStateType
+from apriori.ico.core.runtime.contour import IcoRuntimeContour
+from apriori.ico.core.runtime.node import IcoRuntimeState
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
@@ -48,17 +48,17 @@ def _format_label(
     show_states: bool,
     show_ico_form: bool,
 ) -> Text:
-    text = Text(flow_meta.name or flow_meta.node_type.name, style="bold cyan")
-    text.append(f" ({flow_meta.node_type.name})", style="dim")
+    text = Text(flow_meta.name, style="bold cyan")
+    # text.append(f" ({flow_meta.node_type.name})", style="dim")
 
     # Show runtime states if available
     if show_states and flow_meta.runtime_state is not None:
         color = {
-            IcoRuntimeStateType.inactive: "grey50",
-            IcoRuntimeStateType.ready: "green",
-            IcoRuntimeStateType.running: "yellow",
-            IcoRuntimeStateType.paused: "grey70",
-            IcoRuntimeStateType.error: "red",
+            IcoRuntimeState.inactive: "grey50",
+            IcoRuntimeState.ready: "green",
+            IcoRuntimeState.running: "yellow",
+            IcoRuntimeState.paused: "grey70",
+            IcoRuntimeState.fault: "red",
         }.get(flow_meta.runtime_state, "white")
         text.append(f" [{flow_meta.runtime_state.name}]", style=color)
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     collate = IcoOperator(collate_max)
 
     # Augment each item in the batch, then collate to single value (mimic data loader collate)
-    batch_flow = augment.map() | collate
+    batch_flow = augment.iterate() | collate
     aug_stream = IcoStream(batch_flow, name="data_stream")
 
     """
@@ -164,11 +164,11 @@ if __name__ == "__main__":
     # ──── 5. Combine all into the full flow ────
     full_flow = dataset | aug_stream | train_stream | sink
 
-    runtime = IcoRuntimeOperator(full_flow, name="full_flow_runtime")
+    runtime = IcoRuntimeContour(full_flow, name="full_flow_runtime")
     runtime.activate()
 
     # ──── 6. Visualize ────
-    flow_meta = IcoFlowMeta.from_operator(runtime)
+    flow_meta = IcoFlowMeta.from_node(full_flow)
 
     console = Console()
     console.rule("[bold blue]ICO Dataflow: Dataset → Stream → Train → Sink")
