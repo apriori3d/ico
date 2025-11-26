@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta, IcoNodeType
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.stream import IcoStream
 
@@ -47,21 +48,21 @@ def test_stream_composed_with_another_operator() -> None:
     assert result == 12  # (1,2,3) *2 = (2,4,6) → sum = 12
 
 
-# def test_stream_structure_representation() -> None:
-#     """
-#     Test that IcoStream exposes correct flow structure.
-#     """
+def test_stream_structure_representation() -> None:
+    """
+    Test that IcoStream exposes correct flow structure.
+    """
 
-#     scale = IcoOperator[int, int](lambda x: x * 2, name="scale")
-#     stream = IcoStream[int, int](body=scale)
+    scale = IcoOperator[int, int](lambda x: x * 2, name="scale")
+    stream = IcoStream[int, int](body=scale)
 
-#     flow = IcoFlowMeta.from_operator(stream)
+    flow = IcoFlowMeta.from_node(stream)
 
-#     # Root node should be a stream
-#     assert flow.node_type == IcoNodeType.stream
-#     assert len(flow.children) == 1
-#     assert flow.children[0].name == "scale"
-#     assert flow.children[0].node_type == IcoNodeType.operator
+    # Root node should be a stream
+    assert flow.node_type == IcoNodeType.stream
+    assert len(flow.children) == 1
+    assert flow.children[0].name == "scale"
+    assert flow.children[0].node_type == IcoNodeType.operator
 
 
 if __name__ == "__main__":

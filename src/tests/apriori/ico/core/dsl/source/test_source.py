@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta, IcoNodeType
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
@@ -44,28 +45,28 @@ def test_data_stream_composition() -> None:
     assert result == 12  # (1,2,3) *2 = (2,4,6) → sum = 12
 
 
-# def test_data_structure_representation() -> None:
-#     """
-#     Test that IcoData exposes correct flow structure.
-#     """
+def test_data_structure_representation() -> None:
+    """
+    Test that IcoData exposes correct flow structure.
+    """
 
-#     dataset = IcoSource[int](lambda _: iter(range(5)), name="dataset")
-#     scale = IntOperator(lambda x: x * 2, name="scale")
-#     stream = IcoStream(scale)
-#     flow = dataset | stream
+    dataset = IcoSource[int](lambda _: iter(range(5)), name="dataset")
+    scale = IntOperator(lambda x: x * 2, name="scale")
+    stream = IcoStream(scale)
+    flow = dataset | stream
 
-#     structure = IcoFlowMeta.from_operator(flow)
+    structure = IcoFlowMeta.from_node(flow)
 
-#     # Root node should be composition
-#     assert structure.node_type == IcoNodeType.chain
+    # Root node should be composition
+    assert structure.node_type == IcoNodeType.chain
 
-#     # Check child order
-#     data_node, stream_node = structure.children
-#     assert data_node.node_type == IcoNodeType.source
-#     assert data_node.name == "dataset"
+    # Check child order
+    data_node, stream_node = structure.children
+    assert data_node.node_type == IcoNodeType.source
+    assert data_node.name == "dataset"
 
-#     assert stream_node.node_type == IcoNodeType.stream
-#     assert stream_node.children[0].name == "scale"
+    assert stream_node.node_type == IcoNodeType.stream
+    assert stream_node.children[0].name == "scale"
 
 
 if __name__ == "__main__":

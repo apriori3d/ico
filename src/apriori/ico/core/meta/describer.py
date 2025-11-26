@@ -49,7 +49,7 @@ def _format_label(
     show_ico_form: bool,
 ) -> Text:
     text = Text(flow_meta.name, style="bold cyan")
-    # text.append(f" ({flow_meta.node_type.name})", style="dim")
+    text.append(f" ({flow_meta.node_type.name})", style="dim")
 
     # Show runtime states if available
     if show_states and flow_meta.runtime_state is not None:

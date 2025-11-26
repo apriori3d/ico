@@ -1,3 +1,4 @@
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta, IcoNodeType
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.process import IcoProcess
 
@@ -26,10 +27,10 @@ def test_fibonacci_process() -> None:
     assert result == (21, 34)
 
     # Check structure introspection
-    # flow = IcoFlowMeta.from_operator(fib_process)
-    # assert flow.node_type == IcoNodeType.process
-    # assert len(flow.children) == 1
-    # assert flow.children[0].name == "fib_step"
+    flow = IcoFlowMeta.from_node(fib_process)
+    assert flow.node_type == IcoNodeType.process
+    assert len(flow.children) == 1
+    assert flow.children[0].name == "fib_step"
 
 
 if __name__ == "__main__":
