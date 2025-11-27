@@ -62,6 +62,8 @@ class MPProcessAgent(
                     endpoint=self._channel.input,
                     runtime_node=self,
                     accept_events=False,
+                    accept_commands=True,
+                    ignore_timeouts=True,
                 )
                 if result is None:
                     break  # Exit loop on deactivate command
@@ -72,7 +74,6 @@ class MPProcessAgent(
 
                 # Send output item upstream
                 self.state = IcoRuntimeState.sending
-                print(f"Agent {self.name} sending output: {output}")
                 self._channel.output.send(output)
 
                 # Ready for the next item
@@ -92,7 +93,7 @@ class MPProcessAgent(
 
     @staticmethod
     def spawn(
-        channel: MPQueueChannel[I, O],
+        channel: MPQueueChannel[O, I],
         flow_factory: Callable[[], IcoOperator[I, O]],
         *,
         mp_context: SpawnContext,

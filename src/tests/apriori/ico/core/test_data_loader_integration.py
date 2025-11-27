@@ -27,7 +27,7 @@ def test_ico_integration_data_runner_pipeline() -> None:
         [7, 8, 9],
     ]
 
-    def data_generator(_: None) -> DataStream:
+    def data_generator() -> DataStream:
         for batch in data:
             yield iter(batch)
 

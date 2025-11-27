@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-import pytest
-
 from apriori.ico.core.operator import I, IcoOperator
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.sink import IcoSink
@@ -23,7 +21,7 @@ def drain_all(xs: Iterator[I]) -> None:
 def test_runtime_contour_executes_source_to_sink() -> None:
     """Contour should execute full Source → Operator → Sink chain."""
     # Source: () → Iterable[int]
-    source = IcoSource[int](lambda _: iter(range(3)), name="dataset")
+    source = IcoSource[int](lambda: iter(range(3)), name="dataset")
 
     # Operator: int → int
     op = IcoOperator[int, int](lambda x: x * 2, name="double")

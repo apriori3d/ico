@@ -23,7 +23,7 @@ class MPProcess(
     IcoRuntimeNode,
     ProgressMixin,
 ):
-    flow_factory: Callable[[], IcoOperator[O, I]]
+    flow_factory: Callable[[], IcoOperator[I, O]]
 
     _agent_process: SpawnProcess | None
     _channel: MPQueueChannel[I, O] | None
@@ -31,16 +31,18 @@ class MPProcess(
 
     def __init__(
         self,
-        flow_factory: Callable[[], IcoOperator[O, I]],
+        flow_factory: Callable[[], IcoOperator[I, O]],
         *,
         name: str | None = None,
     ) -> None:
         name = name or "mp_process"
         IcoRuntimeNode.__init__(self, name=name)
+
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             fn=self._portal_fn,
+            ico_form_target=flow_factory,
             name=name,
         )
         ProgressMixin.__init__(self)
@@ -69,6 +71,8 @@ class MPProcess(
                 endpoint=self._channel.input,
                 runtime_node=self,
                 accept_commands=False,
+                accept_events=True,
+                ignore_timeouts=True,
             )
             # MPProcess should always receive an output here
             assert output is not None
@@ -119,7 +123,7 @@ class MPProcess(
     def _spawn_agent(self) -> None:
         assert self._channel is not None
 
-        self._agent_process = MPProcessAgent[O, I].spawn(
+        self._agent_process = MPProcessAgent[I, O].spawn(
             channel=self._channel.make_pair(),  # Invert channel for agent
             flow_factory=self.flow_factory,
             mp_context=self._mp_context,

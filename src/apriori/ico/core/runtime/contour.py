@@ -81,6 +81,24 @@ class IcoRuntimeContour(
     def _contour_fn(self, _: None) -> None:
         self._closure(None)
 
+    # ────────────────────────────────────────────────
+    # Describe Utils interface
+    # ────────────────────────────────────────────────
+
+    def describe(
+        self,
+        *,
+        show_states: bool = True,
+        show_ico_form: bool = True,
+    ) -> None:
+        from apriori.ico.core.meta.describer import print_describe
+
+        print_describe(
+            self._closure,
+            show_states=show_states,
+            show_ico_form=show_ico_form,
+        )
+
 
 # ────────────────────────────────────────────────
 # Runtime Discovery and Connection Utilities

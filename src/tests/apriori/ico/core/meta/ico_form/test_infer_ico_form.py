@@ -7,6 +7,7 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
+from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ─── Operator ───
 
@@ -29,6 +30,16 @@ def test_infer_form_operator_fn() -> None:
 def test_infer_form_operator_no_hints() -> None:
     op = IcoOperator(lambda x: x)  # type: ignore
     assert infer_ico_form(op).name == "Any → Any"  # type: ignore
+
+
+def test_infer_form_operator_with_class_callable() -> None:
+    class Adder:
+        def __call__(self, x: int) -> int:
+            return x + 1
+
+    adder = Adder()
+    op = IcoOperator(adder)
+    assert infer_ico_form(op).name == "int → int"
 
 
 # ─── Composition ───
@@ -127,13 +138,13 @@ def test_infer_form_pipeline_with_fn() -> None:
 
 
 def test_infer_form_source_with_generics() -> None:
-    src = IcoSource[float](lambda _: iter([1.0, 2.0, 3.0]))
+    src = IcoSource[float](lambda: iter([1.0, 2.0, 3.0]))
     form = infer_ico_form(src)
     assert form.name == "() → Iterator[float]"
 
 
 def test_infer_form_source_with_fn() -> None:
-    def source_fn(_: None) -> Iterator[float]:
+    def source_fn() -> Iterator[float]:
         yield from [1.0, 2.0, 3.0]
 
     src = IcoSource(source_fn)
@@ -159,6 +170,15 @@ def test_infer_form_sink_with_fn() -> None:
     sink = IcoSink(sink_fn)
     form = infer_ico_form(sink)
     assert form.name == "Iterator[float] → ()"
+
+
+# ─── Batcher ───
+
+
+def test_infer_form_batcher() -> None:
+    batcher = IcoBatcher[int](batch_size=2)
+    form = infer_ico_form(batcher)
+    assert form.name == "Iterator[int] → Iterator[Iterator[int]]"
 
 
 if __name__ == "__main__":

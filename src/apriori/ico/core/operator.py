@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
+from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
@@ -73,6 +74,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         fn: Callable[[I], O],
         *,
         name: str | None = None,
+        ico_form_target: object | None = None,
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ):
@@ -80,6 +82,7 @@ class IcoOperator(Generic[I, O], IcoNode):
             name=name,
             parent=parent,
             children=children,
+            ico_form_target=ico_form_target or fn,
         )
         self.fn = fn
 
@@ -114,10 +117,38 @@ class IcoOperator(Generic[I, O], IcoNode):
 
         return iterate(self)
 
+    # ────────────────────────────────────────────────
+    # Runtime interface
+    # ────────────────────────────────────────────────
 
-# ────────────────────────────────────────────────
+    def runtime(self) -> IcoRuntimeNode:
+        """Create a runtime contour for this operator."""
+        from apriori.ico.core.runtime.contour import IcoRuntimeContour
+
+        return IcoRuntimeContour(self)
+
+    # ────────────────────────────────────────────────
+    # Describe util interface
+    # ────────────────────────────────────────────────
+
+    def describe(
+        self,
+        *,
+        show_states: bool = True,
+        show_ico_form: bool = True,
+    ) -> None:
+        from apriori.ico.core.meta.describer import print_describe
+
+        print_describe(
+            self,
+            show_states=show_states,
+            show_ico_form=show_ico_form,
+        )
+
+
+# ─────────────────────────────────────────────
 # Operator Wrapping Utility
-# ────────────────────────────────────────────────
+# ─────────────────────────────────────────────
 
 
 @overload

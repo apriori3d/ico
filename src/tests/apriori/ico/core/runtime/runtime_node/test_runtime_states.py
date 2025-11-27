@@ -42,7 +42,7 @@ def test_execution_state_transitions_failure() -> None:
         raise RuntimeError("Intentional error for testing.")
 
     faulty_op = IcoOperator(faulty_fn, name="faulty_op")
-    source = IcoSource[int](lambda _: iter([1, 2, 3]), name="data")
+    source = IcoSource[int](lambda: iter([1, 2, 3]), name="data")
     sink = IcoSink[int](lambda items: None if list(items) else None, name="sink")
 
     flow = source | faulty_op.iterate() | sink

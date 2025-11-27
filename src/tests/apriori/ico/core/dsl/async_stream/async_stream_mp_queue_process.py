@@ -120,7 +120,7 @@ def test_single_mp_process_round_trip() -> None:
     data = list(range(1, num + 1))
     mp_process_mock = MPProcessMock(channel)
     try:
-        source = IcoSource(lambda _: iter(data))
+        source = IcoSource[int](lambda: iter(data))
         flow = source | IcoAsyncStream([mp_process_mock])
         result = list(flow(None))
         assert result == [d * 2 for d in data]
@@ -135,7 +135,7 @@ def test_slow_then_fast_unordered_mp_process_round_trip() -> None:
     processes, flows = create_mp_process([flow_slow_tripple, flow_double], num=1)
     data = [1, 2]
     try:
-        source = IcoSource(lambda _: iter(data))
+        source = IcoSource[int](lambda: iter(data))
         flow = source | IcoAsyncStream(flows, ordered=False)
         result = list(flow(None))
         assert result == [4, 3]
@@ -153,7 +153,7 @@ def test_slow_then_fast_ordered_mp_process_round_trip() -> None:
     processes, flows = create_mp_process([flow_slow_tripple, flow_double], num=1)
     data = list(range(1, num + 1))
     try:
-        source = IcoSource(lambda _: iter(data))
+        source = IcoSource[int](lambda: iter(data))
         flow = source | IcoAsyncStream(flows, ordered=True)
         result = list(flow(None))
         assert result == [3, 4]

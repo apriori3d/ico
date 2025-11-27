@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterator
 from dataclasses import dataclass
+from types import GenericAlias
 from typing import (
     Any,
     Literal,
@@ -17,12 +18,13 @@ from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
 from apriori.ico.core.iterate import IcoIterateOperator
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.operator import C, I, IcoOperator, O
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
+from apriori.ico.core.streamline import IcoStreamline
 
 # In this module me infer ICO forms for possibly untyped callables,
 # and have to disable categories of errors related to using Any type in inspect api.
@@ -120,6 +122,9 @@ def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm 
             B = infer_ico_form(obj.children[1])
             return IcoForm(A.i, None, B.o)
 
+        case IcoStreamline():
+            return infer_ico_form(obj.children[0])
+
         case IcoPipeline():
             ctx = infer_ico_form(obj.children[0])
             body = infer_ico_form(obj.children[1])
@@ -134,6 +139,9 @@ def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm 
             pass
 
     return None
+
+
+# ─── Strategy: add iterator annotations for inferred types ───
 
 
 def annotate_iterator_nodes(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
@@ -170,42 +178,105 @@ def annotate_iterator_nodes(obj: object, ico_form: IcoForm | None) -> IcoForm | 
 # ─── Strategy: from operator function ───
 
 
-def infer_from_function(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
-    if ico_form is not None:
+def infer_from_ico_target(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
+    if not isinstance(obj, IcoNode):
         return ico_form
 
-    fn = getattr(obj, "fn", None)
-    if fn is not None:
-        if isinstance(fn, IcoOperator):
-            return infer_ico_form(fn)  # pyright: ignore[reportUnknownArgumentType]
+    fn = obj.ico_form_target
+    if fn is None:
+        return ico_form
 
+    if isinstance(fn, IcoOperator):
+        return infer_ico_form(fn)  # pyright: ignore[reportUnknownArgumentType]
+
+    if not callable(fn):
+        return ico_form
+
+    if inspect.isfunction(fn) or inspect.ismethod(fn):
         return infer_from_callable(fn, ico_form)
 
-    return None
+    return infer_from_callable(fn.__call__, ico_form)
 
 
 # ─── Strategy: from function annotations ───
 
 
 def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
-    if ico_form is not None:
-        return ico_form
-
     if not callable(fn):
-        return None
+        return ico_form
 
     try:
         sig = inspect.signature(fn)
         hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
 
         params = list(sig.parameters.values())
-        i = hints.get(params[0].name, object) if params else object
-        o = hints.get("return", object)
+        i = hints.get(params[0].name, None) if params else None
+        c = None
+        o = hints.get("return", None)
+
+        # No hints, return existing ico form.
+        if i is None and o is None:
+            return ico_form
+
+        # Both input and output are unresolved, return existing ico form.
+        if i is not None and i in [I, C, O] and o is not None and o in [I, C, O]:
+            return ico_form
+
+        # Special case: method can be a factory for flow.
+        # In this case we try to extract ico form from return value annotation.
+        o_origin = get_origin(o)
+
+        if o_origin is not None and issubclass(o_origin, IcoOperator):
+            o_args = get_args(o)
+
+            match len(o_args):
+                case 1:
+                    i = o_args[0]
+                    o = o_args[0]
+                case 2:
+                    i = o_args[0]
+                    o = o_args[1]
+                case 3:
+                    i = o_args[0]
+                    c = o_args[1]
+                    o = o_args[2]
+                case _:
+                    pass
+            return IcoForm(i, c, o)
+
+        # Special case: item type may be inferered from generic ICO form, but origin, like Iterator, is lost.
+        # Yet it may be restored here from function hints.
+        # In order to get complete ico form here both sources are combined.
+
+        if ico_form is not None:
+            if i is not None and ico_form.i is not None:
+                i = replace_deepest_typevar(i, I, ico_form.i)
+
+            if o is not None and ico_form.o is not None:
+                o = replace_deepest_typevar(o, O, ico_form.o)
+
+            return IcoForm(i, ico_form.c, o)
 
         return IcoForm(i, None, o)
 
     except Exception:
-        return None
+        return ico_form
+
+
+def replace_deepest_typevar(
+    type: GenericAlias,
+    target: TypeVar,
+    replacement: object,
+) -> object:
+    args = get_args(type)
+    if not args:
+        return replacement
+    else:
+        origin = get_origin(type)
+        new_args = tuple(
+            replace_deepest_typevar(arg, target, replacement) for arg in args
+        )
+        return origin[new_args]  # type: ignore
 
 
 # ─── Strategy list ───
@@ -213,7 +284,7 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
 _ALL_STRATEGIES = [
     infer_from_generic,
     infer_from_node_structure,
-    infer_from_function,
+    infer_from_ico_target,
     infer_from_callable,
     annotate_iterator_nodes,
 ]

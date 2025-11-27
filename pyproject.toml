@@ -11,12 +11,22 @@ packages = [
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
 rich = "^14.2.0"
+torch = {version = "^2.9.1", optional = true}
+torchvision = {version = "^0.24.1", optional = true}
+matplotlib = {version = "^3.10.7", optional = true}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.18.2"
 ruff = "^0.6.8"
 pytest = "^8.3.3"
 pytest-xdist = "^3.6.1"
+
+[tool.poetry.extras]
+vision = [
+    "torch",
+    "torchvision",
+    "matplotlib"
+]
 
 # ───────────────────────────────────────────────
 # Ruff

@@ -21,7 +21,7 @@ def test_data_consumes_iterable() -> None:
 
     read_all = False
 
-    def source_fn(_: None) -> Iterator[int]:
+    def source_fn() -> Iterator[int]:
         nonlocal read_all
         yield from [1, 2, 3]
         read_all = True
@@ -38,7 +38,7 @@ def test_data_structure_representation() -> None:
     Test that IcoData exposes correct flow structure.
     """
 
-    dataset = IcoSource[int](lambda _: iter(range(5)), name="dataset")
+    dataset = IcoSource[int](lambda: iter(range(5)), name="dataset")
     scale = IntOperator(lambda x: x * 2, name="scale")
     stream = IcoStream(scale)
     sink_op = IcoSink(sink_fn, name="sink")

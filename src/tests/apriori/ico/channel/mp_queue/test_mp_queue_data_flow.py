@@ -133,7 +133,7 @@ def test_send_receive_stream() -> None:
     )
 
     try:
-        src = IcoSource(lambda _: iter(range(num_queries)))
+        src = IcoSource(lambda: iter(range(num_queries)))
         flow = src | mp_process_mock.iterate()
         results = list(flow(None))
         assert results == [i * 2 for i in range(num_queries)]
@@ -143,8 +143,6 @@ def test_send_receive_stream() -> None:
 
 
 if __name__ == "__main__":
-    # test_send_receive_roundtrip_flow_basic()
-
     import sys
 
     sys.exit(pytest.main([__file__]))

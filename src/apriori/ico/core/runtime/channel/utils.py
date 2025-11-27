@@ -1,3 +1,4 @@
+from queue import Empty
 from typing import TypeVar
 
 from apriori.ico.core.runtime.channel.channel import IcoReceiveEndpoint
@@ -14,12 +15,20 @@ def wait_for_item(
     runtime_node: IcoRuntimeNode | None = None,
     accept_commands: bool = True,
     accept_events: bool = True,
+    ignore_timeouts: bool = True,
 ) -> T | None:
     """Blocking wait for an incoming item."""
     while True:
         if runtime_node is not None:
             runtime_node.state = IcoRuntimeState.waiting
-        input = endpoint.receive()
+
+        try:
+            input = endpoint.receive()
+        except (TimeoutError, Empty):
+            if ignore_timeouts:
+                continue
+            else:
+                raise
 
         # Process runtime commands/events
         if isinstance(input, IcoRuntimeCommand):

@@ -80,7 +80,7 @@ def test_icoflow_process_node() -> None:
 
 # ─── Source ───
 def test_icoflow_source_node() -> None:
-    src = IcoSource[int](lambda _: iter([1, 2, 3]), name="data")
+    src = IcoSource[int](lambda: iter([1, 2, 3]), name="data")
     flow = IcoFlowMeta.from_node(src)
 
     assert flow.ico_form.name == "() → Iterator[int]"
@@ -90,7 +90,7 @@ def test_icoflow_source_node() -> None:
 
 # ─── Traversal ───
 def test_icoflow_traverse_returns_all_nodes() -> None:
-    src = IcoSource[int](lambda _: iter([1, 2, 3]), name="src")
+    src = IcoSource[int](lambda: iter([1, 2, 3]), name="src")
     op = IcoOperator[int, int](lambda x: x + 1, name="plus")
     pipe = IcoPipeline[int, int, int](
         context=IcoOperator[int, int](lambda x: x, name="ctx"),

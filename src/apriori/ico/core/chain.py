@@ -19,7 +19,7 @@ class IcoChainOperator(
     ):
         super().__init__(
             fn=self._chained_fn,
-            name=f"{first.name} ∘ {second.name}",
+            name=f"{first.name} | {second.name}",
             parent=None,
             children=[first, second],
         )

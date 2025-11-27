@@ -17,6 +17,7 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
+from apriori.ico.core.streamline import IcoStreamline
 
 
 class IcoNodeType(Enum):
@@ -28,24 +29,27 @@ class IcoNodeType(Enum):
     iterate = auto()
     chain = auto()
     pipeline = auto()
+    streamline = auto()
     process = auto()
     stream = auto()
     async_stream = auto()
     source = auto()
     sink = auto()
+    runtime_node = auto()
 
 
-CLASS_TO_NODE_TYPE: dict[type[IcoNode], IcoNodeType] = {
-    IcoOperator: IcoNodeType.operator,
-    IcoAsyncOperator: IcoNodeType.async_operator,
+CLASS_TO_NODE_TYPE: dict[type, IcoNodeType] = {
     IcoIterateOperator: IcoNodeType.iterate,
     IcoChainOperator: IcoNodeType.chain,
     IcoPipeline: IcoNodeType.pipeline,
+    IcoStreamline: IcoNodeType.streamline,
     IcoProcess: IcoNodeType.process,
     IcoStream: IcoNodeType.stream,
     IcoAsyncStream: IcoNodeType.async_stream,
     IcoSource: IcoNodeType.source,
     IcoSink: IcoNodeType.sink,
+    IcoAsyncOperator: IcoNodeType.async_operator,
+    IcoOperator: IcoNodeType.operator,
 }
 
 
@@ -109,9 +113,17 @@ class IcoFlowMeta:
         ico_form = infer_ico_form(node)
 
         return IcoFlowMeta(
-            node_type=CLASS_TO_NODE_TYPE.get(type(node), IcoNodeType.unknown),
+            node_type=infer_node_type(node),
             name=node.name,
             ico_form=ico_form,
             runtime_state=runtime_state,
             children=[IcoFlowMeta.from_node(c) for c in node.children],
         )
+
+
+def infer_node_type(node: IcoNode) -> IcoNodeType:
+    """Infer the node type based on its class."""
+    for cls, node_type in CLASS_TO_NODE_TYPE.items():
+        if isinstance(node, cls):
+            return node_type
+    return IcoNodeType.unknown

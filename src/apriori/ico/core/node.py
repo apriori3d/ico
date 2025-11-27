@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Any
 
 
 class IcoNode:
@@ -10,38 +9,23 @@ class IcoNode:
     name: str
     parent: IcoNode | None
     children: Sequence[IcoNode]
+    ico_form_target: object | None
 
     def __init__(
         self,
         name: str | None = None,
+        ico_form_target: object | None = None,
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ) -> None:
         super().__init__()
         self.name = name or self.__class__.__name__
+        self.ico_form_target = ico_form_target
         self.parent = parent
         self.children = children or []
 
         for child in self.children:
             child.parent = self
-
-
-class IcoTypeInfo:
-    ico_input: type | None
-    ico_context: type | None
-    ico_output: type | None
-
-    def __init__(
-        self,
-        i: type | None = None,
-        c: type | None = None,
-        o: type | None = None,
-        *args: Any,
-        **kwargs: Any,
-    ):
-        self.ico_input = i
-        self.ico_context = c
-        self.ico_output = o
 
 
 def iterate_nodes(

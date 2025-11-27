@@ -6,6 +6,7 @@ from rich.text import Text
 from rich.tree import Tree
 
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
@@ -23,6 +24,26 @@ def describe(
 ) -> Tree:
     """Render an ICO operator graph (flow) as a rich tree."""
     return _build_node(flow, show_states, show_ico_form)
+
+
+def print_describe(
+    node: IcoNode,
+    *,
+    show_states: bool = True,
+    show_ico_form: bool = False,
+) -> None:
+    from rich.console import Console
+
+    flow_meta = IcoFlowMeta.from_node(node)
+    console = Console()
+    console.rule(f"[bold blue]ICO flow description of {node.name}")
+    console.print(
+        describe(
+            flow_meta,
+            show_states=show_states,
+            show_ico_form=show_ico_form,
+        )
+    )
 
 
 # ─── Recursive builder ───
@@ -79,7 +100,7 @@ if __name__ == "__main__":
     from rich.console import Console
 
     # ──── 1. Define a batched data source ────
-    def generate_batches(_: None) -> Iterator[DataBatch]:
+    def generate_batches() -> Iterator[DataBatch]:
         """Simulate dataset batches: () → Iterable[list[float]]"""
         data = [
             [0.5, 1.0, 1.5],
