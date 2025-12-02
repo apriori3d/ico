@@ -99,9 +99,6 @@ if __name__ == "__main__":
 
     # ──── 2. Define augmentation & collation pipelines per item ────
 
-    def identity_ctx(x: Item) -> Item:
-        return x
-
     def scale_fn(x: Item) -> Item:
         return x * 1.1
 
@@ -109,12 +106,8 @@ if __name__ == "__main__":
         return x + 0.1
 
     augment = IcoPipeline(
-        context=IcoOperator(identity_ctx),
-        body=[
-            IcoOperator(scale_fn),
-            IcoOperator(shift_fn),
-        ],
-        output=IcoOperator(identity_ctx),
+        scale_fn,
+        shift_fn,
         name="augment_pipeline",
     )
 
@@ -132,8 +125,8 @@ if __name__ == "__main__":
     • dataset: () → Iterable[Iterable[float]]
     • stream: Iterable[Iterable[float]] → Iterable[float]
     • augment.map(): Iterable[float] → Iterable[float]
-    • augment: float → float → float,
-    • collate: Iterable[float] → Iterable[float] → float
+    • augment: float → float,
+    • collate: Iterable[float] → float
     • dataflow: () → Iterable[float]
     """
     dataflow = dataset | aug_stream
@@ -149,21 +142,15 @@ if __name__ == "__main__":
     def pow_if_needed(values: TrainBatch) -> TrainBatch:
         return values**2 if values <= 1.0 else values
 
-    def identity_context_train(x: TrainBatch) -> TrainBatch:
-        return x
-
     train_iter = IcoPipeline(
-        context=IcoOperator(identity_context_train),
-        body=[IcoOperator(pow_if_needed)],
-        output=IcoOperator(identity_context_train),
+        pow_if_needed,
         name="train_pipeline",
     )
 
     train_stream = IcoStream(train_iter, name="train_stream")
 
-    def sink_fn(stream: Iterator[TrainBatch]) -> None:
-        for _ in stream:
-            pass
+    def sink_fn(item: TrainBatch) -> None:
+        pass
 
     sink = IcoSink(sink_fn)
 
