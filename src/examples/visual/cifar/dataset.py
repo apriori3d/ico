@@ -17,7 +17,7 @@ class CifarInMemoryDataset:
     images: Tensor  # (N, 3, 32, 32)
     labels: Tensor  # (N,)
 
-    def __init__(self, root: str = "data/"):
+    def __init__(self, root: str = "data/", share_memory: bool = True):
         dataset = CIFAR10(root=root, download=True, transform=ToTensor())
 
         # Preload all data into memory as tensors
@@ -27,8 +27,9 @@ class CifarInMemoryDataset:
         self.labels = torch.tensor([dataset[i][1] for i in range(len(dataset))])  # (N,)
 
         # Share memory for multi-process data loading
-        self.images.share_memory_()
-        self.labels.share_memory_()
+        if share_memory:
+            self.images.share_memory_()
+            self.labels.share_memory_()
 
     def __len__(self) -> int:
         return len(self.images)

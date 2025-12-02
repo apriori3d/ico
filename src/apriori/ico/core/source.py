@@ -32,17 +32,17 @@ class IcoSource(
 
     def __init__(
         self,
-        iterator: Callable[[], Iterator[O]],
+        fn: Callable[[], Iterator[O]],
         *,
         name: str | None = None,
     ):
         super().__init__(
             fn=self._iterator_fn,
             name=name or "source",
-            ico_form_target=iterator,
+            ico_form_target=fn,
             children=[],
         )
-        self.iterator = iterator
+        self.iterator = fn
 
     def _iterator_fn(self, _: None) -> Iterator[O]:
         yield from self.iterator()

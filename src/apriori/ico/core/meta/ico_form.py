@@ -16,15 +16,17 @@ from typing import (
 
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
+from apriori.ico.core.context_operator import C
+from apriori.ico.core.context_pipeline import IcoContextPipeline
+from apriori.ico.core.context_stream import IcoEpoch
 from apriori.ico.core.iterate import IcoIterateOperator
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import C, I, IcoOperator, O
+from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.core.streamline import IcoStreamline
 
 # In this module me infer ICO forms for possibly untyped callables,
 # and have to disable categories of errors related to using Any type in inspect api.
@@ -47,7 +49,7 @@ class IcoForm:
         if self.c is None:
             return f"{_format_type(self.i)} → {_format_type(self.o)}"
         return (
-            f"{_format_type(self.i)} → {_format_type(self.c)} → {_format_type(self.o)}"
+            f"{_format_type(self.i)}, {_format_type(self.c)} → {_format_type(self.o)}"
         )
 
     @property
@@ -109,31 +111,41 @@ def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm 
 
     match obj:
         case IcoStream():
+            assert len(obj.children) == 1
             return infer_ico_form(obj.children[0])
 
         case IcoAsyncStream():
+            assert len(obj.children) == 1
             return infer_ico_form(obj.children[0])
 
         case IcoIterateOperator():
+            assert len(obj.children) == 1
             return infer_ico_form(obj.children[0])
 
         case IcoChainOperator():
+            assert len(obj.children) == 2
             A = infer_ico_form(obj.children[0])
             B = infer_ico_form(obj.children[1])
             return IcoForm(A.i, None, B.o)
 
-        case IcoStreamline():
+        case IcoPipeline():
+            assert len(obj.children) >= 1
             return infer_ico_form(obj.children[0])
 
-        case IcoPipeline():
-            ctx = infer_ico_form(obj.children[0])
-            body = infer_ico_form(obj.children[1])
-            out = infer_ico_form(obj.children[-1])
-            return IcoForm(ctx.i, body.o, out.o)
-
         case IcoProcess():
+            assert len(obj.children) == 1
             body = infer_ico_form(obj.children[0])
             return IcoForm(body.i, None, body.o)
+
+        case IcoContextPipeline():
+            assert len(obj.children) >= 1
+            return infer_ico_form(obj.children[0])
+
+        case IcoEpoch():
+            assert len(obj.children) == 2
+            source_form = infer_ico_form(obj.children[0])
+            context_form = infer_ico_form(obj.children[1])
+            return IcoForm(source_form.o, context_form.c, context_form.o)
 
         case _:
             pass
@@ -211,7 +223,7 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
 
         params = list(sig.parameters.values())
         i = hints.get(params[0].name, None) if params else None
-        c = None
+        c = hints.get(params[1].name, None) if len(params) > 1 else None
         o = hints.get("return", None)
 
         # No hints, return existing ico form.
@@ -222,7 +234,7 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
         if i is not None and i in [I, C, O] and o is not None and o in [I, C, O]:
             return ico_form
 
-        # Special case: method can be a factory for flow.
+        # Special case: method can be a flow factory.
         # In this case we try to extract ico form from return value annotation.
         o_origin = get_origin(o)
 
@@ -257,7 +269,7 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
 
             return IcoForm(i, ico_form.c, o)
 
-        return IcoForm(i, None, o)
+        return IcoForm(i, c, o)
 
     except Exception:
         return ico_form

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
+from types import FunctionType
 from typing import Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
@@ -11,7 +12,6 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode
 # ────────────────────────────────────────────────
 
 I = TypeVar("I")  # noqa: E741
-C = TypeVar("C")
 O = TypeVar("O")  # noqa: E741
 
 
@@ -78,6 +78,13 @@ class IcoOperator(Generic[I, O], IcoNode):
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ):
+        if not name:
+            cls = getattr(fn, "__class__", None)
+            if cls is FunctionType:
+                name = getattr(fn, "__name__", None)
+            else:
+                name = name or getattr(cls, "__name__", None)
+
         super().__init__(
             name=name,
             parent=parent,
@@ -85,9 +92,6 @@ class IcoOperator(Generic[I, O], IcoNode):
             ico_form_target=ico_form_target or fn,
         )
         self.fn = fn
-
-        if name is None and hasattr(fn, "__name__"):
-            self.name = fn.__name__
 
     def __str__(self) -> str:
         return self.name
@@ -137,9 +141,9 @@ class IcoOperator(Generic[I, O], IcoNode):
         show_states: bool = True,
         show_ico_form: bool = True,
     ) -> None:
-        from apriori.ico.core.meta.describer import print_describe
+        from apriori.ico.core.meta.describer import describe as describe_util
 
-        print_describe(
+        describe_util(
             self,
             show_states=show_states,
             show_ico_form=show_ico_form,

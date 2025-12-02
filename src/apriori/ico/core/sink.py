@@ -18,10 +18,16 @@ class IcoSink(
 
     def __init__(
         self,
-        fn: Callable[[Iterator[I]], None],
+        consume_fn: Callable[[I], None],
         name: str | None = None,
     ) -> None:
         super().__init__(
-            fn=fn,
+            fn=self._sink_fn,
             name=name or "sink",
+            ico_form_target=consume_fn,
         )
+        self.consume_fn = consume_fn
+
+    def _sink_fn(self, items: Iterator[I]) -> None:
+        for item in items:
+            self.consume_fn(item)

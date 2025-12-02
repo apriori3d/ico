@@ -38,7 +38,7 @@ def test_icoflow_iterate_node() -> None:
     iterated = base.iterate()
 
     flow = IcoFlowMeta.from_node(iterated)
-    assert flow.node_type == IcoNodeType.iterate
+    assert flow.node_type == IcoNodeType.iterator
     assert flow.ico_form.name == "Iterator[int] → Iterator[float]"
     assert flow.children and flow.children[0].name == "scale"
 

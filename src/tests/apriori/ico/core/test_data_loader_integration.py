@@ -95,7 +95,7 @@ def test_ico_integration_data_runner_pipeline() -> None:
 
     # Map should have one children: the pipeline for augmentation
     map_node = compose_node.children[0]
-    assert map_node.node_type == IcoNodeType.iterate
+    assert map_node.node_type == IcoNodeType.iterator
     assert len(map_node.children) == 1
 
     # Augmentation pipeline should contain exactly 3 children (context, flow step, output)

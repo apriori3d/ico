@@ -51,7 +51,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     map_node, collate_node = flow.children
 
     # Child 1: iterate
-    assert map_node.node_type == IcoNodeType.iterate
+    assert map_node.node_type == IcoNodeType.iterator
 
     # Child 2: collate
     assert collate_node.node_type == IcoNodeType.operator

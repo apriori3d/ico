@@ -7,6 +7,9 @@ from typing import final
 from apriori.ico.core.async_operator import IcoAsyncOperator
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
+from apriori.ico.core.context_operator import IcoContextOperator
+from apriori.ico.core.context_pipeline import IcoContextPipeline
+from apriori.ico.core.context_stream import IcoEpoch
 from apriori.ico.core.iterate import IcoIterateOperator
 from apriori.ico.core.meta.ico_form import IcoForm, infer_ico_form
 from apriori.ico.core.node import IcoNode
@@ -17,7 +20,6 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.core.streamline import IcoStreamline
 
 
 class IcoNodeType(Enum):
@@ -25,31 +27,36 @@ class IcoNodeType(Enum):
 
     unknown = auto()
     operator = auto()
+    context_operator = auto()
     async_operator = auto()
-    iterate = auto()
+    iterator = auto()
     chain = auto()
     pipeline = auto()
+    context_pipeline = auto()
     streamline = auto()
     process = auto()
     stream = auto()
     async_stream = auto()
     source = auto()
     sink = auto()
+    epoch = auto()
     runtime_node = auto()
 
 
 CLASS_TO_NODE_TYPE: dict[type, IcoNodeType] = {
-    IcoIterateOperator: IcoNodeType.iterate,
+    IcoIterateOperator: IcoNodeType.iterator,
     IcoChainOperator: IcoNodeType.chain,
     IcoPipeline: IcoNodeType.pipeline,
-    IcoStreamline: IcoNodeType.streamline,
+    IcoContextPipeline: IcoNodeType.context_pipeline,
     IcoProcess: IcoNodeType.process,
     IcoStream: IcoNodeType.stream,
     IcoAsyncStream: IcoNodeType.async_stream,
     IcoSource: IcoNodeType.source,
     IcoSink: IcoNodeType.sink,
+    IcoEpoch: IcoNodeType.epoch,
     IcoAsyncOperator: IcoNodeType.async_operator,
     IcoOperator: IcoNodeType.operator,
+    IcoContextOperator: IcoNodeType.context_operator,
 }
 
 

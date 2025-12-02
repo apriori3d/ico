@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Generic, final
 
+from apriori.ico.core.context_operator import C
 from apriori.ico.core.operator import (
-    C,
     IcoOperator,
     wrap_operator,
 )
@@ -44,6 +44,7 @@ class IcoProcess(
     def __init__(
         self,
         body: Callable[[C], C],
+        *,
         num_iterations: int,
         name: str | None = None,
     ):

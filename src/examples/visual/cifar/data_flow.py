@@ -5,8 +5,8 @@ import torch
 from torch import Tensor
 
 from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.source import IcoSource
-from apriori.ico.core.streamline import IcoStreamline
 from apriori.ico.utils.data.batcher import IcoBatcher
 from examples.visual.cifar.augment import (
     AdjustBrightness,
@@ -42,13 +42,6 @@ def to_shared_memory(batch: CifarBatch) -> CifarBatch:
     return batch
 
 
-def fetch_items(
-    batch_ref: Iterator[int], dataset: CifarInMemoryDataset
-) -> CifarItemBatch:
-    for index in batch_ref:
-        yield dataset[index]
-
-
 class CifarItemsResolver:
     dataset: CifarInMemoryDataset
 
@@ -73,19 +66,21 @@ class IndexedAugmentationFlowFactory:
         return resolved_flow
 
 
-def create_augmentation_flow() -> IcoOperator[CifarItemBatch, CifarBatch]:
-    item_aug_flow = IcoStreamline(
-        [
-            HorizontalFlip(),
-            VerticalFlip(),
-            AdjustBrightness(),
-            AdjustContrast(),
-        ]
+def create_augmentation_flow(
+    share_tensors: bool = True,
+) -> IcoOperator[CifarItemBatch, CifarBatch]:
+    item_aug_flow = IcoPipeline(
+        HorizontalFlip(),
+        VerticalFlip(),
+        AdjustBrightness(),
+        AdjustContrast(),
     )
     item_aug_flow.name = "Item augmentation flow"
-    flow = (
-        item_aug_flow.iterate() | IcoOperator(collate) | IcoOperator(to_shared_memory)
-    )
+    flow = item_aug_flow.iterate() | IcoOperator(collate)
+
+    if share_tensors:
+        flow = flow | IcoOperator(to_shared_memory)
+
     flow.name = "Full Augmentation flow"
     return flow
 

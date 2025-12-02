@@ -1,5 +1,8 @@
 from collections.abc import Iterator
 
+from apriori.ico.core.context_operator import IcoContextOperator
+from apriori.ico.core.context_pipeline import IcoContextPipeline
+from apriori.ico.core.context_stream import IcoEpoch
 from apriori.ico.core.meta.ico_form import IcoForm, infer_ico_form
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
@@ -99,39 +102,27 @@ def test_infer_form_process_from_fn() -> None:
 
 
 def test_infer_form_pipeline_generics() -> None:
-    p = IcoPipeline[int, float, str](
-        context=IcoOperator[int, float](float),
-        body=[IcoOperator[float, float](lambda x: x * 2)],
-        output=IcoOperator[float, str](str),
+    p = IcoPipeline[int](
+        IcoOperator[int, int](lambda x: x * 2),
+        IcoOperator[int, int](lambda x: x + 1),
     )
-    assert infer_ico_form(p).name == "int → float → str"
+    assert infer_ico_form(p).name == "int → int"
 
 
 def test_infer_form_pipeline_without_hints() -> None:
-    p = IcoPipeline[int, float, str](
-        context=lambda x: float(x),
-        body=[lambda x: x * 2],
-        output=lambda x: str(x),
+    p = IcoPipeline[int](
+        lambda x: x * 2,
+        lambda x: x + 1,
     )
-    assert infer_ico_form(p).name == "int → float → str"
+    assert infer_ico_form(p).name == "int → int"
 
 
 def test_infer_form_pipeline_with_fn() -> None:
-    def context_fn(x: int) -> float:
-        return float(x)
-
-    def body_fn(x: float) -> float:
+    def body_fn(x: int) -> int:
         return x * 2
 
-    def output_fn(x: float) -> str:
-        return str(x)
-
-    p = IcoPipeline(
-        context=context_fn,
-        body=[body_fn],
-        output=output_fn,
-    )
-    assert infer_ico_form(p).name == "int → float → str"
+    p = IcoPipeline(body_fn)
+    assert infer_ico_form(p).name == "int → int"
 
 
 # ─── Source ───
@@ -155,9 +146,8 @@ def test_infer_form_source_with_fn() -> None:
 # ─── Sink ───
 
 
-def sink_fn(x: Iterator[float]) -> None:
-    for _ in x:
-        pass
+def sink_fn(x: float) -> None:
+    pass
 
 
 def test_infer_form_sink_with_generics() -> None:
@@ -179,6 +169,103 @@ def test_infer_form_batcher() -> None:
     batcher = IcoBatcher[int](batch_size=2)
     form = infer_ico_form(batcher)
     assert form.name == "Iterator[int] → Iterator[Iterator[int]]"
+
+
+# ─── Context operator ───
+
+
+def test_infer_form_context_operator_from_generics() -> None:
+    ctx_op = IcoContextOperator[int, str, str](lambda i, c: c + str(i))
+    form = infer_ico_form(ctx_op)
+    assert form.name == "int, str → str"
+
+
+def test_infer_form_context_operator_from_hints() -> None:
+    def ctx_fn(i: int, c: str) -> str:
+        return c + str(i)
+
+    ctx_op = IcoContextOperator(ctx_fn)
+    form = infer_ico_form(ctx_op)
+    assert form.name == "int, str → str"
+
+
+# ─── Context Pipeline ───
+
+
+def test_infer_form_context_pipeline_from_generics() -> None:
+    ctx_pipe = IcoContextPipeline[int, str, str](
+        IcoContextOperator[int, str, str](lambda i, c: c + str(i)),
+        IcoOperator[str, str](lambda c: c.upper()),
+    )
+    form = infer_ico_form(ctx_pipe)
+    assert form.name == "int, str → str"
+
+
+def test_infer_form_context_pipeline_from_type_hints() -> None:
+    def apply_fn(i: int, c: str) -> str:
+        return c + str(i)
+
+    def step_fn(c: str) -> str:
+        return c.upper()
+
+    ctx_pipe = IcoContextPipeline(
+        apply_fn,
+        step_fn,
+    )
+    form = infer_ico_form(ctx_pipe)
+    assert form.name == "int, str → str"
+
+
+# ─── Epoch ───
+
+
+def test_infer_form_epoch_from_generics() -> None:
+    source = IcoSource[int](lambda: iter([1, 2, 3]))
+    context_op = IcoContextOperator[int, str, str](lambda i, c: c + str(i))
+
+    epoch = IcoEpoch(source, context_op)
+    form = infer_ico_form(epoch)
+    assert form.name == "Iterator[int], str → str"
+
+
+def test_infer_form_epoch_from_type_hints() -> None:
+    def source_fn() -> Iterator[int]:
+        yield from [1, 2, 3]
+
+    def context_fn(i: int, c: str) -> str:
+        return c + str(i)
+
+    source = IcoSource(source_fn)
+    context_op = IcoContextOperator(context_fn)
+
+    epoch = IcoEpoch(source, context_op)
+    form = infer_ico_form(epoch)
+    assert form.name == "Iterator[int], str → str"
+
+
+def test_infer_form_epoch_from_type_hints_fn_only() -> None:
+    def source_fn(_: None) -> Iterator[int]:
+        yield from [1, 2, 3]
+
+    def context_fn(i: int, c: str) -> str:
+        return c + str(i)
+
+    epoch = IcoEpoch(source_fn, context_fn)
+    form = infer_ico_form(epoch)
+    assert form.name == "Iterator[int], str → str"
+
+
+def test_infer_form_epoch_from_type_hints_with_source() -> None:
+    def source_fn() -> Iterator[int]:
+        yield from [1, 2, 3]
+
+    def context_fn(i: int, c: str) -> str:
+        return c + str(i)
+
+    source = IcoSource(source_fn)
+    epoch = IcoEpoch(source, context_fn)
+    form = infer_ico_form(epoch)
+    assert form.name == "Iterator[int], str → str"
 
 
 if __name__ == "__main__":

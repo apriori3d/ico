@@ -17,33 +17,20 @@ from apriori.ico.core.stream import IcoStream
 
 
 def describe(
-    flow: IcoFlowMeta,
-    *,
-    show_states: bool = True,
-    show_ico_form: bool = False,
-) -> Tree:
-    """Render an ICO operator graph (flow) as a rich tree."""
-    return _build_node(flow, show_states, show_ico_form)
-
-
-def print_describe(
     node: IcoNode,
     *,
     show_states: bool = True,
-    show_ico_form: bool = False,
+    show_ico_form: bool = True,
 ) -> None:
     from rich.console import Console
 
+    """Render an ICO operator graph (flow) as a rich tree."""
     flow_meta = IcoFlowMeta.from_node(node)
+    tree = _build_node(flow_meta, show_states, show_ico_form)
+
     console = Console()
-    console.rule(f"[bold blue]ICO flow description of {node.name}")
-    console.print(
-        describe(
-            flow_meta,
-            show_states=show_states,
-            show_ico_form=show_ico_form,
-        )
-    )
+    console.rule(f"[bold blue]{node.name}", style="dim blue")
+    console.print(tree)
 
 
 # ─── Recursive builder ───
@@ -85,7 +72,7 @@ def _format_label(
 
     # Show ICO form (signature)
     if show_ico_form:
-        text.append(f"  {flow_meta.ico_form.name}", style="dim blue")
+        text.append(f"  {flow_meta.ico_form.name}", style="gray70")
 
     return text
 
@@ -97,8 +84,6 @@ DataBatch = Iterator[Item]
 TrainBatch = float
 
 if __name__ == "__main__":
-    from rich.console import Console
-
     # ──── 1. Define a batched data source ────
     def generate_batches() -> Iterator[DataBatch]:
         """Simulate dataset batches: () → Iterable[list[float]]"""
@@ -189,8 +174,4 @@ if __name__ == "__main__":
     runtime.activate()
 
     # ──── 6. Visualize ────
-    flow_meta = IcoFlowMeta.from_node(full_flow)
-
-    console = Console()
-    console.rule("[bold blue]ICO Dataflow: Dataset → Stream → Train → Sink")
-    console.print(describe(flow_meta, show_states=True, show_ico_form=True))
+    describe(full_flow)
