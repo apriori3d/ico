@@ -66,7 +66,6 @@ if __name__ == "__main__":
 
     flow = numbers | (double | shift).iterate() | print_result
     flow.describe()
-    flow.describe(include_runtime=True)
 
     console = Console()
     printer_tool = RichPrinterTool(console)

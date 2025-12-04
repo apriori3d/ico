@@ -128,7 +128,6 @@ class IcoFlowMeta:
     def from_node(
         node: IcoNode,
         include_runtime: bool = False,
-        expand_wrappers: bool = False,
     ) -> IcoFlowMeta: ...
 
     @overload
@@ -141,7 +140,6 @@ class IcoFlowMeta:
     def from_node(
         node: IcoNode | IcoRuntimeNode,
         include_runtime: bool = False,
-        expand_wrappers: bool = False,
     ) -> IcoFlowMeta:
         """Recursively build an IcoFlow from an node tree."""
 
@@ -151,7 +149,6 @@ class IcoFlowMeta:
         return _build_flow_meta(
             node,
             include_runtime=include_runtime,
-            expand_wrappers=expand_wrappers,
         )
 
 
@@ -167,7 +164,6 @@ def _build_runtime_flow_meta(node: IcoRuntimeNode) -> IcoFlowMeta:
 def _build_flow_meta(
     node: IcoNode,
     include_runtime: bool = False,
-    expand_wrappers: bool = False,
 ) -> IcoFlowMeta:
     """Recursively build an IcoFlowMeta from a static node tree."""
 
@@ -175,10 +171,13 @@ def _build_flow_meta(
 
     if node_type == IcoNodeType.runtime_wrapper and not include_runtime:
         # Flatten wrapper nodes by promoting their single child
+        assert (
+            len(node.children) == 1
+        ), "Runtime wrapper must have exactly one child: wrapped operator."
+
         wrapped_node = _build_flow_meta(
             node.children[0],
-            include_runtime=include_runtime,
-            expand_wrappers=False,
+            include_runtime=False,
         )
         return wrapped_node
 
@@ -186,7 +185,6 @@ def _build_flow_meta(
         _build_flow_meta(
             c,
             include_runtime=include_runtime,
-            expand_wrappers=expand_wrappers,
         )
         for c in node.children
     ]

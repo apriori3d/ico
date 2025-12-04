@@ -140,7 +140,6 @@ class IcoOperator(Generic[I, O], IcoNode):
         *,
         show_ico_form: bool = True,
         include_runtime: bool = False,
-        expand_wrappers: bool = False,
     ) -> None:
         from apriori.ico.core.meta.describer import describe as describe_util
         from apriori.ico.core.meta.flow_meta import IcoFlowMeta
@@ -148,7 +147,6 @@ class IcoOperator(Generic[I, O], IcoNode):
         meta = IcoFlowMeta.from_node(
             self,
             include_runtime=include_runtime,
-            expand_wrappers=expand_wrappers,
         )
         describe_util(meta, show_ico_form=show_ico_form)
 
