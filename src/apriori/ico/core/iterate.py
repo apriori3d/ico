@@ -16,7 +16,7 @@ class IcoIterateOperator(
     ) -> None:
         super().__init__(
             fn=self._iterate_fn,
-            name=f"iterate({operator.name})",
+            name=f"Iterate({operator.name})",
             children=[operator],
         )
         self.body = operator

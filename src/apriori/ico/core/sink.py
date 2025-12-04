@@ -31,3 +31,15 @@ class IcoSink(
     def _sink_fn(self, items: Iterator[I]) -> None:
         for item in items:
             self.consume_fn(item)
+
+
+# ─────────────────────────────────────────────
+# Decorator
+# ─────────────────────────────────────────────
+
+
+def sink() -> Callable[[Callable[[I], None]], IcoSink[I]]:
+    def decorator(fn: Callable[[I], None]) -> IcoSink[I]:
+        return IcoSink(fn)
+
+    return decorator

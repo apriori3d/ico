@@ -138,21 +138,31 @@ class IcoOperator(Generic[I, O], IcoNode):
     def describe(
         self,
         *,
-        show_states: bool = True,
         show_ico_form: bool = True,
+        include_runtime: bool = False,
+        expand_wrappers: bool = False,
     ) -> None:
         from apriori.ico.core.meta.describer import describe as describe_util
+        from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 
-        describe_util(
+        meta = IcoFlowMeta.from_node(
             self,
-            show_states=show_states,
-            show_ico_form=show_ico_form,
+            include_runtime=include_runtime,
+            expand_wrappers=expand_wrappers,
         )
+        describe_util(meta, show_ico_form=show_ico_form)
 
 
 # ─────────────────────────────────────────────
 # Operator Wrapping Utility
 # ─────────────────────────────────────────────
+
+
+def operator() -> Callable[[Callable[[I], O]], IcoOperator[I, O]]:
+    def decorator(fn: Callable[[I], O]) -> IcoOperator[I, O]:
+        return wrap_operator(fn)
+
+    return decorator
 
 
 @overload

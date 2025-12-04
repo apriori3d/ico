@@ -46,3 +46,15 @@ class IcoSource(
 
     def _iterator_fn(self, _: None) -> Iterator[O]:
         yield from self.iterator()
+
+
+# ─────────────────────────────────────────────
+# Decorator
+# ─────────────────────────────────────────────
+
+
+def source() -> Callable[[Callable[[], Iterator[O]]], IcoSource[O]]:
+    def decorator(fn: Callable[[], Iterator[O]]) -> IcoSource[O]:
+        return IcoSource(fn)
+
+    return decorator

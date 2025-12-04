@@ -18,7 +18,6 @@ class IcoNode:
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ) -> None:
-        super().__init__()
         self.name = name or self.__class__.__name__
         self.ico_form_target = ico_form_target
         self.parent = parent

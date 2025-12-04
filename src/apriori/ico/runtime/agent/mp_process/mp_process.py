@@ -11,9 +11,9 @@ from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeComman
 from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
-from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.runtime.agent.mp_process.mp_process_agent import MPProcessAgent
 from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
+from apriori.ico.tools.printer.printer_node import IcoPrinter
 
 
 @final
@@ -21,13 +21,13 @@ class MPProcess(
     Generic[I, O],
     IcoOperator[I, O],
     IcoRuntimeNode,
-    ProgressMixin,
 ):
     flow_factory: Callable[[], IcoOperator[I, O]]
 
     _agent_process: SpawnProcess | None
     _channel: MPQueueChannel[I, O] | None
     _mp_context: SpawnContext
+    _print: IcoPrinter
 
     def __init__(
         self,
@@ -36,7 +36,13 @@ class MPProcess(
         name: str | None = None,
     ) -> None:
         name = name or "mp_process"
-        IcoRuntimeNode.__init__(self, name=name)
+        printer = IcoPrinter()
+
+        IcoRuntimeNode.__init__(
+            self,
+            name=name,
+            runtime_children=[printer],
+        )
 
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
@@ -45,12 +51,12 @@ class MPProcess(
             ico_form_target=flow_factory,
             name=name,
         )
-        ProgressMixin.__init__(self)
 
         self.flow_factory = flow_factory
         self._mp_context = get_context("spawn")
         self._channel = None
         self._agent_process = None
+        self._print = printer
 
     @property
     def is_alive(self) -> bool:
@@ -82,9 +88,7 @@ class MPProcess(
             self.state = IcoRuntimeState.fault
             raise
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
-        super().on_command(command)
-
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
         match command.type:
             case IcoRuntimeCommandType.activate:
                 assert self._channel is None
@@ -111,12 +115,15 @@ class MPProcess(
             case _:
                 pass
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+        return super().on_command(command)
+
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if event.type == IcoRuntimeEventType.fault:
             # Raise exception received from agent process
             raise IcoRuntimeError(
                 f"Agent event fault received: {event.meta['message']}"
             )
+        return super().on_event(event)
 
     # ─── Agent process management ───
 
@@ -147,19 +154,22 @@ class MPProcess(
 
                 # Check if worker exited properly
                 if self._agent_process.exitcode is None:
-                    self.progress.print("⚠️ Worker did not exit (possibly stuck)")
+                    self._print("⚠️ Worker did not exit (possibly stuck)")
 
                 elif self._agent_process.exitcode != 0:
-                    self.progress.print(
+                    self._print(
                         f"⚠️ Process Agent {self.name} worker exited with code {self._agent_process.exitcode}."
                     )
         except Exception as e:
-            self.progress.print(f"❌ Error while stopping agent {self.name}: {e}")
+            self._print(f"❌ Error while stopping agent {self.name}: {e}")
             self.bubble_event(IcoRuntimeEvent.exception(e))
 
         finally:
             if self._agent_process.is_alive():
-                # self.progress.print(
+                # self._logger.print(
                 #     f"⚠️ Process Agent {self.name} did not terminate worker gracefully."
                 # )
+                self._print(
+                    f"⚠️ Process Agent {self.name} did not terminate worker gracefully."
+                )
                 self._agent_process.terminate()

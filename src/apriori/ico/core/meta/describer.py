@@ -6,7 +6,6 @@ from rich.text import Text
 from rich.tree import Tree
 
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
-from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
@@ -17,19 +16,17 @@ from apriori.ico.core.stream import IcoStream
 
 
 def describe(
-    node: IcoNode,
+    flow_meta: IcoFlowMeta,
     *,
-    show_states: bool = True,
-    show_ico_form: bool = True,
+    show_ico_form: bool = False,
 ) -> None:
+    """Render an ICO operator graph (flow) as a rich tree."""
     from rich.console import Console
 
-    """Render an ICO operator graph (flow) as a rich tree."""
-    flow_meta = IcoFlowMeta.from_node(node)
-    tree = _build_node(flow_meta, show_states, show_ico_form)
+    tree = _build_node(flow_meta, True, show_ico_form)
 
     console = Console()
-    console.rule(f"[bold blue]{node.name}", style="dim blue")
+    console.rule(f"[bold blue]{flow_meta.name}", style="dim blue")
     console.print(tree)
 
 
@@ -62,7 +59,7 @@ def _format_label(
     # Show runtime states if available
     if show_states and flow_meta.runtime_state is not None:
         color = {
-            IcoRuntimeState.inactive: "grey50",
+            IcoRuntimeState.inactive: "blue",
             IcoRuntimeState.ready: "green",
             IcoRuntimeState.running: "yellow",
             IcoRuntimeState.paused: "grey70",
@@ -71,7 +68,7 @@ def _format_label(
         text.append(f" [{flow_meta.runtime_state.name}]", style=color)
 
     # Show ICO form (signature)
-    if show_ico_form:
+    if show_ico_form and flow_meta.ico_form is not None:
         text.append(f"  {flow_meta.ico_form.name}", style="gray70")
 
     return text

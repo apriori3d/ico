@@ -12,6 +12,10 @@ from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 class IcoRuntimeEventType(Enum):
     fault = auto()
     heartbeat = auto()
+    tool = auto()
+    print = auto()
+    log = auto()
+    progress = auto()
 
 
 class IcoRuntimeEvent:

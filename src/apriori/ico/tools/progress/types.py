@@ -11,11 +11,14 @@ class ProgressProtocol(Protocol):
     def add_task(
         self,
         description: str,
-        total: int,
+        start: bool = True,
+        total: float | None = 100.0,
+        completed: int = 0,
+        visible: bool = True,
         **fields: Any,
     ) -> int: ...
 
-    def advance(self, task_id: int, advance: int = 1) -> None: ...
+    def advance(self, task_id: int, advance: float = 1) -> None: ...
 
     def update(
         self,
@@ -40,6 +43,12 @@ class ProgressProtocol(Protocol):
 @runtime_checkable
 class SupportsProgress(Protocol):
     progress: ProgressProtocol
+
+
+@runtime_checkable
+class SupportsTaskProgress(Protocol):
+    progress: ProgressProtocol
+    task: int
 
 
 class TaskStructure(Enum):

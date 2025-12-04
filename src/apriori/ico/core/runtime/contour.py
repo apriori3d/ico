@@ -4,18 +4,15 @@ from collections.abc import Iterator
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
 from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
     IcoRuntimeState,
     iterate_parents,
 )
-from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 
 
-class IcoRuntimeContour(
-    IcoRuntimeNode,
-    ProgressMixin,
-):
+class IcoRuntimeContour(IcoRuntimeNode):
     """
     Runtime contour that encapsulates a complete ICO flow.
 
@@ -58,46 +55,37 @@ class IcoRuntimeContour(
         *,
         name: str | None = None,
     ) -> None:
-        super().__init__(
-            name=name or "ico_runtime_contour",
-        )
+        super().__init__(runtime_name=name)
         self._closure = closure
 
         discover_and_connect_runtime_subtrees(self, closure)
+
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
+        if command.type == IcoRuntimeCommandType.run:
+            self.run()
+        return super().on_command(command)
 
     # ─── Execution ───
 
     def run(self) -> IcoRuntimeContour:
         """Execute the entire runtime contour."""
+        if self._state != IcoRuntimeState.ready:
+            raise RuntimeError(
+                f"Cannot run contour while in state {self._state.name}. "
+                "Contour must be in 'ready' state to run. Use activate command first."
+            )
         try:
             self.state = IcoRuntimeState.running
             self._contour_fn(None)
             self.state = IcoRuntimeState.ready
             return self
+
         except Exception as e:
             self.state = IcoRuntimeState.fault
             raise e
 
     def _contour_fn(self, _: None) -> None:
         self._closure(None)
-
-    # ────────────────────────────────────────────────
-    # Describe Utils interface
-    # ────────────────────────────────────────────────
-
-    def describe(
-        self,
-        *,
-        show_states: bool = True,
-        show_ico_form: bool = True,
-    ) -> None:
-        from apriori.ico.core.meta.describer import print_describe
-
-        print_describe(
-            self._closure,
-            show_states=show_states,
-            show_ico_form=show_ico_form,
-        )
 
 
 # ────────────────────────────────────────────────

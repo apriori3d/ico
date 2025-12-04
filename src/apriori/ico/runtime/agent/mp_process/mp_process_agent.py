@@ -8,7 +8,6 @@ from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
-from apriori.ico.core.runtime.progress.mixin import ProgressMixin
 from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 
 
@@ -16,7 +15,6 @@ from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 class MPProcessAgent(
     IcoRuntimeNode,
     Generic[I, O],
-    ProgressMixin,
 ):
     _flow: IcoOperator[I, O]
     _channel: MPQueueChannel[O, I]
@@ -28,12 +26,7 @@ class MPProcessAgent(
         flow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
     ) -> None:
-        IcoRuntimeNode.__init__(
-            self,
-            name=name or "mp_process_agent",
-        )
-        ProgressMixin.__init__(self)
-
+        IcoRuntimeNode.__init__(self, name=name or "mp_process_agent")
         self._channel = channel
         self._flow = flow_factory()
 
@@ -85,11 +78,10 @@ class MPProcessAgent(
                 self.bubble_event(IcoRuntimeEvent.exception(e))
                 continue
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
-        super().on_event(event)
-
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         # Send event to upstream runtime
         self._channel.output.send(event)
+        return super().on_event(event)
 
     @staticmethod
     def spawn(

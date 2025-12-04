@@ -51,7 +51,7 @@ COMMAND_TO_STATE = {
 class IcoRuntimeNode(ABC):
     """Structural attributes for graph representation of ICO operators."""
 
-    name: str
+    runtime_name: str
     _runtime_children: list[IcoRuntimeNode]
     _runtime_parent: IcoRuntimeNode | None
     _last_command: IcoRuntimeCommand | None
@@ -60,12 +60,11 @@ class IcoRuntimeNode(ABC):
 
     def __init__(
         self,
-        name: str | None = None,
+        runtime_name: str | None = None,
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
     ) -> None:
-        super().__init__()
-        self.name = name or self.__class__.__name__
+        self.runtime_name = runtime_name or self.__class__.__name__
         self._state = IcoRuntimeState.inactive
         self._runtime_parent = runtime_parent
         self._runtime_children = (
@@ -112,7 +111,7 @@ class IcoRuntimeNode(ABC):
     # Commands
     # ────────────────────────────────────────────────
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
         """
         Handle a single runtime command.
 
@@ -121,6 +120,7 @@ class IcoRuntimeNode(ABC):
         """
         self.state = COMMAND_TO_STATE.get(command.type, self._state)
         self._last_command = command
+        return command
 
     def broadcast_command(
         self,
@@ -131,16 +131,19 @@ class IcoRuntimeNode(ABC):
 
         Each node implementing `SupportsIcoRuntime` receives `on_command(command)`.
         """
-        self.on_command(command)
+        next_command = self.on_command(command)
+
+        if next_command is None:
+            return
 
         for child in self._runtime_children:
-            child.broadcast_command(command)
+            child.broadcast_command(next_command)
 
     # ────────────────────────────────────────────────
     # Events
     # ────────────────────────────────────────────────
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         """
         Handle a single runtime event.
 
@@ -148,15 +151,20 @@ class IcoRuntimeNode(ABC):
         (e.g., logging, metrics, or alerting).
         """
         self._last_event = event
+        return event
 
     def bubble_event(self, event: IcoRuntimeEvent) -> None:
         """
         Propagate a runtime event upward until a contour or agent host is reached.
         """
-        self.on_event(event)
+        # If event is handled and should not propagate further, stop here
+        next_event = self.on_event(event)
+
+        if next_event is None:
+            return
 
         if self._runtime_parent:
-            self._runtime_parent.bubble_event(event)
+            self._runtime_parent.bubble_event(next_event)
 
     # ────────────────────────────────────────────────
     # Runtime Tree Management
@@ -215,19 +223,25 @@ class IcoRuntimeNode(ABC):
         self.broadcast_command(IcoRuntimeCommand.stop())
         return self
 
-    # def attach_progress(self, progress: ProgressProtocol) -> Self:
-    #     """
-    #     Bind a shared progress relay to all progress-capable nodes.
+    # ────────────────────────────────────────────────
+    # Describe util interface
+    # ────────────────────────────────────────────────
 
-    #     Returns:
-    #         Self — allows chaining: contour.bind_progress().ready().run().idle()
-    #     """
-    #     self.progress = progress
-    #     for runtime in iterate_nodes(self):
-    #         if isinstance(runtime, SupportsProgress):
-    #             runtime.progress = self.progress
+    def describe(self) -> None:
+        from apriori.ico.core.meta.describer import describe as describe_util
+        from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 
-    #     return self
+        meta = IcoFlowMeta.from_node(self)
+        describe_util(meta)
+
+    # ────────────────────────────────────────────────
+    # Tools
+    # ────────────────────────────────────────────────
+
+    def add_tool(self, tool: IcoRuntimeNode) -> IcoRuntimeNode:
+        """Attach a runtime tool to this node."""
+        tool.connect_runtime(self)
+        return tool
 
 
 def iterate_nodes(

@@ -1,17 +1,24 @@
-from typing import Any
-
-from apriori.ico.core.runtime.progress.types import ProgressProtocol
+from typing import Any, final
 
 
-class NoOpProgress(ProgressProtocol):
+@final
+class NoOpProgress:
     @property
     def tasks(self) -> list[Any]:
         return []
 
-    def add_task(self, description: str, total: int, **fields: Any) -> int:
+    def add_task(
+        self,
+        description: str,
+        start: bool = True,
+        total: float | None = 100.0,
+        completed: int = 0,
+        visible: bool = True,
+        **fields: Any,
+    ) -> int:
         return 0
 
-    def advance(self, task_id: int, advance: int = 1) -> None:
+    def advance(self, task_id: int, advance: float = 1) -> None:
         pass
 
     def update(

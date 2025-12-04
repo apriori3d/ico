@@ -28,17 +28,24 @@ class IcoRuntimeCommandType(Enum):
 
 
 class IcoRuntimeCommand:
-    __slots__ = ("type", "meta")
+    __slots__ = (
+        "type",
+        "targets",
+        "meta",
+    )
 
     type: IcoRuntimeCommandType
+    targets: set[str]
     meta: Mapping[str, object]
 
     def __init__(
         self,
         type: IcoRuntimeCommandType,
+        targets: set[str] | None = None,
         meta: Mapping[str, object] | None = None,
     ) -> None:
         self.type = type
+        self.targets = targets or set()
         self.meta = meta or {}
 
     @staticmethod
@@ -68,3 +75,17 @@ class IcoRuntimeCommand:
     @staticmethod
     def stop() -> IcoRuntimeCommand:
         return IcoRuntimeCommand(type=IcoRuntimeCommandType.stop)
+
+    def add_target(self, target: str) -> IcoRuntimeCommand:
+        return IcoRuntimeCommand(
+            type=self.type,
+            targets=self.targets | {target},
+            meta=self.meta,
+        )
+
+    def remove_target(self, target: str) -> IcoRuntimeCommand:
+        return IcoRuntimeCommand(
+            type=self.type,
+            targets=self.targets - {target},
+            meta=self.meta,
+        )

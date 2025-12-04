@@ -39,11 +39,11 @@ class RecordingRuntimeNode(IcoRuntimeNode):
         self._state = state
         self.recorded_states.append(state)
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
         super().on_command(command)
         self.recorded_commands.append(command.type)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         super().on_event(event)
         self.recorded_events.append(event.type)
 
@@ -71,10 +71,10 @@ class RecordingContour(IcoRuntimeContour):
         self._state = state
         self.recorded_states.append(state)
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
         super().on_command(command)
         self.recorded_commands.append(command.type)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         super().on_event(event)
         self.recorded_events.append(event.type)

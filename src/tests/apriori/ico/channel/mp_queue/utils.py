@@ -35,11 +35,11 @@ class MPProcessMock(
         assert item is not None
         return item
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
         super().on_command(command)
         self._channel.output.send(command)
 
-    def on_event(self, event: IcoRuntimeEvent) -> None:
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if event.type == IcoRuntimeEventType.fault:
             raise IcoRuntimeError(f"Agent exception: {event.meta['message']}")
 
