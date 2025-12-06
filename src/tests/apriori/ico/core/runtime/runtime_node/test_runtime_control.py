@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
-from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
+from apriori.ico.core.runtime.command import IcoRuntimeCommandType
+from apriori.ico.core.runtime.event import (
+    IcoHearbeatEvent,
+    IcoRuntimeEventType,
+)
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
 
 
@@ -12,15 +15,14 @@ def test_runtime_command_and_event_propagation() -> None:
     root = RecordingRuntimeNode(runtime_children=[mid], name="root")
 
     # --- Test: Broadcast command from root ---
-    activate = IcoRuntimeCommand.activate()
-    root.broadcast_command(activate)
+    root.activate()
 
     assert root.recorded_commands == [IcoRuntimeCommandType.activate]
     assert mid.recorded_commands == [IcoRuntimeCommandType.activate]
     assert leaf.recorded_commands == [IcoRuntimeCommandType.activate]
 
     # --- Test: Bubble event from leaf ---
-    heartbeat = IcoRuntimeEvent.heartbeat()
+    heartbeat = IcoHearbeatEvent()
     leaf.bubble_event(heartbeat)
 
     # leaf handles event, mid handles, root handles

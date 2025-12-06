@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
+from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
-from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 
 
@@ -12,8 +12,8 @@ class RecordingRuntimeNode(IcoRuntimeNode):
     Test-only runtime node that records received commands + events.
     """
 
-    recorded_commands: list[IcoRuntimeCommandType]
-    recorded_events: list[IcoRuntimeEventType]
+    recorded_commands: list[type[IcoRuntimeCommand]]
+    recorded_events: list[type[IcoRuntimeEvent]]
     recorded_states: list[IcoRuntimeState]
 
     def __init__(
@@ -24,7 +24,7 @@ class RecordingRuntimeNode(IcoRuntimeNode):
     ) -> None:
         super().__init__(
             runtime_children=runtime_children,
-            name=name,
+            runtime_name=name,
         )
         self.recorded_states = [self._state]
         self.recorded_commands = []
@@ -39,18 +39,18 @@ class RecordingRuntimeNode(IcoRuntimeNode):
         self._state = state
         self.recorded_states.append(state)
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
-        super().on_command(command)
-        self.recorded_commands.append(command.type)
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+        self.recorded_commands.append(type(command))
+        return super().on_command(command)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        super().on_event(event)
-        self.recorded_events.append(event.type)
+        self.recorded_events.append(type(event))
+        return super().on_event(event)
 
 
 class RecordingContour(IcoRuntimeContour):
-    recorded_commands: list[IcoRuntimeCommandType]
-    recorded_events: list[IcoRuntimeEventType]
+    recorded_commands: list[type[IcoRuntimeCommand]]
+    recorded_events: list[type[IcoRuntimeEvent]]
     recorded_states: list[IcoRuntimeState]
 
     def __init__(
@@ -71,10 +71,10 @@ class RecordingContour(IcoRuntimeContour):
         self._state = state
         self.recorded_states.append(state)
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
-        super().on_command(command)
-        self.recorded_commands.append(command.type)
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+        self.recorded_commands.append(type(command))
+        return super().on_command(command)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        super().on_event(event)
-        self.recorded_events.append(event.type)
+        self.recorded_events.append(type(event))
+        return super().on_event(event)

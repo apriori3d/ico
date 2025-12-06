@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Iterator
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
+from apriori.ico.core.runtime.command import (
+    IcoRunCommand,
+    IcoRuntimeCommand,
+)
 from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
     IcoRuntimeState,
@@ -60,8 +64,8 @@ class IcoRuntimeContour(IcoRuntimeNode):
 
         discover_and_connect_runtime_subtrees(self, closure)
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
-        if command.type == IcoRuntimeCommandType.run:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+        if isinstance(command, IcoRunCommand):
             self.run()
         return super().on_command(command)
 
@@ -75,13 +79,13 @@ class IcoRuntimeContour(IcoRuntimeNode):
                 "Contour must be in 'ready' state to run. Use activate command first."
             )
         try:
-            self.state = IcoRuntimeState.running
+            self._set_state(IcoRuntimeState.running)
             self._contour_fn(None)
-            self.state = IcoRuntimeState.ready
+            self._set_state(IcoRuntimeState.ready)
             return self
 
         except Exception as e:
-            self.state = IcoRuntimeState.fault
+            self._set_state(IcoRuntimeState.fault)
             raise e
 
     def _contour_fn(self, _: None) -> None:
@@ -96,18 +100,18 @@ class IcoRuntimeContour(IcoRuntimeNode):
 def discover_runtime_subtrees(flow: IcoNode) -> list[IcoRuntimeNode]:
     """Discover all runtime hosts within the given closure."""
     all_runtimes = list(_discover_runtime_deep(flow))
-    roots = set[IcoRuntimeNode]()
+    roots = OrderedDict[IcoRuntimeNode, None]()
 
     for runtime in all_runtimes:
         if runtime.runtime_parent is None:
-            roots.add(runtime)
+            roots[runtime] = None
             continue
 
         all_parents = list(iterate_parents(runtime))
         if len(all_parents) > 0:
-            roots.add(all_parents[-1])  # add top-most parent
+            roots[all_parents[-1]] = None
 
-    return list(roots)
+    return list(roots.keys())
 
 
 def _discover_runtime_deep(

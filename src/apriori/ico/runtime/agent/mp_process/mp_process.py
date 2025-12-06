@@ -6,14 +6,23 @@ from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.channel.utils import wait_for_item
-from apriori.ico.core.runtime.command import IcoRuntimeCommand, IcoRuntimeCommandType
-from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
+from apriori.ico.core.runtime.channel.channel import IcoChannel
+from apriori.ico.core.runtime.command import (
+    IcoActivateCommand,
+    IcoDeactivateCommand,
+    IcoRuntimeCommand,
+)
+from apriori.ico.core.runtime.event import (
+    IcoFaultEvent,
+    IcoRuntimeEvent,
+)
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.runtime.agent.mp_process.mp_process_agent import MPProcessAgent
-from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
-from apriori.ico.tools.printer.printer_node import IcoPrinter
+from apriori.ico.runtime.channel.mp_queue.channel import (
+    MPChannel,
+)
+from apriori.ico.tools.printer.node import IcoPrinter
 
 
 @final
@@ -25,7 +34,7 @@ class MPProcess(
     flow_factory: Callable[[], IcoOperator[I, O]]
 
     _agent_process: SpawnProcess | None
-    _channel: MPQueueChannel[I, O] | None
+    _channel: IcoChannel[I, O] | None
     _mp_context: SpawnContext
     _print: IcoPrinter
 
@@ -40,7 +49,7 @@ class MPProcess(
 
         IcoRuntimeNode.__init__(
             self,
-            name=name,
+            runtime_name=name,
             runtime_children=[printer],
         )
 
@@ -69,43 +78,42 @@ class MPProcess(
 
         try:
             # Send item to agent process
-            self.state = IcoRuntimeState.running
-            self._channel.output.send(input)
+            self._set_state(IcoRuntimeState.running)
+            self._channel.send(input)
 
             # Wait for result from agent process
-            output = wait_for_item(
-                endpoint=self._channel.input,
-                runtime_node=self,
-                accept_commands=False,
-                accept_events=True,
-                ignore_timeouts=True,
-            )
+            self._set_state(IcoRuntimeState.waiting)
+            output = self._channel.wait_for_item()
+            self._set_state(IcoRuntimeState.ready)
+
             # MPProcess should always receive an output here
             assert output is not None
             return output
 
         except Exception:
-            self.state = IcoRuntimeState.fault
+            self._set_state(IcoRuntimeState.fault)
             raise
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
-        match command.type:
-            case IcoRuntimeCommandType.activate:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+        match command:
+            case IcoActivateCommand():
                 assert self._channel is None
 
-                self._channel = MPQueueChannel[I, O](self._mp_context)
-                # Connect to runtime port to enable event handling from downstream remote runtime
-                self._channel.input.runtime_port = self
-
+                self._channel = MPChannel[I, O](
+                    mp_context=self._mp_context,
+                    runtime_port=self,
+                    accept_commands=False,
+                    accept_events=True,
+                    strict_accept=True,
+                )
                 # Spawn agent before sending a command downstream
                 self._spawn_agent()
-                self._channel.output.send(command)
+                next_command = self._channel.send_command(command)
 
-            case IcoRuntimeCommandType.deactivate:
+            case IcoDeactivateCommand():
                 assert self._channel is not None
-
-                # Send deactivate command downstream before shutting down an agent
-                self._channel.output.send(command)
+                # Use post-order propagation to ensure children are deactivated before parents
+                next_command = self._channel.send_command(command)
                 self._shutdown_agent()
 
                 # Close channel queues
@@ -113,25 +121,27 @@ class MPProcess(
                 self._channel = None
 
             case _:
-                pass
+                assert self._channel is not None
+                next_command = self._channel.send_command(command)
 
-        return super().on_command(command)
+        return super().on_command(next_command)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        if event.type == IcoRuntimeEventType.fault:
+        if isinstance(event, IcoFaultEvent):
             # Raise exception received from agent process
             raise IcoRuntimeError(
-                f"Agent event fault received: {event.meta['message']}"
+                f"Agent event fault received: {event.info['message']}"
             )
         return super().on_event(event)
 
     # ─── Agent process management ───
 
     def _spawn_agent(self) -> None:
-        assert self._channel is not None
+        assert self._channel is not None and isinstance(self._channel, MPChannel)
+        # Invert channel for agent
 
         self._agent_process = MPProcessAgent[I, O].spawn(
-            channel=self._channel.make_pair(),  # Invert channel for agent
+            channel=self._channel.make_agent_channel(),
             flow_factory=self.flow_factory,
             mp_context=self._mp_context,
             name=f"{self.name}_agent",
@@ -162,13 +172,10 @@ class MPProcess(
                     )
         except Exception as e:
             self._print(f"❌ Error while stopping agent {self.name}: {e}")
-            self.bubble_event(IcoRuntimeEvent.exception(e))
+            self.bubble_event(IcoFaultEvent.exception(e))
 
         finally:
             if self._agent_process.is_alive():
-                # self._logger.print(
-                #     f"⚠️ Process Agent {self.name} did not terminate worker gracefully."
-                # )
                 self._print(
                     f"⚠️ Process Agent {self.name} did not terminate worker gracefully."
                 )

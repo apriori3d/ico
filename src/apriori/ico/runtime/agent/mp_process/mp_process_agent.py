@@ -5,10 +5,10 @@ from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.channel.utils import wait_for_item
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.runtime.channel.channel import IcoChannel
+from apriori.ico.core.runtime.contour import discover_and_connect_runtime_subtrees
+from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
-from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 
 
 @final
@@ -17,21 +17,23 @@ class MPProcessAgent(
     Generic[I, O],
 ):
     _flow: IcoOperator[I, O]
-    _channel: MPQueueChannel[O, I]
+    _channel: IcoChannel[O, I]
 
     def __init__(
         self,
         *,
-        channel: MPQueueChannel[O, I],
+        channel: IcoChannel[O, I],
         flow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
     ) -> None:
-        IcoRuntimeNode.__init__(self, name=name or "mp_process_agent")
+        IcoRuntimeNode.__init__(self, runtime_name=name or "mp_process_agent")
         self._channel = channel
         self._flow = flow_factory()
 
+        discover_and_connect_runtime_subtrees(self, self._flow)
+
         # Connect to runtime port to enable command and event handling remote runtime
-        channel.input.runtime_port = self
+        channel.runtime_port = self
 
     def _run_loop(self) -> None:
         """
@@ -50,42 +52,38 @@ class MPProcessAgent(
         while True:
             try:
                 # Blocks internally until new input arrives in the input channel.
+                self._set_state(IcoRuntimeState.waiting)
+                input_item = self._channel.wait_for_item()
 
-                result = wait_for_item(
-                    endpoint=self._channel.input,
-                    runtime_node=self,
-                    accept_events=False,
-                    accept_commands=True,
-                    ignore_timeouts=True,
-                )
-                if result is None:
+                if input_item is None:
+                    self._set_state(IcoRuntimeState.inactive)
                     break  # Exit loop on deactivate command
 
                 # Process input item through flow
-                self.state = IcoRuntimeState.running
-                output = self._flow(result)
+                self._set_state(IcoRuntimeState.running)
+                output = self._flow(input_item)
 
                 # Send output item upstream
-                self.state = IcoRuntimeState.sending
-                self._channel.output.send(output)
+                self._set_state(IcoRuntimeState.sending)
+                self._channel.send(output)
 
                 # Ready for the next item
-                self.state = IcoRuntimeState.ready
+                self._set_state(IcoRuntimeState.ready)
 
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
-                self.state = IcoRuntimeState.fault
-                self.bubble_event(IcoRuntimeEvent.exception(e))
+                self._set_state(IcoRuntimeState.fault)
+                self.bubble_event(IcoFaultEvent.exception(e))
                 continue
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         # Send event to upstream runtime
-        self._channel.output.send(event)
+        self._channel.send_event(event)
         return super().on_event(event)
 
     @staticmethod
     def spawn(
-        channel: MPQueueChannel[O, I],
+        channel: IcoChannel[O, I],
         flow_factory: Callable[[], IcoOperator[I, O]],
         *,
         mp_context: SpawnContext,
@@ -100,7 +98,7 @@ class MPProcessAgent(
 
     @staticmethod
     def _process_fn(
-        channel: MPQueueChannel[O, I],
+        channel: IcoChannel[O, I],
         flow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
     ) -> None:

@@ -1,0 +1,119 @@
+import time
+from collections.abc import Iterator
+from functools import partial
+from typing import final
+
+from rich.progress import Progress, TaskID
+
+from apriori.ico.core.operator import IcoOperator, operator
+from apriori.ico.core.process import IcoProcess
+from apriori.ico.core.runtime.event import (
+    IcoRuntimeEvent,
+)
+from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.sink import sink
+from apriori.ico.core.source import source
+from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.tools.progress.node import (
+    IcoProgress,
+    IcoProgressDiscoveryEvent,
+    IcoProgressEvent,
+)
+
+
+@final
+class RichProgressTool(IcoRuntimeNode):
+    _progress: Progress
+    _tasks: dict[int, TaskID]
+
+    def __init__(self, progress: Progress):
+        IcoRuntimeNode.__init__(self)
+        self._progress = progress
+        self._tasks = {}
+
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+        if isinstance(event, IcoProgressDiscoveryEvent):
+            node_task = self._progress.add_task(
+                description=event.node_name,
+                total=event.total,
+            )
+            self._tasks[event.node_id] = node_task
+
+            self._progress.print(
+                f"Discovered progress node {event.node_name} with total={event.total}, id={event.node_id}"
+            )
+            # Stop propagation after handling log event
+            return None
+
+        if isinstance(event, IcoProgressEvent):
+            task_id = self._tasks[event.node_id]
+            task = self._progress.tasks[task_id]
+
+            if task.finished:
+                self._progress.reset(task_id)
+
+            self._progress.advance(task_id, event.advance)
+
+            # # Stop propagation after handling log event
+            return None
+
+        return super().on_event(event)
+
+
+def create_item_flow(name: str) -> IcoOperator[int, int]:
+    num_iters = 10
+
+    @operator()
+    def double(x: int) -> int:
+        time.sleep(0.1)
+        res = x * 2
+        return res
+
+    @operator()
+    def shift(x: int) -> int:
+        res = x + 1
+        return res
+
+    progress = IcoProgress[int](total=num_iters, name=name)
+
+    return IcoProcess[int](
+        double | shift | progress,
+        num_iterations=num_iters,
+        name=name,
+    )
+
+
+if __name__ == "__main__":
+    total = 10
+
+    @source()
+    def numbers() -> Iterator[int]:
+        for i in range(total):
+            time.sleep(1)
+            yield i
+
+    @sink()
+    def print_result(x: int) -> None:
+        pass
+
+    progress = IcoProgress[int](total=total, name="Overall Progress")
+
+    mp_process1 = MPProcess(partial(create_item_flow, name="Process 1"))
+    mp_process2 = MPProcess(partial(create_item_flow, name="Process 2"))
+
+    # item_flow = create_item_flow()
+
+    flow = numbers | (progress | mp_process1 | mp_process2).iterate() | print_result
+    flow.describe()
+
+    with Progress() as progress:
+        progress_tool = RichProgressTool(progress)
+
+        runtime = flow.runtime().add_tool(progress_tool)
+
+        runtime.activate().describe()
+        runtime.discover(IcoProgress).describe()
+
+        runtime.run()
+
+        runtime.deactivate().describe()

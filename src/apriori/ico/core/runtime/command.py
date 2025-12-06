@@ -1,10 +1,22 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import Enum, auto
+from typing import final
 
 
 class IcoRuntimeCommandType(Enum):
+    activate = auto()
+    run = auto()
+    reset = auto()
+    deactivate = auto()
+    pause = auto()
+    resume = auto()
+    stop = auto()
+
+
+@dataclass(slots=True, frozen=True)
+class IcoRuntimeCommand:
     """
     Runtime commands controlling activation and resource lifecycle
     across agents and runtime contours.
@@ -18,74 +30,46 @@ class IcoRuntimeCommandType(Enum):
         • stop       - Stop signal for iterative or streaming operators
     """
 
-    activate = auto()
-    run = auto()
-    reset = auto()
-    deactivate = auto()
-    pause = auto()
-    resume = auto()
-    stop = auto()
+    pass
 
 
-class IcoRuntimeCommand:
-    __slots__ = (
-        "type",
-        "targets",
-        "meta",
-    )
+@final
+@dataclass(slots=True, frozen=True)
+class IcoActivateCommand(IcoRuntimeCommand):
+    pass
 
-    type: IcoRuntimeCommandType
-    targets: set[str]
-    meta: Mapping[str, object]
 
-    def __init__(
-        self,
-        type: IcoRuntimeCommandType,
-        targets: set[str] | None = None,
-        meta: Mapping[str, object] | None = None,
-    ) -> None:
-        self.type = type
-        self.targets = targets or set()
-        self.meta = meta or {}
+@final
+@dataclass(slots=True, frozen=True)
+class IcoRunCommand(IcoRuntimeCommand):
+    pass
 
-    @staticmethod
-    def activate() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.activate)
 
-    @staticmethod
-    def run() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.run)
+@final
+@dataclass(slots=True, frozen=True)
+class IcoDeactivateCommand(IcoRuntimeCommand):
+    pass
 
-    @staticmethod
-    def deactivate() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.deactivate)
 
-    @staticmethod
-    def pause() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.pause)
+@final
+@dataclass(slots=True, frozen=True)
+class IcoPauseCommand(IcoRuntimeCommand):
+    pass
 
-    @staticmethod
-    def resume() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.resume)
 
-    @staticmethod
-    def reset() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.reset)
+@final
+@dataclass(slots=True, frozen=True)
+class IcoResumeCommand(IcoRuntimeCommand):
+    pass
 
-    @staticmethod
-    def stop() -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(type=IcoRuntimeCommandType.stop)
 
-    def add_target(self, target: str) -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(
-            type=self.type,
-            targets=self.targets | {target},
-            meta=self.meta,
-        )
+@final
+@dataclass(slots=True, frozen=True)
+class IcoResetCommand(IcoRuntimeCommand):
+    pass
 
-    def remove_target(self, target: str) -> IcoRuntimeCommand:
-        return IcoRuntimeCommand(
-            type=self.type,
-            targets=self.targets - {target},
-            meta=self.meta,
-        )
+
+@final
+@dataclass(slots=True, frozen=True)
+class IcoStopCommand(IcoRuntimeCommand):
+    pass

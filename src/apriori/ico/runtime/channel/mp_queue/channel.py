@@ -7,97 +7,106 @@ from typing import Generic, final
 
 from apriori.ico.core.operator import I, O
 from apriori.ico.core.runtime.channel.channel import (
-    IcoRuntimeChannel,
+    IcoChannel,
+    IcoReceiveEndpoint,
+    IcoSendEndpoint,
 )
-from apriori.ico.core.runtime.channel.messages import (
-    AcknowledgeChannelMessage,
-    ChannelMessage,
-)
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.runtime.channel.mp_queue.receive_endpoint import (
-    MPQueueReceiveEndpoint,
-)
-from apriori.ico.runtime.channel.mp_queue.send_endpoint import MPQueueSendEndpoint
+from apriori.ico.core.runtime.channel.messages import DataMessage, SystemMessageTypes
+from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
 @final
-class MPQueueChannel(
-    Generic[I, O],
-    IcoRuntimeChannel[I, O],
-):
-    __slots__ = (
-        "mp_context",
-        "output",
-        "input",
-        "_queues_owned",
-        "_input_queue",
-        "_output_queue",
-        "_input_ack_queue",
-        "_output_ack_queue",
-    )
+class MPQueueSendEndpoint(Generic[I], IcoSendEndpoint[I]):
+    __slots__ = "queue"
+
+    queue: Queue[DataMessage[I] | SystemMessageTypes]
+
+    def __init__(self, main_queue: Queue[DataMessage[I] | SystemMessageTypes]) -> None:
+        self.queue = main_queue
+
+    def send(self, message: DataMessage[I] | SystemMessageTypes) -> None:
+        self.queue.put(message)
+
+    def close(self) -> None:
+        """Close queues."""
+
+        self.queue.close()
+        self.queue.join_thread()
+
+
+@final
+class MPQueueReceiveEndpoint(Generic[O], IcoReceiveEndpoint[O]):
+    __slots__ = "queue"
+    queue: Queue[DataMessage[O] | SystemMessageTypes]
+
+    def __init__(self, main_queue: Queue[DataMessage[O] | SystemMessageTypes]) -> None:
+        self.queue = main_queue
+
+    def receive(self) -> DataMessage[O] | SystemMessageTypes:
+        return self.queue.get()
+
+    def close(self) -> None:
+        """Close queues."""
+
+        self.queue.close()
+        self.queue.join_thread()
+
+
+class MPChannel(Generic[I, O], IcoChannel[I, O]):
+    __slots__ = "mp_context"
 
     mp_context: SpawnContext
-    _output_queue: Queue[ChannelMessage[I | IcoRuntimeCommand | IcoRuntimeEvent]]
-    _output_ack_queue: Queue[AcknowledgeChannelMessage]
-    _input_queue: Queue[ChannelMessage[O | IcoRuntimeCommand | IcoRuntimeEvent]]
-    _input_ack_queue: Queue[AcknowledgeChannelMessage]
 
     def __init__(
         self,
         mp_context: SpawnContext,
+        send_endpoint: MPQueueSendEndpoint[I] | None = None,
+        receive_endpoint: MPQueueReceiveEndpoint[O] | None = None,
         *,
-        output_queue: Queue[ChannelMessage[I | IcoRuntimeCommand | IcoRuntimeEvent]]
-        | None = None,
-        output_ack_queue: Queue[AcknowledgeChannelMessage] | None = None,
-        input_queue: Queue[ChannelMessage[O | IcoRuntimeCommand | IcoRuntimeEvent]]
-        | None = None,
-        input_ack_queue: Queue[AcknowledgeChannelMessage] | None = None,
+        runtime_port: IcoRuntimeNode | None = None,
+        timeout: int = 5,
+        ignore_receive_timeouts: bool = True,
+        accept_commands: bool = True,
+        accept_events: bool = True,
+        strict_accept: bool = False,
     ) -> None:
-        if input_queue and output_queue and input_ack_queue and output_ack_queue:
-            self._output_queue = output_queue
-            self._output_ack_queue = output_ack_queue
-            self._input_queue = input_queue
-            self._input_ack_queue = input_ack_queue
-        elif (
-            not input_queue
-            and not output_queue
-            and not input_ack_queue
-            and not output_ack_queue
-        ):
-            self._output_queue = mp_context.Queue()
-            self._output_ack_queue = mp_context.Queue()
-            self._input_queue = mp_context.Queue()
-            self._input_ack_queue = mp_context.Queue()
-        else:
-            raise ValueError(
-                "Either provide all queues or none when initializing MPQueueChannel."
+        if not send_endpoint:
+            sender_queue: Queue[DataMessage[I] | SystemMessageTypes] = (
+                mp_context.Queue()
             )
+            send_endpoint = MPQueueSendEndpoint[I](sender_queue)
 
-        # Define endpoints
-        self.output = MPQueueSendEndpoint[I](self._output_queue, self._output_ack_queue)
-        self.input = MPQueueReceiveEndpoint[O](self._input_queue, self._input_ack_queue)
+        if not receive_endpoint:
+            receiver_queue: Queue[DataMessage[O] | SystemMessageTypes] = (
+                mp_context.Queue()
+            )
+            receive_endpoint = MPQueueReceiveEndpoint[O](receiver_queue)
+
+        super().__init__(
+            send_endpoint,
+            receive_endpoint,
+            runtime_port=runtime_port,
+            timeout=timeout,
+            ignore_receive_timeouts=ignore_receive_timeouts,
+            accept_commands=accept_commands,
+            accept_events=accept_events,
+            strict_accept=strict_accept,
+        )
         self.mp_context = mp_context
 
-    def close(self) -> None:
-        """Close owned queues."""
+    def make_agent_channel(self) -> MPChannel[O, I]:
+        """Create inverted channel pair for agent process."""
+        assert isinstance(self.sender, MPQueueSendEndpoint)
+        assert isinstance(self.receiver, MPQueueReceiveEndpoint)
 
-        self._input_queue.close()
-        self._input_queue.join_thread()
-        self._output_queue.close()
-        self._output_queue.join_thread()
-        self._input_ack_queue.close()
-        self._input_ack_queue.join_thread()
-        self._output_ack_queue.close()
-        self._output_ack_queue.join_thread()
+        send_endpoint = MPQueueSendEndpoint[O](self.receiver.queue)
+        receive_endpoint = MPQueueReceiveEndpoint[I](self.sender.queue)
 
-    def make_pair(self) -> MPQueueChannel[O, I]:
-        """Create a paired channel for the opposite endpoint roles."""
-
-        return MPQueueChannel[O, I](
+        return MPChannel[O, I](
             mp_context=self.mp_context,
-            input_queue=self._output_queue,
-            input_ack_queue=self._output_ack_queue,
-            output_queue=self._input_queue,
-            output_ack_queue=self._input_ack_queue,
+            send_endpoint=send_endpoint,
+            receive_endpoint=receive_endpoint,
+            accept_commands=True,
+            accept_events=False,
+            strict_accept=True,
         )

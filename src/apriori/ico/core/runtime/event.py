@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import traceback
 from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import Enum, auto
-
-from apriori.ico.core.runtime.exceptions import IcoRuntimeError
+from typing import NamedTuple, TypeAlias, final
 
 # ──── Event types for runtime signaling ────
 
@@ -18,44 +18,52 @@ class IcoRuntimeEventType(Enum):
     progress = auto()
 
 
+# ───── Define payload types ─────
+
+
+class PrintEventMeta(NamedTuple):
+    message: str
+
+
+class ProgressEventMeta(NamedTuple):
+    total: int
+    advance: int
+
+
+# Union of all possible meta payloads
+RuntimeEventMeta: TypeAlias = PrintEventMeta | ProgressEventMeta | Mapping[str, object]
+
+
+# ───── Event class ─────
+
+
+@dataclass(slots=True, frozen=True)
 class IcoRuntimeEvent:
-    __slots__ = ("type", "meta")
+    pass
 
-    type: IcoRuntimeEventType
-    meta: Mapping[str, object]
 
-    def __init__(
-        self,
-        type: IcoRuntimeEventType,
-        meta: Mapping[str, object] | None = None,
-    ) -> None:
-        self.type = type
-        self.meta = meta or {}
+@final
+@dataclass(slots=True, frozen=True)
+class IcoHearbeatEvent(IcoRuntimeEvent):
+    pass
 
-    @staticmethod
-    def heartbeat() -> IcoRuntimeEvent:
-        return IcoRuntimeEvent(type=IcoRuntimeEventType.heartbeat)
+
+@final
+@dataclass(slots=True, frozen=True)
+class IcoFaultEvent(IcoRuntimeEvent):
+    info: dict[str, object]
 
     @staticmethod
-    def exception(e: Exception) -> IcoRuntimeEvent:
+    def exception(e: Exception) -> IcoFaultEvent:
         # Extract exception metadata
         exc_type = type(e)
         tb = e.__traceback__
 
-        meta = {
+        info: dict[str, object] = {
             "type": f"{exc_type.__module__}.{exc_type.__name__}",
             "message": str(e),
             "repr": repr(e),
             "traceback": traceback.format_exception(exc_type, e, tb),
         }
 
-        return IcoRuntimeEvent(type=IcoRuntimeEventType.fault, meta=meta)
-
-    @property
-    def is_fault(self) -> bool:
-        return self.type == IcoRuntimeEventType.fault
-
-    def raise_if_fault(self) -> None:
-        if self.type == IcoRuntimeEventType.fault:
-            msg = self.meta.get("message", "Unknown fault")
-            raise IcoRuntimeError(f"IcoRuntimeEvent fault: {msg}")
+        return IcoFaultEvent(info=info)

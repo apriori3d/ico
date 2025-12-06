@@ -2,61 +2,74 @@
 #  Test: Runtime command propagation (roundtrip)
 # ───────────────────────────────────────────────
 import time
+from dataclasses import dataclass
 from multiprocessing import get_context
 from multiprocessing.context import SpawnProcess
 
 import pytest
 
-from apriori.ico.core.runtime.channel.utils import wait_for_item
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.runtime.channel.channel import IcoChannel
+from apriori.ico.core.runtime.command import IcoRuntimeCommand
+from apriori.ico.core.runtime.event import (
+    IcoFaultEvent,
+    IcoHearbeatEvent,
+    IcoRuntimeEvent,
+)
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
+from apriori.ico.runtime.channel.mp_queue.channel import MPChannel
 from tests.apriori.ico.channel.mp_queue.utils import MPProcessMock
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
 
 
+@dataclass(slots=True, frozen=True)
+class AgentReport:
+    recorded_commands: list[type[IcoRuntimeCommand]]
+    recorded_events: list[type[IcoRuntimeEvent]]
+
+
 def recording_agent(
-    channel: MPQueueChannel[dict[str, object], str],
+    channel: IcoChannel[AgentReport, str],
     runs_num: int = 1,
 ) -> None:
     """Agent process that records received commands and sends back acknowledgements."""
 
     # Create agent flow to record and report commands/events
     recording_node = RecordingRuntimeNode(name="agent_runtime")
+    channel.runtime_port = recording_node
 
     run_num = 0
     while run_num < runs_num:
         try:
-            item = wait_for_item(
-                runtime_node=recording_node,
-                endpoint=channel.input,
-                accept_commands=True,
-                accept_events=False,
-            )
-            assert item is not None
-            hearbeat = IcoRuntimeEvent.heartbeat()
+            item = channel.wait_for_item()
+
+            # Shutdown signal
+            if item is None:
+                channel.close()
+                return
+
+            hearbeat = IcoHearbeatEvent()
             recording_node.on_event(hearbeat)
-            channel.output.send(hearbeat)
+            channel.send_event(hearbeat)
 
             if item == "report":
                 # Return recorded commands and events
-                report: dict[str, object] = {
-                    "commands": recording_node.recorded_commands,
-                    "events": recording_node.recorded_events,
-                }
-                channel.output.send(report)
+                report: AgentReport = AgentReport(
+                    recorded_commands=recording_node.recorded_commands,
+                    recorded_events=recording_node.recorded_events,
+                )
+                channel.send(report)
             elif item == "error":
-                channel.output.send(
-                    IcoRuntimeEvent.exception(IcoRuntimeError("Simulated agent error"))
+                channel.send_event(
+                    IcoFaultEvent.exception(IcoRuntimeError("Simulated agent error"))
                 )
             else:
-                channel.output.send(
-                    IcoRuntimeEvent.exception(IcoRuntimeError("Unknown command"))
+                channel.send_event(
+                    IcoFaultEvent.exception(IcoRuntimeError("Unknown command"))
                 )
 
             run_num += 1
         except Exception as e:
-            channel.output.send(IcoRuntimeEvent.exception(e))
+            channel.send_event(IcoFaultEvent.exception(e))
 
 
 # ───────────────────────────────────────────────
@@ -72,18 +85,23 @@ def test_runtime_flow_propagation() -> None:
     4. Clean deactivation of runtimes
     """
 
-    # Create communication channel between host and agent
-    ctx = get_context("spawn")
-    channel = MPQueueChannel[str, dict[str, object]](ctx)
-
     # Create host runtime to aggregate bubble-up events via channel
     host_runtime = RecordingRuntimeNode(name="host_runtime")
 
+    # Create communication channel between host and agent
+    ctx = get_context("spawn")
+    channel = MPChannel[str, AgentReport](
+        mp_context=ctx,
+        runtime_port=host_runtime,
+        accept_commands=False,
+        accept_events=True,
+        strict_accept=True,
+    )
     # Strat agent process
     process: SpawnProcess = ctx.Process(
         target=recording_agent,
         args=(
-            channel.make_pair(),
+            channel.make_agent_channel(),
             3,  # first run for 'report', second for 'error', third to test clean exit
         ),
         daemon=True,
@@ -99,12 +117,12 @@ def test_runtime_flow_propagation() -> None:
 
         # ──── Check commands and events propagation ────
 
-        agent_runtime_recording = mp_process_mock("report")
+        agent_report = mp_process_mock("report")
 
         # Check that commands were received correctly
-        assert agent_runtime_recording["commands"] == host_runtime.recorded_commands
+        assert agent_report.recorded_commands == host_runtime.recorded_commands
         # Check that events were received correctly
-        assert agent_runtime_recording["events"] == host_runtime.recorded_events
+        assert agent_report.recorded_events == host_runtime.recorded_events
 
         # ──── Check Exception event propagation ────
 

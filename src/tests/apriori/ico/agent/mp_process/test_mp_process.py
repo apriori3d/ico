@@ -5,9 +5,16 @@ import time
 import pytest
 
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.command import IcoRuntimeCommandType
+from apriori.ico.core.runtime.command import (
+    IcoActivateCommand,
+    IcoDeactivateCommand,
+    IcoPauseCommand,
+    IcoResumeCommand,
+)
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
-from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
+from apriori.ico.core.runtime.event import (
+    IcoHearbeatEvent,
+)
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.runtime.agent.mp_process.mp_process import (
     MPProcess,
@@ -118,10 +125,10 @@ def test_agent_command_propagation() -> None:
 
     # Agent receives commands in same order
     assert end_runtime.recorded_commands == [
-        IcoRuntimeCommandType.activate,
-        IcoRuntimeCommandType.pause,
-        IcoRuntimeCommandType.resume,
-        IcoRuntimeCommandType.deactivate,
+        IcoActivateCommand,
+        IcoPauseCommand,
+        IcoResumeCommand,
+        IcoDeactivateCommand,
     ]
 
 
@@ -141,12 +148,12 @@ def test_agent_event_propagation() -> None:
     # flow = host.channel.send | host.channel.receive
 
     # Agent echoes heartbeat event manually
-    mp_process.bubble_event(IcoRuntimeEvent.heartbeat())
+    mp_process.bubble_event(IcoHearbeatEvent())
 
     # produce/consume one item to flush internal queues
     # flow(123)
 
-    assert [IcoRuntimeEventType.heartbeat] == main_runtime.recorded_events
+    assert [IcoHearbeatEvent] == main_runtime.recorded_events
 
     main_runtime.deactivate()
 

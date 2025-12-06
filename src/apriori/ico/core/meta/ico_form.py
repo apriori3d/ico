@@ -16,7 +16,6 @@ from typing import (
 
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
-from apriori.ico.core.context_operator import C
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.context_stream import IcoEpoch
 from apriori.ico.core.iterate import IcoIterateOperator
@@ -124,9 +123,9 @@ def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm 
 
         case IcoChainOperator():
             assert len(obj.children) == 2
-            A = infer_ico_form(obj.children[0])
-            B = infer_ico_form(obj.children[1])
-            return IcoForm(A.i, None, B.o)
+            a = infer_ico_form(obj.children[0])
+            b = infer_ico_form(obj.children[1])
+            return IcoForm(a.i, None, b.o)
 
         case IcoPipeline():
             assert len(obj.children) >= 1
@@ -231,7 +230,12 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
             return ico_form
 
         # Both input and output are unresolved, return existing ico form.
-        if i is not None and i in [I, C, O] and o is not None and o in [I, C, O]:
+        if (
+            i is not None
+            and isinstance(i, TypeVar)
+            and o is not None
+            and isinstance(o, TypeVar)
+        ):
             return ico_form
 
         # Special case: method can be a flow factory.

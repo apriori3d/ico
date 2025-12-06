@@ -3,12 +3,14 @@ from __future__ import annotations
 from typing import Generic
 
 from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.channel.utils import wait_for_item
+from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.event import IcoRuntimeEvent, IcoRuntimeEventType
+from apriori.ico.core.runtime.event import (
+    IcoFaultEvent,
+    IcoRuntimeEvent,
+)
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
 
 
 class MPProcessMock(
@@ -18,29 +20,26 @@ class MPProcessMock(
 ):
     def __init__(
         self,
-        channel: MPQueueChannel[I, O],
+        channel: IcoChannel[I, O],
     ) -> None:
-        super().__init__(fn=self._portal_fn)
+        IcoOperator.__init__(self, fn=self._portal_fn)  # pyright: ignore[reportUnknownMemberType]
+        IcoRuntimeNode.__init__(self)
         self._channel = channel
+        self._channel.runtime_port = self
 
     def _portal_fn(self, input: I) -> O:
         # Send item to agent process
-        self._channel.output.send(input)
-        item = wait_for_item(
-            runtime_node=self,
-            endpoint=self._channel.input,
-            accept_commands=False,
-            accept_events=True,
-        )
+        self._channel.send(input)
+        item = self._channel.wait_for_item()
         assert item is not None
         return item
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand | None:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
         super().on_command(command)
-        self._channel.output.send(command)
+        return self._channel.send_command(command)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        if event.type == IcoRuntimeEventType.fault:
-            raise IcoRuntimeError(f"Agent exception: {event.meta['message']}")
+        if isinstance(event, IcoFaultEvent):
+            raise IcoRuntimeError(f"Agent exception: {event.info['message']}")
 
-        super().on_event(event)
+        return super().on_event(event)
