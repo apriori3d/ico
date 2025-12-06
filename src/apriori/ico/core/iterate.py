@@ -8,6 +8,8 @@ class IcoIterateOperator(
     Generic[I, O],
     IcoOperator[Iterator[I], Iterator[O]],
 ):
+    type_name: str = "iterator"
+
     body: IcoOperator[I, O]
 
     def __init__(

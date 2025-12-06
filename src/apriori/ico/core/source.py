@@ -28,6 +28,8 @@ class IcoSource(
         12.0
     """
 
+    type_name: str = "source"
+
     iterator: Callable[[], Iterator[O]]
 
     def __init__(

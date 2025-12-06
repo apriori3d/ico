@@ -10,6 +10,8 @@ class IcoRuntimeWrapper(
     IcoOperator[I, O],
     IcoRuntimeNode,
 ):
+    type_name: str = "runtime_wrapper"
+
     operator: IcoOperator[I, O]
 
     def __init__(

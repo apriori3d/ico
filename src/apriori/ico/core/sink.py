@@ -16,6 +16,8 @@ class IcoSink(
         Iterator[I] → ()
     """
 
+    type_name: str = "sink"
+
     def __init__(
         self,
         consume_fn: Callable[[I], None],

@@ -11,7 +11,7 @@ from apriori.ico.core.runtime.channel.channel import (
     IcoReceiveEndpoint,
     IcoSendEndpoint,
 )
-from apriori.ico.core.runtime.channel.messages import DataMessage, SystemMessageTypes
+from apriori.ico.core.runtime.channel.messages import DataMessage, RuntimeMessage
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
@@ -19,12 +19,12 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode
 class MPQueueSendEndpoint(Generic[I], IcoSendEndpoint[I]):
     __slots__ = "queue"
 
-    queue: Queue[DataMessage[I] | SystemMessageTypes]
+    queue: Queue[DataMessage[I] | RuntimeMessage]
 
-    def __init__(self, main_queue: Queue[DataMessage[I] | SystemMessageTypes]) -> None:
+    def __init__(self, main_queue: Queue[DataMessage[I] | RuntimeMessage]) -> None:
         self.queue = main_queue
 
-    def send(self, message: DataMessage[I] | SystemMessageTypes) -> None:
+    def send(self, message: DataMessage[I] | RuntimeMessage) -> None:
         self.queue.put(message)
 
     def close(self) -> None:
@@ -37,12 +37,12 @@ class MPQueueSendEndpoint(Generic[I], IcoSendEndpoint[I]):
 @final
 class MPQueueReceiveEndpoint(Generic[O], IcoReceiveEndpoint[O]):
     __slots__ = "queue"
-    queue: Queue[DataMessage[O] | SystemMessageTypes]
+    queue: Queue[DataMessage[O] | RuntimeMessage]
 
-    def __init__(self, main_queue: Queue[DataMessage[O] | SystemMessageTypes]) -> None:
+    def __init__(self, main_queue: Queue[DataMessage[O] | RuntimeMessage]) -> None:
         self.queue = main_queue
 
-    def receive(self) -> DataMessage[O] | SystemMessageTypes:
+    def receive(self) -> DataMessage[O] | RuntimeMessage:
         return self.queue.get()
 
     def close(self) -> None:
@@ -71,15 +71,11 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         strict_accept: bool = False,
     ) -> None:
         if not send_endpoint:
-            sender_queue: Queue[DataMessage[I] | SystemMessageTypes] = (
-                mp_context.Queue()
-            )
+            sender_queue: Queue[DataMessage[I] | RuntimeMessage] = mp_context.Queue()
             send_endpoint = MPQueueSendEndpoint[I](sender_queue)
 
         if not receive_endpoint:
-            receiver_queue: Queue[DataMessage[O] | SystemMessageTypes] = (
-                mp_context.Queue()
-            )
+            receiver_queue: Queue[DataMessage[O] | RuntimeMessage] = mp_context.Queue()
             receive_endpoint = MPQueueReceiveEndpoint[O](receiver_queue)
 
         super().__init__(

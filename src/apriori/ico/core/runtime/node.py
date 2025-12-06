@@ -60,6 +60,7 @@ DEFAULT_COMMAND_TO_STATE = {
 class IcoRuntimeNode(ABC):
     """Structural attributes for graph representation of ICO operators."""
 
+    type_name: str = "runtime_node"
     _COMMAND_TO_STATE = DEFAULT_COMMAND_TO_STATE
 
     runtime_name: str
@@ -277,10 +278,8 @@ class IcoRuntimeNode(ABC):
 
     def describe(self) -> None:
         from apriori.ico.core.meta.describer import describe as describe_util
-        from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 
-        meta = IcoFlowMeta.from_node(self)
-        describe_util(meta)
+        describe_util(self)
 
     # ────────────────────────────────────────────────
     # Tools

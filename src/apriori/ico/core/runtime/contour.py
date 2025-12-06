@@ -51,6 +51,8 @@ class IcoRuntimeContour(IcoRuntimeNode):
 
     """
 
+    type_name: str = "runtime_contour"
+
     _closure: IcoOperator[None, None]
 
     def __init__(

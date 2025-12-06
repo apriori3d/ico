@@ -21,6 +21,8 @@ class IcoContextPipeline(
     Generic[I, C, O],
     IcoContextOperator[I, C, O],
 ):
+    type_name: str = "context_pipeline"
+
     __slots__ = ("apply", "body")
 
     apply: IcoContextOperator[I, C, O]

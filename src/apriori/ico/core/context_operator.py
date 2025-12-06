@@ -19,6 +19,8 @@ C = TypeVar("C")
 
 
 class IcoContextOperator(Generic[I, C, O], IcoNode):
+    type_name: str = "context_operator"
+
     fn: Callable[[I, C], O]
 
     def __init__(
@@ -50,24 +52,6 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
 
     def __call__(self, item: I, context: C) -> O:
         return self.fn(item, context)
-
-    # ────────────────────────────────────────────────
-    # Describe util interface
-    # ────────────────────────────────────────────────
-
-    def describe(
-        self,
-        *,
-        show_states: bool = True,
-        show_ico_form: bool = True,
-    ) -> None:
-        from apriori.ico.core.meta.describer import describe as describe_util
-
-        describe_util(
-            self,
-            show_states=show_states,
-            show_ico_form=show_ico_form,
-        )
 
 
 # ─────────────────────────────────────────────

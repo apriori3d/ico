@@ -31,6 +31,8 @@ class MPProcess(
     IcoOperator[I, O],
     IcoRuntimeNode,
 ):
+    type_name: str = "agent"
+
     flow_factory: Callable[[], IcoOperator[I, O]]
 
     _agent_process: SpawnProcess | None

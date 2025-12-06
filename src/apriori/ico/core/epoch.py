@@ -14,6 +14,8 @@ class IcoEpoch(
     Generic[I, C],
     IcoOperator[C, C],
 ):
+    type_name: str = "epoch"
+
     source: IcoOperator[None, Iterator[I]]
     context_operator: IcoContextOperator[I, C, C]
 

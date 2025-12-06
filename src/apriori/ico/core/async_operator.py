@@ -15,6 +15,8 @@ from apriori.ico.core.operator import (
 
 
 class IcoAsyncOperator(Generic[I, O], IcoNode):
+    type_name: str = "async_operator"
+
     fn: Callable[[I], Awaitable[O]]
 
     def __init__(

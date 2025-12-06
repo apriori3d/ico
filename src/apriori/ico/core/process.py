@@ -36,6 +36,8 @@ class IcoProcess(
         └── operator[fib_step]
     """
 
+    type_name: str = "process"
+
     __slots__ = ("num_iterations", "body")
 
     num_iterations: int

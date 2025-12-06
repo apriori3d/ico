@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 from apriori.ico.core.context_operator import IcoContextOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
-from apriori.ico.core.context_stream import IcoEpoch
+from apriori.ico.core.epoch import IcoEpoch
 from apriori.ico.core.meta.ico_form import IcoForm, infer_ico_form
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline

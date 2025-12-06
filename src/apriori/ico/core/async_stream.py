@@ -39,6 +39,9 @@ class IcoAsyncStream(
         "_next_index",
         "_ordering_buffer",
     )
+
+    type_name: str = "async_stream"
+
     operators: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
     ordered: bool
     _num_executors: int

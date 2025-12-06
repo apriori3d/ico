@@ -14,7 +14,7 @@ def test_icoflow_operator_node() -> None:
     op = IcoOperator[int, float](lambda x: float(x), name="to_float")
     flow = IcoFlowMeta.from_node(op)
 
-    assert flow.node_type == IcoNodeType.operator
+    assert flow.node_type == "operator"
     assert flow.ico_form.name == "int → float"
     assert flow.name == "to_float"
     assert not flow.children
@@ -27,7 +27,7 @@ def test_icoflow_compose_node() -> None:
     composed = a | b
 
     flow = IcoFlowMeta.from_node(composed)
-    assert flow.node_type == IcoNodeType.chain
+    assert flow.node_type == "chain"
     assert flow.ico_form.name == "int → str"
     assert [c.name for c in flow.children] == ["to_float", "to_str"]
 
@@ -38,7 +38,7 @@ def test_icoflow_iterate_node() -> None:
     iterated = base.iterate()
 
     flow = IcoFlowMeta.from_node(iterated)
-    assert flow.node_type == IcoNodeType.iterator
+    assert flow.node_type == "iterator"
     assert flow.ico_form.name == "Iterator[int] → Iterator[float]"
     assert flow.children and flow.children[0].name == "scale"
 
@@ -49,7 +49,7 @@ def test_icoflow_stream_node() -> None:
     stream = IcoStream(base, name="stream")
 
     flow = IcoFlowMeta.from_node(stream)
-    assert flow.node_type == IcoNodeType.stream
+    assert flow.node_type == "stream"
     assert flow.ico_form.name == "Iterator[int] → Iterator[float]"
     assert flow.children and flow.children[0].name == "scale"
 

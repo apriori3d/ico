@@ -17,7 +17,7 @@ from typing import (
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
-from apriori.ico.core.context_stream import IcoEpoch
+from apriori.ico.core.epoch import IcoEpoch
 from apriori.ico.core.iterate import IcoIterateOperator
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import I, IcoOperator, O

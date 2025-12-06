@@ -1,4 +1,4 @@
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta, IcoNodeType
+from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.process import IcoProcess
 
@@ -58,10 +58,10 @@ def test_process_structure_representation() -> None:
     flow = IcoFlowMeta.from_node(process)
 
     # Root node should be a process
-    assert flow.node_type == IcoNodeType.process
+    assert flow.node_type == "process"
     assert len(flow.children) == 1
     assert flow.children[0].name == "scale"
-    assert flow.children[0].node_type == IcoNodeType.operator
+    assert flow.children[0].node_type == "operator"
 
 
 if __name__ == "__main__":

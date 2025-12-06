@@ -66,6 +66,7 @@ class IcoOperator(Generic[I, O], IcoNode):
     """
 
     # Note: do not use __slots__ here to allow dynamic inference of ICO-form attributes
+    type_name: str = "operator"
 
     fn: Callable[[I], O]
 
@@ -130,25 +131,6 @@ class IcoOperator(Generic[I, O], IcoNode):
         from apriori.ico.core.runtime.contour import IcoRuntimeContour
 
         return IcoRuntimeContour(self)
-
-    # ────────────────────────────────────────────────
-    # Describe util interface
-    # ────────────────────────────────────────────────
-
-    def describe(
-        self,
-        *,
-        show_ico_form: bool = True,
-        include_runtime: bool = False,
-    ) -> None:
-        from apriori.ico.core.meta.describer import describe as describe_util
-        from apriori.ico.core.meta.flow_meta import IcoFlowMeta
-
-        meta = IcoFlowMeta.from_node(
-            self,
-            include_runtime=include_runtime,
-        )
-        describe_util(meta, show_ico_form=show_ico_form)
 
 
 # ─────────────────────────────────────────────

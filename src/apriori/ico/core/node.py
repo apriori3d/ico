@@ -6,6 +6,8 @@ from collections.abc import Iterator, Sequence
 class IcoNode:
     """Structural attributes for graph representation of ICO operators."""
 
+    type_name: str = "node"
+
     name: str
     parent: IcoNode | None
     children: Sequence[IcoNode]
@@ -25,6 +27,24 @@ class IcoNode:
 
         for child in self.children:
             child.parent = self
+
+    # ────────────────────────────────────────────────
+    # Describe util interface
+    # ────────────────────────────────────────────────
+
+    def describe(
+        self,
+        *,
+        show_ico_form: bool = True,
+        include_runtime: bool = False,
+    ) -> None:
+        from apriori.ico.core.meta.describer import describe as describe_util
+
+        describe_util(
+            self,
+            show_ico_form=show_ico_form,
+            include_runtime=include_runtime,
+        )
 
 
 def iterate_nodes(

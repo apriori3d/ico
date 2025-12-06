@@ -28,6 +28,8 @@ class IcoStream(
         result = list(stream((1, 2, 3)))  # [2, 4, 6]
     """
 
+    type_name: str = "stream"
+
     __slots__ = ("body",)
 
     body: IcoOperator[I, O]

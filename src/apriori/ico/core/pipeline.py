@@ -15,6 +15,8 @@ class IcoPipeline(
     Generic[I],
     IcoOperator[I, I],
 ):
+    type_name: str = "pipeline"
+
     __slots__ = "body"
 
     body: Sequence[IcoOperator[I, I]]

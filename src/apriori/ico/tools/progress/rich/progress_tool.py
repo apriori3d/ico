@@ -5,6 +5,7 @@ from typing import final
 
 from rich.progress import Progress, TaskID
 
+from apriori.ico.core.meta.describer import describe
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.runtime.event import (
@@ -98,22 +99,27 @@ if __name__ == "__main__":
 
     progress = IcoProgress[int](total=total, name="Overall Progress")
 
-    mp_process1 = MPProcess(partial(create_item_flow, name="Process 1"))
-    mp_process2 = MPProcess(partial(create_item_flow, name="Process 2"))
+    mp_process1 = MPProcess[int, int](partial(create_item_flow, name="Process 1"))
+    mp_process2 = MPProcess[int, int](partial(create_item_flow, name="Process 2"))
 
     # item_flow = create_item_flow()
 
     flow = numbers | (progress | mp_process1 | mp_process2).iterate() | print_result
-    flow.describe()
+    describe(flow)
 
     with Progress() as progress:
+        console = progress.console
+
         progress_tool = RichProgressTool(progress)
 
         runtime = flow.runtime().add_tool(progress_tool)
+        runtime.activate()
+        describe(runtime, console=console)
 
-        runtime.activate().describe()
-        runtime.discover(IcoProgress).describe()
+        runtime.discover(IcoProgress)
+        describe(runtime, console=console)
 
         runtime.run()
 
-        runtime.deactivate().describe()
+        runtime.deactivate()
+        describe(runtime, console=console)

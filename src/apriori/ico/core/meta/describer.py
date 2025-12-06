@@ -1,32 +1,58 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import overload
 
+from rich.console import Console
 from rich.text import Text
 from rich.tree import Tree
 
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
-from apriori.ico.core.runtime.node import IcoRuntimeState
+from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
 
 
+@overload
 def describe(
-    flow_meta: IcoFlowMeta,
+    node: IcoNode,
     *,
-    show_ico_form: bool = False,
+    include_runtime: bool = False,
+    show_ico_form: bool = True,
+    console: Console | None = None,
+) -> None: ...
+
+
+@overload
+def describe(
+    node: IcoRuntimeNode,
+    *,
+    console: Console | None = None,
+) -> None: ...
+
+
+def describe(
+    node: IcoNode | IcoRuntimeNode,
+    *,
+    show_ico_form: bool = True,
+    include_runtime: bool = False,
+    console: Console | None = None,
 ) -> None:
     """Render an ICO operator graph (flow) as a rich tree."""
-    from rich.console import Console
+    if isinstance(node, IcoNode):
+        meta = IcoFlowMeta.from_node(node, include_runtime=include_runtime)
+    else:
+        meta = IcoFlowMeta.from_node(node)
 
-    tree = _build_node(flow_meta, True, show_ico_form)
+    tree = _build_node(meta, show_ico_form=show_ico_form)
 
-    console = Console()
-    console.rule(f"[bold blue]{flow_meta.name}", style="dim blue")
+    console = console or Console()
+    console.rule(f"[bold blue]{meta.name}", style="dim blue")
     console.print(tree)
 
 
@@ -35,13 +61,13 @@ def describe(
 
 def _build_node(
     flow: IcoFlowMeta,
-    show_states: bool,
+    *,
     show_ico_form: bool,
 ) -> Tree:
-    label = _format_label(flow, show_states, show_ico_form)
+    label = _format_label(flow, show_ico_form)
     node = Tree(label)
     for child in flow.children:
-        node.add(_build_node(child, show_states, show_ico_form))
+        node.add(_build_node(child, show_ico_form=show_ico_form))
     return node
 
 
@@ -50,14 +76,13 @@ def _build_node(
 
 def _format_label(
     flow_meta: IcoFlowMeta,
-    show_states: bool,
     show_ico_form: bool,
 ) -> Text:
     text = Text(flow_meta.name, style="bold cyan")
-    text.append(f" ({flow_meta.node_type.name})", style="dim")
+    text.append(f" ({flow_meta.node_type})", style="dim")
 
     # Show runtime states if available
-    if show_states and flow_meta.runtime_state is not None:
+    if flow_meta.runtime_state is not None:
         color = {
             IcoRuntimeState.inactive: "blue",
             IcoRuntimeState.ready: "green",

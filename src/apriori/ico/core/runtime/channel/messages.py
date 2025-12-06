@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, TypeAlias, TypeVar
+from typing import Generic, TypeVar
 
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
@@ -15,38 +15,37 @@ P = TypeVar("P", covariant=True)
 
 
 @dataclass(slots=True, frozen=True)
-class ChannelMessage(Generic[P]):
+class ChannelMessage:
     """Unified envelope exchanged between runtime endpoints."""
 
     id: int
+
+
+@dataclass(slots=True, frozen=True)
+class DataMessage(Generic[P], ChannelMessage):
     payload: P
 
 
 @dataclass(slots=True, frozen=True)
-class DataMessage(Generic[P], ChannelMessage[P]):
+class RuntimeMessage(ChannelMessage):
     pass
 
 
 @dataclass(slots=True, frozen=True)
-class CommandMessage(ChannelMessage[IcoRuntimeCommand]):
-    pass
+class CommandMessage(RuntimeMessage):
+    command: IcoRuntimeCommand
 
 
 @dataclass(slots=True, frozen=True)
-class EventMessage(ChannelMessage[IcoRuntimeEvent]):
-    pass
+class EventMessage(RuntimeMessage):
+    event: IcoRuntimeEvent
 
 
 @dataclass(slots=True, frozen=True)
-class AcknowledgeMessage(ChannelMessage[int]):
-    pass
+class AcknowledgeMessage(RuntimeMessage):
+    message_id: int
 
 
 @dataclass(slots=True, frozen=True)
 class CommandAcknowledgeMessage(AcknowledgeMessage):
     command: IcoRuntimeCommand
-
-
-# Non-generic message types
-RuntimeMessageTypes: TypeAlias = CommandMessage | EventMessage
-SystemMessageTypes: TypeAlias = RuntimeMessageTypes | AcknowledgeMessage

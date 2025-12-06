@@ -9,6 +9,8 @@ class IcoChainOperator(
 ):
     """Chained ICO Operator: (I → O, O → O2) == I → O2."""
 
+    type_name: str = "chain"
+
     _first: IcoOperator[I, O]
     _second: IcoOperator[O, O2]
 

@@ -11,7 +11,7 @@ from apriori.ico.core.runtime.channel.messages import (
     CommandMessage,
     DataMessage,
     EventMessage,
-    SystemMessageTypes,
+    RuntimeMessage,
 )
 from apriori.ico.core.runtime.command import IcoDeactivateCommand, IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
@@ -20,7 +20,7 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 class IcoSendEndpoint(Generic[I], ABC):
     @abstractmethod
-    def send(self, message: DataMessage[I] | SystemMessageTypes) -> None: ...
+    def send(self, message: DataMessage[I] | RuntimeMessage) -> None: ...
 
     @abstractmethod
     def close(self) -> None: ...
@@ -28,7 +28,7 @@ class IcoSendEndpoint(Generic[I], ABC):
 
 class IcoReceiveEndpoint(Generic[O], ABC):
     @abstractmethod
-    def receive(self) -> DataMessage[O] | SystemMessageTypes: ...
+    def receive(self) -> DataMessage[O] | RuntimeMessage: ...
 
     @abstractmethod
     def close(self) -> None: ...
@@ -105,7 +105,7 @@ class IcoChannel(Generic[I, O], ABC):
         self._send(message)
         self._wait_for_ack(message.id)
 
-    def _send(self, message: DataMessage[I] | SystemMessageTypes) -> None:
+    def _send(self, message: DataMessage[I] | RuntimeMessage) -> None:
         self._message_id += 1
         self.sender.send(message)
 
@@ -116,9 +116,9 @@ class IcoChannel(Generic[I, O], ABC):
             raise RuntimeError(
                 f"Unexpected response: expected ACK, got {type(input_item)}"
             )
-        if input_item.payload != pending_message_id:
+        if input_item.message_id != pending_message_id:
             raise RuntimeError(
-                f"Unexpected ACK: expected {pending_message_id}, got {input_item.payload}"
+                f"Unexpected ACK: expected {pending_message_id}, got {input_item.message_id}"
             )
         if isinstance(input_item, CommandAcknowledgeMessage):
             return input_item.command
@@ -150,23 +150,30 @@ class IcoChannel(Generic[I, O], ABC):
                     raise
 
             match input_message:
+                case DataMessage():
+                    self._send(
+                        AcknowledgeMessage(
+                            self._message_id, message_id=input_message.id
+                        )
+                    )
+                    return input_message
+
                 case CommandMessage():
                     self._handle_input_command(input_message)
 
-                    if isinstance(input_message.payload, IcoDeactivateCommand):
+                    if isinstance(input_message.command, IcoDeactivateCommand):
                         return None  # Exit on deactivate command
 
                 case EventMessage():
                     self._handle_input_event(input_message)
 
-                case DataMessage():
-                    self._send(
-                        AcknowledgeMessage(self._message_id, payload=input_message.id)
-                    )
-                    return input_message
-
                 case AcknowledgeMessage():
                     return input_message
+
+                case _:
+                    raise RuntimeError(
+                        f"Unexpected message type: {type(input_message)}"
+                    )
 
     def _handle_input_command(self, message: CommandMessage) -> None:
         if not self.accept_commands:
@@ -175,20 +182,20 @@ class IcoChannel(Generic[I, O], ABC):
             return  # Ignore command, wait for actual data item
 
         if self.runtime_port is not None:
-            if isinstance(message.payload, IcoDeactivateCommand):
+            if isinstance(message.command, IcoDeactivateCommand):
                 # Use post-order traversal for deactivation commands
                 next_command = self.runtime_port.broadcast_command_post_order(
-                    message.payload
+                    message.command
                 )
             else:
-                next_command = self.runtime_port.broadcast_command(message.payload)
+                next_command = self.runtime_port.broadcast_command(message.command)
         else:
-            next_command = message.payload
+            next_command = message.command
 
         self._send(
             CommandAcknowledgeMessage(
                 self._message_id,
-                payload=message.id,
+                message_id=message.id,
                 command=next_command,
             )
         )
@@ -202,7 +209,7 @@ class IcoChannel(Generic[I, O], ABC):
         if self.runtime_port is None:
             return
 
-        self.runtime_port.bubble_event(message.payload)
+        self.runtime_port.bubble_event(message.event)
 
         self._send(AcknowledgeMessage(self._message_id, message.id))
 
