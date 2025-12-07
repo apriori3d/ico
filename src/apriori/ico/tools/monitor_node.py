@@ -19,7 +19,7 @@ class IcoMonitor(
     ) -> None:
         super().__init__(
             fn=self._monitor_fn,
-            name=name or f"Monitor({operator.name})",
+            name=name or f"Monitor({operator})",
         )
         self.operator = operator
 

@@ -18,7 +18,7 @@ from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.iterate import IcoIterateOperator
+from apriori.ico.core.iteratator import IcoIterateOperator
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.pipeline import IcoPipeline
@@ -193,7 +193,7 @@ def infer_from_ico_target(obj: object, ico_form: IcoForm | None) -> IcoForm | No
     if not isinstance(obj, IcoNode):
         return ico_form
 
-    fn = obj.ico_form_target
+    fn = obj.original_fn
     if fn is None:
         return ico_form
 
@@ -316,7 +316,7 @@ def _format_type(tp: object) -> str:
     args = get_args(tp)
 
     if tp is None or tp is type(None):
-        return "()"
+        return "None"
 
     if origin is Union:
         args_ = [a for a in args if a is not type(None)]

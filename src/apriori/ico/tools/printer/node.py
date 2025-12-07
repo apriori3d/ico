@@ -1,13 +1,19 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import overload
+from typing import ClassVar, overload
 
 from typing_extensions import final
 
 from apriori.ico.core.operator import I, IcoOperator, O, wrap_operator
-from apriori.ico.core.runtime.discovery import IcoDiscovarableNode
+from apriori.ico.core.runtime.discovery import IcoDiscovarableNode, IcoRegistrationEvent
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
+
+
+@final
+@dataclass(slots=True, frozen=True)
+class IcoPrinterRegistrationEvent(IcoRegistrationEvent):
+    pass
 
 
 @final
@@ -19,18 +25,14 @@ class IcoPrintEvent(IcoRuntimeEvent):
 
 @final
 class IcoPrinter(IcoDiscovarableNode):
-    def __init__(self, *, name: str | None = None, strict: bool = False) -> None:
-        super().__init__(runtime_name=name)
-        self.strict = strict
+    type_name: ClassVar[str] = "Printer"
 
     def __call__(self, message: str) -> None:
-        if self.strict:
-            self._ensure_is_ready()
-            assert self.registered_id is not None
-        elif self.registered_id is None:
-            return
+        self.state_model.running()
+        assert self.registered_id is not None
 
         self.bubble_event(IcoPrintEvent(node_id=self.registered_id, message=message))
+        self.state_model.ready()
 
 
 # ─────────────────────────────────────────────

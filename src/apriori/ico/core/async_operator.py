@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Generic
+from typing import ClassVar, Generic
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import (
@@ -15,7 +15,7 @@ from apriori.ico.core.operator import (
 
 
 class IcoAsyncOperator(Generic[I, O], IcoNode):
-    type_name: str = "async_operator"
+    type_name: ClassVar[str] = "Async Operator"
 
     fn: Callable[[I], Awaitable[O]]
 

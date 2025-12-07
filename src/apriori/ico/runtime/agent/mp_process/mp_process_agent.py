@@ -8,7 +8,7 @@ from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.contour import discover_and_connect_runtime_subtrees
 from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
+from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
 @final
@@ -52,27 +52,27 @@ class MPProcessAgent(
         while True:
             try:
                 # Blocks internally until new input arrives in the input channel.
-                self._set_state(IcoRuntimeState.waiting)
+                self.state_model.waiting()
                 input_item = self._channel.wait_for_item()
 
                 if input_item is None:
-                    self._set_state(IcoRuntimeState.inactive)
+                    self.state_model.inactive()
                     break  # Exit loop on deactivate command
 
                 # Process input item through flow
-                self._set_state(IcoRuntimeState.running)
+                self.state_model.running()
                 output = self._flow(input_item)
 
                 # Send output item upstream
-                self._set_state(IcoRuntimeState.sending)
+                self.state_model.sending()
                 self._channel.send(output)
 
                 # Ready for the next item
-                self._set_state(IcoRuntimeState.ready)
+                self.state_model.ready()
 
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
-                self._set_state(IcoRuntimeState.fault)
+                self.state_model.fault()
                 self.bubble_event(IcoFaultEvent.exception(e))
                 continue
 

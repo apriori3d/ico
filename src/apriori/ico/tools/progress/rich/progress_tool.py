@@ -1,7 +1,7 @@
 import time
 from collections.abc import Iterator
 from functools import partial
-from typing import final
+from typing import ClassVar, final
 
 from rich.progress import Progress, TaskID
 
@@ -11,29 +11,32 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.tool import IcoRuntimeTool
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
 from apriori.ico.tools.progress.node import (
     IcoProgress,
-    IcoProgressDiscoveryEvent,
     IcoProgressEvent,
+    IcoProgressRegistrationEvent,
 )
 
 
 @final
-class RichProgressTool(IcoRuntimeNode):
+class RichProgressTool(IcoRuntimeTool):
+    type_name: ClassVar[str] = "Rich Progress Tool"
     _progress: Progress
     _tasks: dict[int, TaskID]
 
     def __init__(self, progress: Progress):
-        IcoRuntimeNode.__init__(self)
+        IcoRuntimeTool.__init__(self)
         self._progress = progress
         self._tasks = {}
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        if isinstance(event, IcoProgressDiscoveryEvent):
+        emitting_event = super().on_event(event)
+
+        if isinstance(event, IcoProgressRegistrationEvent):
             node_task = self._progress.add_task(
                 description=event.node_name,
                 total=event.total,

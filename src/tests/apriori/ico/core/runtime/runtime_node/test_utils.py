@@ -4,7 +4,7 @@ from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
+from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeStateOld
 
 
 class RecordingRuntimeNode(IcoRuntimeNode):
@@ -14,7 +14,7 @@ class RecordingRuntimeNode(IcoRuntimeNode):
 
     recorded_commands: list[type[IcoRuntimeCommand]]
     recorded_events: list[type[IcoRuntimeEvent]]
-    recorded_states: list[IcoRuntimeState]
+    recorded_states: list[IcoRuntimeStateOld]
 
     def __init__(
         self,
@@ -31,11 +31,11 @@ class RecordingRuntimeNode(IcoRuntimeNode):
         self.recorded_events = []
 
     @property
-    def state(self) -> IcoRuntimeState:
+    def state(self) -> IcoRuntimeStateOld:
         return self._state
 
     @state.setter
-    def state(self, state: IcoRuntimeState) -> None:
+    def state(self, state: IcoRuntimeStateOld) -> None:
         self._state = state
         self.recorded_states.append(state)
 
@@ -51,7 +51,7 @@ class RecordingRuntimeNode(IcoRuntimeNode):
 class RecordingContour(IcoRuntimeContour):
     recorded_commands: list[type[IcoRuntimeCommand]]
     recorded_events: list[type[IcoRuntimeEvent]]
-    recorded_states: list[IcoRuntimeState]
+    recorded_states: list[IcoRuntimeStateOld]
 
     def __init__(
         self,
@@ -63,11 +63,11 @@ class RecordingContour(IcoRuntimeContour):
         self.recorded_events = []
 
     @property
-    def state(self) -> IcoRuntimeState:
+    def state(self) -> IcoRuntimeStateOld:
         return self._state
 
     @state.setter
-    def state(self, state: IcoRuntimeState) -> None:
+    def state(self, state: IcoRuntimeStateOld) -> None:
         self._state = state
         self.recorded_states.append(state)
 

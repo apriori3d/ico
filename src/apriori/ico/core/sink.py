@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from typing import Generic
+from typing import ClassVar, Generic
 
 from apriori.ico.core.operator import (
     I,
@@ -16,7 +16,7 @@ class IcoSink(
         Iterator[I] → ()
     """
 
-    type_name: str = "sink"
+    type_name: ClassVar[str] = "Sink"
 
     def __init__(
         self,
@@ -26,7 +26,7 @@ class IcoSink(
         super().__init__(
             fn=self._sink_fn,
             name=name or "sink",
-            ico_form_target=consume_fn,
+            original_fn=consume_fn,
         )
         self.consume_fn = consume_fn
 

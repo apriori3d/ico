@@ -1,7 +1,7 @@
 import pytest
 
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.node import IcoRuntimeState
+from apriori.ico.core.runtime.node import IcoRuntimeStateOld
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingContour
@@ -18,19 +18,19 @@ def test_state_transitions_success() -> None:
     recording_runtime = RecordingContour(clousure)
 
     # Initially idle
-    assert recording_runtime.state is IcoRuntimeState.inactive
+    assert recording_runtime.state is IcoRuntimeStateOld.inactive
 
     # Call operator
     recording_runtime.activate().run().pause().resume().deactivate()
 
     assert recording_runtime.recorded_states == [
-        IcoRuntimeState.inactive,
-        IcoRuntimeState.ready,
-        IcoRuntimeState.running,
-        IcoRuntimeState.ready,
-        IcoRuntimeState.paused,
-        IcoRuntimeState.ready,
-        IcoRuntimeState.inactive,
+        IcoRuntimeStateOld.inactive,
+        IcoRuntimeStateOld.ready,
+        IcoRuntimeStateOld.running,
+        IcoRuntimeStateOld.ready,
+        IcoRuntimeStateOld.paused,
+        IcoRuntimeStateOld.ready,
+        IcoRuntimeStateOld.inactive,
     ]
 
 
@@ -55,11 +55,11 @@ def test_execution_state_transitions_failure() -> None:
     runtime.deactivate()
 
     assert runtime.recorded_states == [
-        IcoRuntimeState.inactive,
-        IcoRuntimeState.ready,
-        IcoRuntimeState.running,
-        IcoRuntimeState.fault,
-        IcoRuntimeState.inactive,
+        IcoRuntimeStateOld.inactive,
+        IcoRuntimeStateOld.ready,
+        IcoRuntimeStateOld.running,
+        IcoRuntimeStateOld.fault,
+        IcoRuntimeStateOld.inactive,
     ]
 
 

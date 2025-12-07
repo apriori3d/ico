@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from types import FunctionType
-from typing import Generic, TypeVar, overload
+from typing import ClassVar, Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -66,7 +65,7 @@ class IcoOperator(Generic[I, O], IcoNode):
     """
 
     # Note: do not use __slots__ here to allow dynamic inference of ICO-form attributes
-    type_name: str = "operator"
+    type_name: ClassVar[str] = "Operator"
 
     fn: Callable[[I], O]
 
@@ -75,27 +74,20 @@ class IcoOperator(Generic[I, O], IcoNode):
         fn: Callable[[I], O],
         *,
         name: str | None = None,
-        ico_form_target: object | None = None,
+        original_fn: object | None = None,
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ):
-        if not name:
-            cls = getattr(fn, "__class__", None)
-            if cls is FunctionType:
-                name = getattr(fn, "__name__", None)
-            else:
-                name = name or getattr(cls, "__name__", None)
-
         super().__init__(
             name=name,
             parent=parent,
             children=children,
-            ico_form_target=ico_form_target or fn,
+            original_fn=original_fn or fn,
         )
         self.fn = fn
 
     def __str__(self) -> str:
-        return self.name
+        return self.name or type(self).type_name
 
     def __call__(self, item: I) -> O:
         return self.fn(item)
@@ -118,7 +110,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         """Apply this operator elementwise over an iterable (lazy generator):
         Iterable[I] → Iterable[O]
         """
-        from apriori.ico.core.iterate import iterate
+        from apriori.ico.core.iteratator import iterate
 
         return iterate(self)
 

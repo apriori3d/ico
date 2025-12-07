@@ -1,32 +1,36 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from typing import ClassVar
 
 
 class IcoNode:
     """Structural attributes for graph representation of ICO operators."""
 
-    type_name: str = "node"
+    type_name: ClassVar[str] = "Node"
 
-    name: str
+    name: str | None
     parent: IcoNode | None
     children: Sequence[IcoNode]
-    ico_form_target: object | None
+    original_fn: object | None
 
     def __init__(
         self,
         name: str | None = None,
-        ico_form_target: object | None = None,
+        original_fn: object | None = None,
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ) -> None:
-        self.name = name or self.__class__.__name__
-        self.ico_form_target = ico_form_target
+        self.name = name
+        self.original_fn = original_fn
         self.parent = parent
         self.children = children or []
 
         for child in self.children:
             child.parent = self
+
+    def __str__(self) -> str:
+        return self.name or self.type_name
 
     # ────────────────────────────────────────────────
     # Describe util interface

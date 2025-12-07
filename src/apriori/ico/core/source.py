@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from typing import Generic, final
+from typing import ClassVar, Generic, final
 
 from apriori.ico.core.operator import (
     IcoOperator,
@@ -28,7 +28,7 @@ class IcoSource(
         12.0
     """
 
-    type_name: str = "source"
+    type_name: ClassVar[str] = "Source"
 
     iterator: Callable[[], Iterator[O]]
 
@@ -40,8 +40,8 @@ class IcoSource(
     ):
         super().__init__(
             fn=self._iterator_fn,
-            name=name or "source",
-            ico_form_target=fn,
+            name=name,
+            original_fn=fn,
             children=[],
         )
         self.iterator = fn

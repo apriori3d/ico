@@ -4,50 +4,36 @@ from typing import final
 from rich.console import Console
 
 from apriori.ico.core.operator import operator
-from apriori.ico.core.runtime.command import (
-    IcoActivateCommand,
-    IcoRuntimeCommand,
-)
-from apriori.ico.core.runtime.discovery import IcoDiscoveryCommand, IcoDiscoveryEvent
+from apriori.ico.core.runtime.discovery import IcoDiscovarableNode, IcoRegistrationEvent
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
+from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.tool import IcoRuntimeTool
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.tools.printer.node import (
     IcoPrinter,
+    IcoPrinterRegistrationEvent,
     IcoPrintEvent,
     printer,
 )
 
 
 @final
-class RichPrinterTool(IcoRuntimeNode):
+class RichPrinterTool(IcoRuntimeTool):
+    discoverable_node_types: set[type[IcoDiscovarableNode]] = {IcoPrinter}
+    discovery_event_types: set[type[IcoRegistrationEvent]] = {
+        IcoPrinterRegistrationEvent
+    }
+
     _console: Console
 
     def __init__(self, console: Console):
         IcoRuntimeNode.__init__(self)
         self._console = console
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
-        if isinstance(command, IcoActivateCommand):
-            if self.state == IcoRuntimeState.inactive:
-                # Discover all printers to confirm activation
-                self.broadcast_command(IcoDiscoveryCommand(node_types={IcoPrinter}))
-            elif self.state != IcoRuntimeState.ready:
-                raise RuntimeError(
-                    "PrinterTool can only be activated from inactive state."
-                )
-
-        return super().on_command(command)
-
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        if isinstance(event, IcoDiscoveryEvent):
-            self._console.print(f"Discovered {event.node_name}, id={event.node_id}")
-            # Stop propagation after handling log event
-            return None
-
         if isinstance(event, IcoPrintEvent):
             self._console.print(event.message)
             # Stop propagation after handling log event
@@ -83,6 +69,8 @@ if __name__ == "__main__":
         print(f"Sink received: {x}")
 
     flow = numbers | (double | shift).iterate() | print_result
+    flow.name = "Example Flow"
+
     flow.describe()
     flow.describe(include_runtime=True)
 
@@ -92,7 +80,9 @@ if __name__ == "__main__":
     runtime = flow.runtime().add_tool(printer_tool)
     runtime.describe()
     runtime.activate().describe()
-    runtime.discover(IcoPrinter).describe()
+    printer_tool.discover().describe()
+
+    flow.describe(include_runtime=True)
 
     runtime.run()
 

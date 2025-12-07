@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from typing import Generic, final
+from typing import ClassVar, Generic, final
 
 from apriori.ico.core.operator import (
     I,
@@ -28,7 +28,7 @@ class IcoStream(
         result = list(stream((1, 2, 3)))  # [2, 4, 6]
     """
 
-    type_name: str = "stream"
+    type_name: ClassVar[str] = "Stream"
 
     __slots__ = ("body",)
 

@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from typing import Generic
+from typing import ClassVar, Generic
 
 from apriori.ico.core.context_operator import (
     C,
@@ -14,7 +14,7 @@ class IcoEpoch(
     Generic[I, C],
     IcoOperator[C, C],
 ):
-    type_name: str = "epoch"
+    type_name: ClassVar[str] = "Epoch"
 
     source: IcoOperator[None, Iterator[I]]
     context_operator: IcoContextOperator[I, C, C]

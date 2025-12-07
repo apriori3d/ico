@@ -2,19 +2,16 @@ from dataclasses import dataclass
 from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.discovery import (
     IcoDiscovarableNode,
-    IcoDiscoveryCommand,
-    IcoDiscoveryEvent,
+    IcoRegistrationEvent,
 )
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeState
 
 
 @final
 @dataclass(slots=True, frozen=True)
-class IcoProgressDiscoveryEvent(IcoDiscoveryEvent):
+class IcoProgressRegistrationEvent(IcoRegistrationEvent):
     total: float
 
 
@@ -30,6 +27,8 @@ class IcoProgress(
     IcoOperator[I, I],
     IcoDiscovarableNode,
 ):
+    __slots__ = ("total",)
+
     total: float
 
     def __init__(
@@ -47,27 +46,23 @@ class IcoProgress(
         self.total = total
 
     def _progress_fn(self, item: I) -> I:
-        self._ensure_is_ready()
+        self.state_model.running()
         assert self.registered_id is not None
 
         self.bubble_event(IcoProgressEvent(node_id=self.registered_id, advance=1))
+
+        self.state_model.ready()
         return item
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
-        # Implement discovery contract
-        if isinstance(command, IcoDiscoveryCommand) and command.match(self):
-            self.bubble_event(
-                IcoProgressDiscoveryEvent(
-                    node_type=type(self),
-                    node_name=self.runtime_name,
-                    node_id=command.register_id,
-                    total=self.total,
-                )
-            )
-            self.registered_id = command.register_id
-            self._set_state(IcoRuntimeState.ready)
-            command = command.next()
-        else:
-            command = super().on_command(command)
+    def _register_node(self):
+        """Implement discovery contract"""
+        assert self.registered_id is not None
 
-        return command
+        self.bubble_event(
+            IcoProgressRegistrationEvent(
+                node_type=type(self),
+                node_name=self.runtime_name,
+                node_id=self.registered_id,
+                total=self.total,
+            )
+        )

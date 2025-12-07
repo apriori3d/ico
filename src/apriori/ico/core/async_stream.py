@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Iterator, Sequence
-from typing import Generic, TypeVar, final
+from typing import ClassVar, Generic, TypeVar, final
 
 from apriori.ico.core.async_operator import IcoAsyncOperator
 from apriori.ico.core.operator import I, IcoOperator, O
@@ -40,7 +40,7 @@ class IcoAsyncStream(
         "_ordering_buffer",
     )
 
-    type_name: str = "async_stream"
+    type_name: ClassVar[str] = "Async Stream"
 
     operators: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
     ordered: bool

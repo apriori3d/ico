@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Iterator, Sequence
 from enum import Enum, auto
+from typing import ClassVar
 
 from typing_extensions import Self
 
@@ -14,16 +15,16 @@ from apriori.ico.core.runtime.command import (
     IcoResumeCommand,
     IcoRunCommand,
     IcoRuntimeCommand,
-    IcoStopCommand,
 )
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.runtime.state import BaseStateModel, IcoRuntimeState
 
 # ────────────────────────────────────────────────
 # State of runtime node
 # ────────────────────────────────────────────────
 
 
-class IcoRuntimeState(Enum):
+class IcoRuntimeStateOld(Enum):
     """
     Current runtime state of an agent and connected contour.
 
@@ -45,11 +46,11 @@ class IcoRuntimeState(Enum):
 
 
 DEFAULT_COMMAND_TO_STATE = {
-    IcoActivateCommand: IcoRuntimeState.ready,
-    IcoResetCommand: IcoRuntimeState.ready,
-    IcoDeactivateCommand: IcoRuntimeState.inactive,
-    IcoPauseCommand: IcoRuntimeState.paused,
-    IcoResumeCommand: IcoRuntimeState.ready,
+    IcoActivateCommand: IcoRuntimeStateOld.ready,
+    IcoResetCommand: IcoRuntimeStateOld.ready,
+    IcoDeactivateCommand: IcoRuntimeStateOld.inactive,
+    IcoPauseCommand: IcoRuntimeStateOld.paused,
+    IcoResumeCommand: IcoRuntimeStateOld.ready,
 }
 
 # ────────────────────────────────────────────────
@@ -60,15 +61,19 @@ DEFAULT_COMMAND_TO_STATE = {
 class IcoRuntimeNode(ABC):
     """Structural attributes for graph representation of ICO operators."""
 
-    type_name: str = "runtime_node"
-    _COMMAND_TO_STATE = DEFAULT_COMMAND_TO_STATE
+    type_name: ClassVar[str] = "Runtime Node"
 
-    runtime_name: str
+    __slots__ = (
+        "state_model",
+        "runtime_name",
+        "_runtime_children",
+        "_runtime_parent",
+    )
+
+    state_model: BaseStateModel
+    runtime_name: str | None
     _runtime_children: list[IcoRuntimeNode]
     _runtime_parent: IcoRuntimeNode | None
-    _last_command: IcoRuntimeCommand | None
-    _last_event: IcoRuntimeEvent | None
-    _state: IcoRuntimeState
 
     def __init__(
         self,
@@ -76,12 +81,12 @@ class IcoRuntimeNode(ABC):
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
     ) -> None:
-        self.runtime_name = runtime_name or self.__class__.__name__
+        self.runtime_name = runtime_name
         self._runtime_parent = runtime_parent
         self._runtime_children = (
             list(runtime_children) if runtime_children is not None else []
         )
-        self._set_state(IcoRuntimeState.inactive)
+        self.state_model = BaseStateModel()
 
         for child in self._runtime_children:
             child._runtime_parent = self
@@ -103,24 +108,7 @@ class IcoRuntimeNode(ABC):
     @property
     def state(self) -> IcoRuntimeState:
         """Current runtime state of the operator."""
-        return self._state
-
-    def _set_state(self, state: IcoRuntimeState) -> None:
-        self._state = state
-
-    # @state.setter
-    # def state(self, state: IcoRuntimeState) -> None:
-    #     self._state = state
-
-    @property
-    def last_command(self) -> IcoRuntimeCommand | None:
-        """Last received runtime command."""
-        return self._last_command
-
-    @property
-    def last_event(self) -> IcoRuntimeEvent | None:
-        """Last received runtime event."""
-        return self._last_event
+        return self.state_model.state
 
     # ────────────────────────────────────────────────
     # Commands
@@ -133,22 +121,8 @@ class IcoRuntimeNode(ABC):
         Subclasses may override to implement additional behavior
         (e.g., resource allocation, reset hooks, or teardown logic).
         """
-        new_state = self._command_type_to_state(command)
-        if new_state is not None:
-            self._set_state(new_state)
-
-        self._last_command = command
+        self.state_model.update(command)
         return command
-
-    @classmethod
-    def _command_type_to_state(
-        cls, command: IcoRuntimeCommand
-    ) -> IcoRuntimeState | None:
-        """Infer the node type based on its class."""
-        for command_cls, node_type in cls._COMMAND_TO_STATE.items():
-            if isinstance(command, command_cls):
-                return node_type
-        return None
 
     def broadcast_command(
         self,
@@ -192,7 +166,6 @@ class IcoRuntimeNode(ABC):
         Subclasses may override to implement additional behavior
         (e.g., logging, metrics, or alerting).
         """
-        self._last_event = event
         return event
 
     def bubble_event(self, event: IcoRuntimeEvent) -> None:
@@ -235,41 +208,14 @@ class IcoRuntimeNode(ABC):
         self.broadcast_command(IcoActivateCommand())
         return self
 
-    def discover(self, *node_types: type[IcoRuntimeNode]) -> Self:
-        """Broadcast 'discover' event through the entire flow."""
-        from apriori.ico.core.runtime.discovery import IcoDiscoveryCommand
-
-        self.broadcast_command(IcoDiscoveryCommand(node_types=set(node_types)))
-        return self
-
     def run(self) -> Self:
         """Broadcast 'run' event through the entire flow."""
         self.broadcast_command(IcoRunCommand())
         return self
 
-    def reset(self) -> Self:
-        """Broadcast 'reset' event through the entire flow."""
-        self.broadcast_command(IcoResetCommand())
-        return self
-
     def deactivate(self) -> Self:
         """Broadcast 'deactivate' event through the entire flow."""
         self.broadcast_command_post_order(IcoDeactivateCommand())
-        return self
-
-    def pause(self) -> Self:
-        """Broadcast 'pause' event through the entire flow."""
-        self.broadcast_command(IcoPauseCommand())
-        return self
-
-    def resume(self) -> Self:
-        """Broadcast 'resume' event through the entire flow."""
-        self.broadcast_command(IcoResumeCommand())
-        return self
-
-    def stop(self) -> Self:
-        """Broadcast 'stop' event through the entire flow."""
-        self.broadcast_command(IcoStopCommand())
         return self
 
     # ────────────────────────────────────────────────

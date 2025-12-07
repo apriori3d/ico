@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Generic
+from typing import ClassVar, Generic
 
 from apriori.ico.core.operator import I, IcoOperator, O
 
@@ -8,7 +8,7 @@ class IcoIterateOperator(
     Generic[I, O],
     IcoOperator[Iterator[I], Iterator[O]],
 ):
-    type_name: str = "iterator"
+    type_name: ClassVar[str] = "Iterator"
 
     body: IcoOperator[I, O]
 
@@ -18,7 +18,7 @@ class IcoIterateOperator(
     ) -> None:
         super().__init__(
             fn=self._iterate_fn,
-            name=f"Iterate({operator.name})",
+            name=f"Iterator({operator})",
             children=[operator],
         )
         self.body = operator

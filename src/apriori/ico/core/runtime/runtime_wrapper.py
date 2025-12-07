@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Generic
+from typing import ClassVar, Generic
 
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -10,7 +10,7 @@ class IcoRuntimeWrapper(
     IcoOperator[I, O],
     IcoRuntimeNode,
 ):
-    type_name: str = "runtime_wrapper"
+    type_name: ClassVar[str] = "Runtime Wrapper"
 
     operator: IcoOperator[I, O]
 
@@ -18,24 +18,23 @@ class IcoRuntimeWrapper(
         self,
         operator: IcoOperator[I, O],
         *,
+        name: str | None = None,
         runtime_name: str | None = None,
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
     ) -> None:
-        name = f"Runtime({operator.name})"
-
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             fn=self._wrapped_fn,
             name=name,
-            ico_form_target=operator,
+            original_fn=operator,
             children=[operator],
         )
 
         IcoRuntimeNode.__init__(
             self,
-            runtime_name=runtime_name or name,
+            runtime_name=runtime_name,
             runtime_parent=runtime_parent,
             runtime_children=runtime_children,
         )

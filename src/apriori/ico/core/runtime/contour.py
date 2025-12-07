@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Iterator
+from typing import ClassVar
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
@@ -11,7 +12,6 @@ from apriori.ico.core.runtime.command import (
 )
 from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
-    IcoRuntimeState,
     iterate_parents,
 )
 
@@ -51,7 +51,7 @@ class IcoRuntimeContour(IcoRuntimeNode):
 
     """
 
-    type_name: str = "runtime_contour"
+    type_name: ClassVar[str] = "Runtime Contour"
 
     _closure: IcoOperator[None, None]
 
@@ -75,19 +75,15 @@ class IcoRuntimeContour(IcoRuntimeNode):
 
     def run(self) -> IcoRuntimeContour:
         """Execute the entire runtime contour."""
-        if self._state != IcoRuntimeState.ready:
-            raise RuntimeError(
-                f"Cannot run contour while in state {self._state.name}. "
-                "Contour must be in 'ready' state to run. Use activate command first."
-            )
         try:
-            self._set_state(IcoRuntimeState.running)
+            self.state_model.running()
             self._contour_fn(None)
-            self._set_state(IcoRuntimeState.ready)
+
+            self.state_model.ready()
             return self
 
         except Exception as e:
-            self._set_state(IcoRuntimeState.fault)
+            self.state_model.fault()
             raise e
 
     def _contour_fn(self, _: None) -> None:

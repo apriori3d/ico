@@ -3,16 +3,18 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import overload
 
+from pyparsing import Enum
 from rich.console import Console
 from rich.text import Text
 from rich.tree import Tree
 
+from apriori.ico.core.meta.collector import collect_meta
 from apriori.ico.core.meta.flow_meta import IcoFlowMeta
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
-from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeState
+from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
@@ -45,9 +47,9 @@ def describe(
 ) -> None:
     """Render an ICO operator graph (flow) as a rich tree."""
     if isinstance(node, IcoNode):
-        meta = IcoFlowMeta.from_node(node, include_runtime=include_runtime)
+        meta = collect_meta(node, include_runtime=include_runtime)
     else:
-        meta = IcoFlowMeta.from_node(node)
+        meta = collect_meta(node)
 
     tree = _build_node(meta, show_ico_form=show_ico_form)
 
@@ -66,35 +68,107 @@ def _build_node(
 ) -> Tree:
     label = _format_label(flow, show_ico_form)
     node = Tree(label)
+
     for child in flow.children:
         node.add(_build_node(child, show_ico_form=show_ico_form))
+
+    for child in flow.runtime_children:
+        node.add(_build_node(child, show_ico_form=show_ico_form))
+
     return node
 
 
 # ─── Label formatting ───
+
+state_schemes = {
+    "Inactive": "gray70",
+    "Active": "blue",
+    "Ready": "green",
+    "Running": "yellow",
+    "Fault": "red",
+}
+
+
+class NameStyle(Enum):
+    fn = "#A67F59"
+    # class_ = "#9CDCFE"
+    type = "#569CD6"
+    class_ = "#007ACC"
+    keyword = "#E12EE1"
+    dimmed = "#C8C8C8"
+    meta = "#4FC1FF"
+
+
+name_origin_scheme = {
+    "fn": NameStyle.fn.value,
+    "class": NameStyle.class_.value,
+}
+
+
+def get_name_text(meta: IcoFlowMeta) -> Text:
+    if meta.node_type_name == "Runtime Wrapper":
+        assert meta.runtime_state is not None
+
+        state_style = state_schemes.get(meta.runtime_state, "black")
+
+        if len(meta.children) == 1:
+            # Computation flow perspective of runtime wrapper - we able to use child operator to color name
+            name = Text("Runtime(", style=state_style)
+
+            wrapped_op_name = get_name_text(meta.children[0])
+            name.append(wrapped_op_name)
+
+            name.append(")", style=state_style)
+        else:
+            # Runtime perspective of runtime wrapper - no child operator available
+            assert len(meta.children) == 0
+            name = Text(meta.runtime_name or meta.node_type_name, style=state_style)
+
+        return name
+
+    if meta.runtime_state is not None:
+        return Text(meta.name, style=state_schemes.get(meta.runtime_state, "black"))
+
+    if meta.node_type_name == "Iterator":
+        name = Text("Iterator(", style=NameStyle.keyword.value)
+        assert len(meta.children) == 1
+        iterable_name = get_name_text(meta.children[0])
+        name.append(iterable_name)
+        name.append(")", style=NameStyle.keyword.value)
+        return name
+
+    if meta.node_type_name == "Chain":
+        assert len(meta.children) == 2
+        left_name = get_name_text(meta.children[0])
+        right_name = get_name_text(meta.children[1])
+        name = Text("", style=NameStyle.keyword.value)
+        name.append(left_name)
+        name.append(" | ", style=NameStyle.keyword.value)
+        name.append(right_name)
+        # name.append("", style=NameStyle.keyword.value)
+        return name
+
+    return Text(meta.name, style=name_origin_scheme.get(meta.name_origin, "black"))
 
 
 def _format_label(
     flow_meta: IcoFlowMeta,
     show_ico_form: bool,
 ) -> Text:
-    text = Text(flow_meta.name, style="bold cyan")
-    text.append(f" ({flow_meta.node_type})", style="dim")
+    # Format name with origin-based style
+    text = get_name_text(flow_meta)
+
+    # Show type name
+    text.append(f" {flow_meta.node_type_name}", style="dim")
 
     # Show runtime states if available
     if flow_meta.runtime_state is not None:
-        color = {
-            IcoRuntimeState.inactive: "blue",
-            IcoRuntimeState.ready: "green",
-            IcoRuntimeState.running: "yellow",
-            IcoRuntimeState.paused: "grey70",
-            IcoRuntimeState.fault: "red",
-        }.get(flow_meta.runtime_state, "white")
-        text.append(f" [{flow_meta.runtime_state.name}]", style=color)
+        color = state_schemes.get(flow_meta.runtime_state, "black")
+        text.append(f" <{flow_meta.runtime_state}>", style=color)
 
     # Show ICO form (signature)
     if show_ico_form and flow_meta.ico_form is not None:
-        text.append(f"  {flow_meta.ico_form.name}", style="gray70")
+        text.append(f"  {flow_meta.ico_form.name}", style="cyan")
 
     return text
 
