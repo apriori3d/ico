@@ -25,6 +25,14 @@ class IcoForm(NamedTuple):
         return self.format()
 
 
+class IcoRuntimeNodeMeta(NamedTuple):
+    name: str
+    name_origin: str
+    type_name: str
+    state: IcoRuntimeState
+    children: list[IcoRuntimeNodeMeta]
+
+
 class IcoNodeMeta(NamedTuple):
     """Meta-description of an ICO computational flow.
 
@@ -40,48 +48,18 @@ class IcoNodeMeta(NamedTuple):
 
     name: str
     name_origin: str
-    node_type_name: str
+    type_name: str
     ico_form: IcoForm | None = None
     children: list[IcoNodeMeta] = list()
 
-    runtime_name: str | None = None
-    runtime_state: IcoRuntimeState | None = None
-    runtime_children: list[IcoNodeMeta] = list()
+    runtime: IcoRuntimeNodeMeta | None = None
 
-    def add_runtime(
-        self,
-        *,
-        runtime_name: str | None,
-        runtime_state: IcoRuntimeState | None,
-        runtime_children: list[IcoNodeMeta],
-    ) -> IcoNodeMeta:
+    def add_runtime(self, runtime_meta: IcoRuntimeNodeMeta) -> IcoNodeMeta:
         return IcoNodeMeta(
             name=self.name,
             name_origin=self.name_origin,
-            node_type_name=self.node_type_name,
+            type_name=self.type_name,
             ico_form=self.ico_form,
             children=self.children,
-            runtime_name=runtime_name,
-            runtime_state=runtime_state,
-            runtime_children=runtime_children,
+            runtime=runtime_meta,
         )
-
-    # def update(self, *, ico_form: IcoForm, children: list[IcoNodeMeta]) -> IcoNodeMeta:
-    #     return IcoNodeMeta(
-    #         name=self.name,
-    #         name_origin=self.name_origin,
-    #         node_type_name=self.node_type_name,
-    #         runtime_name=self.runtime_name,
-    #         runtime_state=self.runtime_state,
-    #         runtime_children=self.runtime_children,
-    #         ico_form=ico_form,
-    #         children=children,
-    #     )
-
-    # def __str__(self) -> str:
-    #     return self.name
-
-    # def traverse(self) -> Iterator[IcoFlowMeta]:
-    #     yield self
-    #     for c in self.children:
-    #         yield from c.traverse()

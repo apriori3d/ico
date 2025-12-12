@@ -8,10 +8,10 @@ from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.tool import IcoRuntimeTool
-from apriori.ico.core.runtime.tool.discovery import (
+from apriori.ico.core.runtime.tool import (
     IcoDiscovarableNode,
     IcoRegistrationEvent,
+    IcoRuntimeTool,
 )
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source

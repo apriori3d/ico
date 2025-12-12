@@ -61,7 +61,7 @@ DEFAULT_COMMAND_TO_STATE = {
 class IcoRuntimeNode(ABC):
     """Structural attributes for graph representation of ICO operators."""
 
-    type_name: ClassVar[str] = "Runtime Node"
+    runtime_type_name: ClassVar[str] = "Runtime Node"
 
     __slots__ = (
         "state_model",

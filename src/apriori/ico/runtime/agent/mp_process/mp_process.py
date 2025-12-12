@@ -45,8 +45,6 @@ class MPProcess(
     ) -> None:
         printer = IcoPrinter()
 
-        IcoAgentNode.__init__(self, name=name)
-
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
@@ -54,6 +52,8 @@ class MPProcess(
             original_fn=flow_factory,
             name=name,
         )
+
+        IcoAgentNode.__init__(self, name=name)
 
         self.flow_factory = flow_factory
         self._mp_context = get_context("spawn")

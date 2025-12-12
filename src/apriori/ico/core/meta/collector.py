@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from types import FunctionType
-from typing import cast, overload
+from typing import cast
 
 from apriori.ico.core.meta.ico_form_inference import infer_ico_form
-from apriori.ico.core.meta.node_meta import IcoNodeMeta
+from apriori.ico.core.meta.node_meta import IcoNodeMeta, IcoRuntimeNodeMeta
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -14,38 +14,7 @@ from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 
 
-@overload
-@staticmethod
 def collect_meta(
-    node: IcoNode,
-    include_runtime: bool = False,
-) -> IcoNodeMeta: ...
-
-
-@overload
-@staticmethod
-def collect_meta(node: IcoRuntimeNode) -> IcoNodeMeta: ...
-
-
-@staticmethod
-def collect_meta(
-    node: IcoNode | IcoRuntimeNode, include_runtime: bool = False
-) -> IcoNodeMeta:
-    """Recursively build an IcoFlow from an node tree."""
-
-    if isinstance(node, IcoRuntimeNode):
-        return _build_runtime_flow_meta(node)
-
-    return _build_flow_meta(
-        node,
-        include_runtime=include_runtime,
-    )
-
-
-#  ──────────── Computation flow builder ────────────
-
-
-def _build_flow_meta(
     node: IcoNode,
     include_runtime: bool = False,
 ) -> IcoNodeMeta:
@@ -58,7 +27,7 @@ def _build_flow_meta(
             len(node.children) == 1
         ), "Runtime wrapper must have exactly one child: wrapped operator."
 
-        wrapped_node = _build_flow_meta(
+        wrapped_node = collect_meta(
             node.children[0],
             include_runtime=False,
         )
@@ -67,11 +36,7 @@ def _build_flow_meta(
     # Build children recursively
 
     children: list[IcoNodeMeta] = [
-        _build_flow_meta(
-            c,
-            include_runtime=include_runtime,
-        )
-        for c in node.children
+        collect_meta(c, include_runtime=include_runtime) for c in node.children
     ]
 
     node = cast(IcoNode, node)
@@ -100,31 +65,27 @@ def _build_flow_meta(
         name_origin = "type_name"
 
     node_meta = IcoNodeMeta(
-        node_type_name=node.type_name,
+        type_name=node.type_name,
         name=name,
         name_origin=name_origin,
         ico_form=ico_form,
-        runtime_state=None,
         children=children,
+        runtime=None,
     )
     if not include_runtime or not isinstance(node, IcoRuntimeNode):
         return node_meta
 
+    # Add runtime meta if applicable
     runtime_node = cast(IcoRuntimeNode, node)
-    runtime_meta = _build_runtime_flow_meta(runtime_node)
-    updated = node_meta.add_runtime(
-        runtime_name=runtime_meta.runtime_name,
-        runtime_state=runtime_meta.runtime_state,
-        runtime_children=runtime_meta.runtime_children,
-    )
+    runtime_meta = collect_runtime_meta(runtime_node)
+    updated = node_meta.add_runtime(runtime_meta)
     return updated
 
 
-# ──────────── Runtime builder ────────────
+# ──────────── Runtime collector ────────────
 
 
-def _build_runtime_flow_meta(node: IcoRuntimeNode) -> IcoNodeMeta:
-    children = [_build_runtime_flow_meta(c) for c in node.runtime_children]
+def collect_runtime_meta(node: IcoRuntimeNode) -> IcoRuntimeNodeMeta:
     name = node.runtime_name
     name_origin = "user" if name is not None else None
 
@@ -134,16 +95,17 @@ def _build_runtime_flow_meta(node: IcoRuntimeNode) -> IcoNodeMeta:
             name_origin = "class"
 
     if name is None or name_origin is None:
-        name = node.type_name
+        name = node.runtime_type_name
         name_origin = "type_name"
 
-    return IcoNodeMeta(
-        node_type_name=node.type_name,
+    children = [collect_runtime_meta(c) for c in node.runtime_children]
+
+    return IcoRuntimeNodeMeta(
         name=name,
         name_origin=name_origin,
-        runtime_name=name,
-        runtime_state=replace(node.state),
-        runtime_children=children,
+        type_name=node.runtime_type_name,
+        state=replace(node.state),
+        children=children,
     )
 
 

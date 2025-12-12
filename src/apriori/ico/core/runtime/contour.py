@@ -51,7 +51,7 @@ class IcoRuntimeContour(IcoRuntimeNode):
 
     """
 
-    type_name: ClassVar[str] = "Runtime Contour"
+    runtime_type_name: ClassVar[str] = "Runtime Contour"
 
     _closure: IcoOperator[None, None]
 

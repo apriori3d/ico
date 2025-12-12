@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from typing import Generic, final
 
-from apriori.ico.core.operator import I, IcoOperator
+from apriori.ico.core.operator import I
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.runtime.monitor import IcoMonitor
 from apriori.ico.core.runtime.tool import IcoDiscovarableNode, IcoRegistrationEvent
 
 
@@ -21,7 +22,7 @@ class IcoProgressEvent(IcoRuntimeEvent):
 
 class IcoProgress(
     Generic[I],
-    IcoOperator[I, I],
+    IcoMonitor[I],
     IcoDiscovarableNode,
 ):
     __slots__ = ("total",)
@@ -34,22 +35,19 @@ class IcoProgress(
         *,
         name: str | None = None,
     ) -> None:
-        IcoDiscovarableNode.__init__(self, runtime_name=name)
-        IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
-            self,
-            fn=self._progress_fn,
-            name=name or "Progress",
+        IcoMonitor.__init__(  # pyright: ignore[reportUnknownMemberType]
+            self, name=name
         )
+        IcoDiscovarableNode.__init__(self, runtime_name=name)
         self.total = total
 
-    def _progress_fn(self, item: I) -> I:
-        self.state_model.running()
+    def _before_call(self, item: I) -> None:
         assert self.registered_id is not None
-
+        self.state_model.running()
         self.bubble_event(IcoProgressEvent(node_id=self.registered_id, advance=1))
 
+    def _after_call(self, item: I) -> None:
         self.state_model.ready()
-        return item
 
     def _register_node(self):
         """Implement discovery contract"""

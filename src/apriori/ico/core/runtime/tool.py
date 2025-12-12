@@ -75,7 +75,7 @@ class DiscoverableStateModel(BaseStateModel):
 
 
 class IcoDiscovarableNode(IcoRuntimeNode):
-    type_name: ClassVar[str] = "Discoverable Node"
+    runtime_type_name: ClassVar[str] = "Discoverable Node"
 
     __slots__ = ("registered_id",)
 
@@ -134,7 +134,7 @@ class IcoDiscovarableNode(IcoRuntimeNode):
 
 
 class IcoRuntimeTool(IcoRuntimeNode, ABC):
-    type_name: ClassVar[str] = "Runtime Tool"
+    runtime_type_name: ClassVar[str] = "Runtime Tool"
 
     __slots__ = ("registry",)
 

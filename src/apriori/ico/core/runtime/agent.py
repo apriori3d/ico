@@ -49,7 +49,7 @@ class AgentStateModel(BaseStateModel):
 
 
 class IcoAgentNode(IcoRuntimeNode, ABC):
-    type_name: ClassVar[str] = "Agent"
+    runtime_type_name: ClassVar[str] = "Agent"
 
     def __init__(self, *, name: str | None = None) -> None:
         IcoRuntimeNode.__init__(

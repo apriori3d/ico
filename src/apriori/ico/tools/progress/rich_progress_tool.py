@@ -1,7 +1,7 @@
 import time
 from collections.abc import Iterator
 from functools import partial
-from typing import ClassVar, final
+from typing import final
 
 from rich.progress import Progress, TaskID
 
@@ -11,6 +11,11 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
+from apriori.ico.core.runtime.progress import (
+    IcoProgress,
+    IcoProgressEvent,
+    IcoProgressRegistrationEvent,
+)
 from apriori.ico.core.runtime.tool import (
     IcoDiscovarableNode,
     IcoRegistrationEvent,
@@ -19,17 +24,10 @@ from apriori.ico.core.runtime.tool import (
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
-from apriori.ico.tools.progress.node import (
-    IcoProgress,
-    IcoProgressEvent,
-    IcoProgressRegistrationEvent,
-)
 
 
 @final
 class RichProgressTool(IcoRuntimeTool):
-    type_name: ClassVar[str] = "Rich Progress Tool"
-
     _progress: Progress
     _tasks: dict[int, TaskID]
 
