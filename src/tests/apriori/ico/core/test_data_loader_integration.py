@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.source import IcoSource
@@ -74,7 +74,7 @@ def test_ico_integration_data_runner_pipeline() -> None:
     # ─────────────────────────────
     # 6. Validate flow structure
     # ─────────────────────────────
-    flow = IcoFlowMeta.from_node(data_flow)
+    flow = IcoNodeMeta.from_node(data_flow)
 
     # Root should be compose node
     assert flow.node_type == "chain"

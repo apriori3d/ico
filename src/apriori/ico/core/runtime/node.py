@@ -80,13 +80,14 @@ class IcoRuntimeNode(ABC):
         runtime_name: str | None = None,
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
+        state_model: BaseStateModel | None = None,
     ) -> None:
         self.runtime_name = runtime_name
         self._runtime_parent = runtime_parent
         self._runtime_children = (
             list(runtime_children) if runtime_children is not None else []
         )
-        self.state_model = BaseStateModel()
+        self.state_model = state_model or BaseStateModel()
 
         for child in self._runtime_children:
             child._runtime_parent = self

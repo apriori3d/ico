@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import ClassVar
 
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
@@ -9,7 +10,7 @@ from apriori.ico.core.runtime.command import (
 
 @dataclass(slots=True, frozen=True)
 class IcoRuntimeState:
-    name: str = "base_state"
+    name: ClassVar[str] = "base_state"
 
     def is_ready(self) -> bool:
         return isinstance(self, ReadyState)
@@ -18,40 +19,35 @@ class IcoRuntimeState:
         return type(self).name
 
 
-class InactiveState(IcoRuntimeState):
-    name: str = "Inactive"
+@dataclass(slots=True, frozen=True)
+class IdleState(IcoRuntimeState):
+    name: ClassVar[str] = "Idle"
 
 
-class ActiveState(IcoRuntimeState):
-    name: str = "Active"
+@dataclass(slots=True, frozen=True)
+class ReadyState(IcoRuntimeState):
+    name: ClassVar[str] = "Ready"
 
 
-class ReadyState(ActiveState):
-    name: str = "Ready"
-
-
-class WaitingState(ReadyState):
-    name: str = "Waiting"
-
-
+@dataclass(slots=True, frozen=True)
 class RunningState(ReadyState):
-    name: str = "Running"
+    name: ClassVar[str] = "Running"
 
 
-class SendingState(ReadyState):
-    name: str = "Sending"
-
-
+@dataclass(slots=True, frozen=True)
 class FaultState(IcoRuntimeState):
-    name: str = "Fault"
+    name: ClassVar[str] = "Fault"
+
+
+StateTransitionMap = dict[type[IcoRuntimeCommand], type[IcoRuntimeState]]
 
 
 class BaseStateModel:
     """Base state model for ICO runtime nodes. Node becomes ready after activation."""
 
-    transitions: dict[type[IcoRuntimeCommand], type[IcoRuntimeState]] = {
+    transitions: ClassVar[StateTransitionMap] = {
         IcoActivateCommand: ReadyState,
-        IcoDeactivateCommand: InactiveState,
+        IcoDeactivateCommand: IdleState,
     }
 
     __slots__ = ("state",)
@@ -59,7 +55,7 @@ class BaseStateModel:
     state: IcoRuntimeState
 
     def __init__(self) -> None:
-        self.state = InactiveState()
+        self.state = IdleState()
 
     def update(self, command: IcoRuntimeCommand) -> None:
         new_state: IcoRuntimeState | None = None
@@ -71,15 +67,14 @@ class BaseStateModel:
         if new_state:
             self.state = new_state
 
-    def inactive(self) -> None:
-        self.state = InactiveState()
+    def idle(self) -> None:
+        self.state = IdleState()
 
-    def waiting(self) -> None:
+    def ready(self) -> None:
         if not self.state.is_ready():
-            raise RuntimeError(
-                "Cannot transition to Waiting state from non-Ready state."
-            )
-        self.state = WaitingState()
+            raise RuntimeError("Cannot transition to Ready state from non-Ready state.")
+
+        self.state = ReadyState()
 
     def running(self) -> None:
         if not self.state.is_ready():
@@ -87,19 +82,6 @@ class BaseStateModel:
                 "Cannot transition to Running state from non-Ready state."
             )
         self.state = RunningState()
-
-    def sending(self) -> None:
-        if not self.state.is_ready():
-            raise RuntimeError(
-                "Cannot transition to Sending state from non-Ready state."
-            )
-        self.state = SendingState()
-
-    def ready(self) -> None:
-        if not self.state.is_ready():
-            raise RuntimeError("Cannot transition to Ready state from non-Ready state.")
-
-        self.state = ReadyState()
 
     def fault(self) -> None:
         self.state = FaultState()

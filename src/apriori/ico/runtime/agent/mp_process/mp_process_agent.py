@@ -5,15 +5,15 @@ from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.runtime.agent import AgentStateModel, IcoAgentNode
 from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.contour import discover_and_connect_runtime_subtrees
 from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
 @final
 class MPProcessAgent(
-    IcoRuntimeNode,
+    IcoAgentNode,
     Generic[I, O],
 ):
     _flow: IcoOperator[I, O]
@@ -26,13 +26,13 @@ class MPProcessAgent(
         flow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
     ) -> None:
-        IcoRuntimeNode.__init__(self, runtime_name=name or "mp_process_agent")
+        IcoAgentNode.__init__(self, name=name)
         self._channel = channel
         self._flow = flow_factory()
 
         discover_and_connect_runtime_subtrees(self, self._flow)
 
-        # Connect to runtime port to enable command and event handling remote runtime
+        # Connect to runtime port to enable command and event handling for remote runtime
         channel.runtime_port = self
 
     def _run_loop(self) -> None:
@@ -48,15 +48,18 @@ class MPProcessAgent(
             - reset
             - deactivate
         """
+        assert isinstance(self.state_model, AgentStateModel)
+
+        # Agent is now pending activation
+        self.state_model.pending()
 
         while True:
             try:
                 # Blocks internally until new input arrives in the input channel.
-                self.state_model.waiting()
                 input_item = self._channel.wait_for_item()
 
                 if input_item is None:
-                    self.state_model.inactive()
+                    self.state_model.idle()
                     break  # Exit loop on deactivate command
 
                 # Process input item through flow
@@ -67,8 +70,8 @@ class MPProcessAgent(
                 self.state_model.sending()
                 self._channel.send(output)
 
-                # Ready for the next item
-                self.state_model.ready()
+                # Wait for the next item
+                self.state_model.waiting()
 
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate

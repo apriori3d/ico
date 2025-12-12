@@ -5,9 +5,9 @@ from typing import ClassVar, overload
 from typing_extensions import final
 
 from apriori.ico.core.operator import I, IcoOperator, O, wrap_operator
-from apriori.ico.core.runtime.discovery import IcoDiscovarableNode, IcoRegistrationEvent
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
+from apriori.ico.core.runtime.tool import IcoDiscovarableNode, IcoRegistrationEvent
 
 
 @final

@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
-from typing import ClassVar, Generic, final
+from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.runtime.agent import AgentStateModel, IcoAgentNode
 from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
@@ -17,7 +18,6 @@ from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.runtime.agent.mp_process.mp_process_agent import MPProcessAgent
 from apriori.ico.runtime.channel.mp_queue.channel import (
     MPChannel,
@@ -29,12 +29,9 @@ from apriori.ico.tools.printer.node import IcoPrinter
 class MPProcess(
     Generic[I, O],
     IcoOperator[I, O],
-    IcoRuntimeNode,
+    IcoAgentNode,
 ):
-    type_name: ClassVar[str] = "Agent"
-
     flow_factory: Callable[[], IcoOperator[I, O]]
-
     _agent_process: SpawnProcess | None
     _channel: IcoChannel[I, O] | None
     _mp_context: SpawnContext
@@ -46,14 +43,9 @@ class MPProcess(
         *,
         name: str | None = None,
     ) -> None:
-        name = name or "mp_process"
         printer = IcoPrinter()
 
-        IcoRuntimeNode.__init__(
-            self,
-            runtime_name=name,
-            runtime_children=[printer],
-        )
+        IcoAgentNode.__init__(self, name=name)
 
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
@@ -76,6 +68,7 @@ class MPProcess(
 
     def _portal_fn(self, input: I) -> O:
         assert self._channel is not None
+        assert isinstance(self.state_model, AgentStateModel)
 
         try:
             # Send item to agent process

@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
@@ -55,7 +55,7 @@ def test_data_structure_representation() -> None:
     stream = IcoStream(scale)
     flow = dataset | stream
 
-    structure = IcoFlowMeta.from_node(flow)
+    structure = IcoNodeMeta.from_node(flow)
 
     # Root node should be composition
     assert structure.node_type == "chain"

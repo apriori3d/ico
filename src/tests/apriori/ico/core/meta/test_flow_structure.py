@@ -1,6 +1,6 @@
 import pytest
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta, IcoNodeType
+from apriori.ico.core.meta.node_meta import IcoNodeMeta, IcoNodeType
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
@@ -12,7 +12,7 @@ from apriori.ico.core.stream import IcoStream
 
 def test_icoflow_operator_node() -> None:
     op = IcoOperator[int, float](lambda x: float(x), name="to_float")
-    flow = IcoFlowMeta.from_node(op)
+    flow = IcoNodeMeta.from_node(op)
 
     assert flow.node_type == "operator"
     assert flow.ico_form.name == "int → float"
@@ -26,7 +26,7 @@ def test_icoflow_compose_node() -> None:
     b = IcoOperator[float, str](str, name="to_str")
     composed = a | b
 
-    flow = IcoFlowMeta.from_node(composed)
+    flow = IcoNodeMeta.from_node(composed)
     assert flow.node_type == "chain"
     assert flow.ico_form.name == "int → str"
     assert [c.name for c in flow.children] == ["to_float", "to_str"]
@@ -37,7 +37,7 @@ def test_icoflow_iterate_node() -> None:
     base = IcoOperator[int, float](lambda x: x * 0.5, name="scale")
     iterated = base.iterate()
 
-    flow = IcoFlowMeta.from_node(iterated)
+    flow = IcoNodeMeta.from_node(iterated)
     assert flow.node_type == "iterator"
     assert flow.ico_form.name == "Iterator[int] → Iterator[float]"
     assert flow.children and flow.children[0].name == "scale"
@@ -48,7 +48,7 @@ def test_icoflow_stream_node() -> None:
     base = IcoOperator[int, float](lambda x: x * 2, name="scale")
     stream = IcoStream(base, name="stream")
 
-    flow = IcoFlowMeta.from_node(stream)
+    flow = IcoNodeMeta.from_node(stream)
     assert flow.node_type == "stream"
     assert flow.ico_form.name == "Iterator[int] → Iterator[float]"
     assert flow.children and flow.children[0].name == "scale"
@@ -61,7 +61,7 @@ def test_icoflow_pipeline_node() -> None:
         body=[IcoOperator[float, float](lambda x: x * 2, name="scale")],
         output=IcoOperator[float, str](str, name="to_str"),
     )
-    flow = IcoFlowMeta.from_node(pipe)
+    flow = IcoNodeMeta.from_node(pipe)
 
     assert flow.node_type == IcoNodeType.pipeline
     assert flow.ico_form.name == "int → float → str"
@@ -72,7 +72,7 @@ def test_icoflow_pipeline_node() -> None:
 def test_icoflow_process_node() -> None:
     increment_op = IcoOperator[int, int](lambda c: c + 1)
     process = IcoProcess[int](increment_op, num_iterations=3)
-    flow = IcoFlowMeta.from_node(process)
+    flow = IcoNodeMeta.from_node(process)
 
     assert flow.node_type == IcoNodeType.process
     assert flow.ico_form.name == "int → int"
@@ -81,7 +81,7 @@ def test_icoflow_process_node() -> None:
 # ─── Source ───
 def test_icoflow_source_node() -> None:
     src = IcoSource[int](lambda: iter([1, 2, 3]), name="data")
-    flow = IcoFlowMeta.from_node(src)
+    flow = IcoNodeMeta.from_node(src)
 
     assert flow.ico_form.name == "() → Iterator[int]"
     assert flow.name == "data"
@@ -100,7 +100,7 @@ def test_icoflow_traverse_returns_all_nodes() -> None:
     )
     stream = IcoStream(pipe, name="stream")
     flow = src | stream
-    flow_desc = IcoFlowMeta.from_node(flow)
+    flow_desc = IcoNodeMeta.from_node(flow)
     names: list[str] = [n.name for n in flow_desc.traverse() if n.name]
     used_names: set[str] = {"src", "stream", "pipe", "ctx", "plus", "out"}
     names_set: set[str] = set(names)

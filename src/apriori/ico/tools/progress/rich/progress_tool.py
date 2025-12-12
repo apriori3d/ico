@@ -11,7 +11,11 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.tool import IcoRuntimeTool
+from apriori.ico.core.runtime.tool import (
+    IcoDiscovarableNode,
+    IcoRegistrationEvent,
+    IcoRuntimeTool,
+)
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
@@ -25,6 +29,7 @@ from apriori.ico.tools.progress.node import (
 @final
 class RichProgressTool(IcoRuntimeTool):
     type_name: ClassVar[str] = "Rich Progress Tool"
+
     _progress: Progress
     _tasks: dict[int, TaskID]
 
@@ -33,12 +38,16 @@ class RichProgressTool(IcoRuntimeTool):
         self._progress = progress
         self._tasks = {}
 
-    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        emitting_event = super().on_event(event)
+    def get_discoverable_node_types(self) -> set[type[IcoDiscovarableNode]]:
+        return {IcoProgress}
 
+    def get_registration_event_types(self) -> set[type[IcoRegistrationEvent]]:
+        return {IcoProgressRegistrationEvent}
+
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoProgressRegistrationEvent):
             node_task = self._progress.add_task(
-                description=event.node_name,
+                description=event.node_name or f"Progress {event.node_id}",
                 total=event.total,
             )
             self._tasks[event.node_id] = node_task
@@ -109,6 +118,7 @@ if __name__ == "__main__":
 
     flow = numbers | (progress | mp_process1 | mp_process2).iterate() | print_result
     describe(flow)
+    describe(flow, include_runtime=True)
 
     with Progress() as progress:
         console = progress.console
@@ -119,7 +129,7 @@ if __name__ == "__main__":
         runtime.activate()
         describe(runtime, console=console)
 
-        runtime.discover(IcoProgress)
+        progress_tool.discover()
         describe(runtime, console=console)
 
         runtime.run()

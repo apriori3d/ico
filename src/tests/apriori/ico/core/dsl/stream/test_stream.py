@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.stream import IcoStream
 
@@ -56,7 +56,7 @@ def test_stream_structure_representation() -> None:
     scale = IcoOperator[int, int](lambda x: x * 2, name="scale")
     stream = IcoStream[int, int](body=scale)
 
-    flow = IcoFlowMeta.from_node(stream)
+    flow = IcoNodeMeta.from_node(stream)
 
     # Root node should be a stream
     assert flow.node_type == "stream"

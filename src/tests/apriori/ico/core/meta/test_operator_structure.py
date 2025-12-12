@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 
 
@@ -39,7 +39,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     # 4. Retrieve and inspect structural description
     # ─────────────────────────────
-    flow = IcoFlowMeta.from_node(pipeline)
+    flow = IcoNodeMeta.from_node(pipeline)
 
     # Root node — composition
     assert flow.node_type == "chain"
@@ -73,7 +73,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     assert "collate" in names
 
 
-def _collect_names(node: IcoFlowMeta) -> list[str]:
+def _collect_names(node: IcoNodeMeta) -> list[str]:
     """Recursively traverse an IcoFlow and collect node names."""
     result = [node.name]
     for child in node.children:

@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Iterator
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
+from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
@@ -44,7 +44,7 @@ def test_data_structure_representation() -> None:
     sink_op = IcoSink(sink_fn, name="sink")
     flow = dataset | stream | sink_op
 
-    structure = IcoFlowMeta.from_node(flow)
+    structure = IcoNodeMeta.from_node(flow)
 
     # Root node should be composition
     assert structure.node_type == "chain"

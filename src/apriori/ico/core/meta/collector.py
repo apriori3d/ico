@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import FunctionType
 from typing import cast, overload
 
-from apriori.ico.core.meta.flow_meta import IcoFlowMeta
-from apriori.ico.core.meta.ico_form import infer_ico_form
+from apriori.ico.core.meta.ico_form_inference import infer_ico_form
+from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -13,24 +14,23 @@ from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 
 
-# sdsdsaa
 @overload
 @staticmethod
 def collect_meta(
     node: IcoNode,
     include_runtime: bool = False,
-) -> IcoFlowMeta: ...
+) -> IcoNodeMeta: ...
 
 
 @overload
 @staticmethod
-def collect_meta(node: IcoRuntimeNode) -> IcoFlowMeta: ...
+def collect_meta(node: IcoRuntimeNode) -> IcoNodeMeta: ...
 
 
 @staticmethod
 def collect_meta(
     node: IcoNode | IcoRuntimeNode, include_runtime: bool = False
-) -> IcoFlowMeta:
+) -> IcoNodeMeta:
     """Recursively build an IcoFlow from an node tree."""
 
     if isinstance(node, IcoRuntimeNode):
@@ -48,7 +48,7 @@ def collect_meta(
 def _build_flow_meta(
     node: IcoNode,
     include_runtime: bool = False,
-) -> IcoFlowMeta:
+) -> IcoNodeMeta:
     """Recursively build an IcoFlowMeta from a static node tree."""
 
     # Special case: runtime wrapper nodes
@@ -66,7 +66,7 @@ def _build_flow_meta(
 
     # Build children recursively
 
-    children: list[IcoFlowMeta] = [
+    children: list[IcoNodeMeta] = [
         _build_flow_meta(
             c,
             include_runtime=include_runtime,
@@ -76,13 +76,6 @@ def _build_flow_meta(
 
     node = cast(IcoNode, node)
     ico_form = infer_ico_form(node)
-
-    # Return meta from runtime perspective
-    if include_runtime and isinstance(node, IcoRuntimeNode):
-        runtime_node = cast(IcoRuntimeNode, node)
-        runtime_meta = _build_runtime_flow_meta(runtime_node)
-        updated = runtime_meta.update(ico_form=ico_form, children=children)
-        return updated
 
     # Determine node name
     name = node.name
@@ -106,7 +99,7 @@ def _build_flow_meta(
         name = node.type_name
         name_origin = "type_name"
 
-    return IcoFlowMeta(
+    node_meta = IcoNodeMeta(
         node_type_name=node.type_name,
         name=name,
         name_origin=name_origin,
@@ -114,12 +107,23 @@ def _build_flow_meta(
         runtime_state=None,
         children=children,
     )
+    if not include_runtime or not isinstance(node, IcoRuntimeNode):
+        return node_meta
+
+    runtime_node = cast(IcoRuntimeNode, node)
+    runtime_meta = _build_runtime_flow_meta(runtime_node)
+    updated = node_meta.add_runtime(
+        runtime_name=runtime_meta.runtime_name,
+        runtime_state=runtime_meta.runtime_state,
+        runtime_children=runtime_meta.runtime_children,
+    )
+    return updated
 
 
 # ──────────── Runtime builder ────────────
 
 
-def _build_runtime_flow_meta(node: IcoRuntimeNode) -> IcoFlowMeta:
+def _build_runtime_flow_meta(node: IcoRuntimeNode) -> IcoNodeMeta:
     children = [_build_runtime_flow_meta(c) for c in node.runtime_children]
     name = node.runtime_name
     name_origin = "user" if name is not None else None
@@ -133,12 +137,12 @@ def _build_runtime_flow_meta(node: IcoRuntimeNode) -> IcoFlowMeta:
         name = node.type_name
         name_origin = "type_name"
 
-    return IcoFlowMeta(
+    return IcoNodeMeta(
         node_type_name=node.type_name,
         name=name,
         name_origin=name_origin,
         runtime_name=name,
-        runtime_state=type(node.state_model.state).name,
+        runtime_state=replace(node.state),
         runtime_children=children,
     )
 

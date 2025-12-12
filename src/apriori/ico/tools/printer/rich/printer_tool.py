@@ -4,12 +4,15 @@ from typing import final
 from rich.console import Console
 
 from apriori.ico.core.operator import operator
-from apriori.ico.core.runtime.discovery import IcoDiscovarableNode, IcoRegistrationEvent
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.tool import IcoRuntimeTool
+from apriori.ico.core.runtime.tool.discovery import (
+    IcoDiscovarableNode,
+    IcoRegistrationEvent,
+)
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.tools.printer.node import (
@@ -22,16 +25,17 @@ from apriori.ico.tools.printer.node import (
 
 @final
 class RichPrinterTool(IcoRuntimeTool):
-    discoverable_node_types: set[type[IcoDiscovarableNode]] = {IcoPrinter}
-    discovery_event_types: set[type[IcoRegistrationEvent]] = {
-        IcoPrinterRegistrationEvent
-    }
-
     _console: Console
 
     def __init__(self, console: Console):
         IcoRuntimeNode.__init__(self)
         self._console = console
+
+    def get_discoverable_node_types(self) -> set[type[IcoDiscovarableNode]]:
+        return {IcoPrinter}
+
+    def get_registration_event_types(self) -> set[type[IcoRegistrationEvent]]:
+        return {IcoPrinterRegistrationEvent}
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoPrintEvent):
