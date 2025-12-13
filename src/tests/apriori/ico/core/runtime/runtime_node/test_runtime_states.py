@@ -45,7 +45,7 @@ def test_execution_state_transitions_failure() -> None:
     source = IcoSource[int](lambda: iter([1, 2, 3]), name="data")
     sink = IcoSink[int](lambda items: None if list(items) else None, name="sink")
 
-    flow = source | faulty_op.iterate() | sink
+    flow = source | faulty_op.stream() | sink
 
     runtime = RecordingContour(flow)
 

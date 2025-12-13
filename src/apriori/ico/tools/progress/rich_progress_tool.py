@@ -114,7 +114,8 @@ if __name__ == "__main__":
 
     # item_flow = create_item_flow()
 
-    flow = numbers | (progress | mp_process1 | mp_process2).iterate() | print_result
+    flow = numbers | (progress | mp_process1 | mp_process2).stream() | print_result
+    flow.name = "Example Flow"
     describe(flow)
     describe(flow, include_runtime=True)
 

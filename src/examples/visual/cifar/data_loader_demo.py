@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     # 1. Run augmentation in main process
     augment_flow = create_augmentation_flow()
-    single_data_flow = data_input_flow | augment_flow.iterate()
+    single_data_flow = data_input_flow | augment_flow.stream()
     single_data_flow.name = "Single Process Data Flow with Augmentation"
     single_data_flow.describe()
 

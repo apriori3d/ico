@@ -128,7 +128,7 @@ def test_send_receive_stream() -> None:
 
     try:
         src = IcoSource(lambda: iter(range(num_queries)))
-        flow = src | mp_process_mock.iterate()
+        flow = src | mp_process_mock.stream()
         results = list(flow(None))
         assert results == [i * 2 for i in range(num_queries)]
     finally:

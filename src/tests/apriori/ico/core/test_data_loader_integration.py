@@ -57,7 +57,7 @@ def test_ico_integration_data_runner_pipeline() -> None:
         output=max,
     )
 
-    pipeline = augment.iterate() | collate
+    pipeline = augment.stream() | collate
 
     # ─────────────────────────────
     # 4. Wrap into runner and connect with data

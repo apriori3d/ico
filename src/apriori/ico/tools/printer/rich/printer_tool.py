@@ -72,7 +72,7 @@ if __name__ == "__main__":
     def print_result(x: int) -> None:
         print(f"Sink received: {x}")
 
-    flow = numbers | (double | shift).iterate() | print_result
+    flow = numbers | (double | shift).stream() | print_result
     flow.name = "Example Flow"
 
     flow.describe()

@@ -28,7 +28,7 @@ def test_operator_structure_builds_correct_tree() -> None:
     # ─────────────────────────────
     # 2. Compose operators into a small pipeline
     # ─────────────────────────────
-    pipeline = augment.iterate() | collate
+    pipeline = augment.stream() | collate
 
     # ─────────────────────────────
     # 3. Execute the pipeline

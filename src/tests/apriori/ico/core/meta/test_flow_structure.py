@@ -35,7 +35,7 @@ def test_icoflow_compose_node() -> None:
 # ─── Map ───
 def test_icoflow_iterate_node() -> None:
     base = IcoOperator[int, float](lambda x: x * 0.5, name="scale")
-    iterated = base.iterate()
+    iterated = base.stream()
 
     flow = IcoNodeMeta.from_node(iterated)
     assert flow.node_type == "iterator"

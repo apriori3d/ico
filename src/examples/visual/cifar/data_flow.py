@@ -76,7 +76,7 @@ def create_augmentation_flow(
         AdjustContrast(),
     )
     item_aug_flow.name = "Item augmentation flow"
-    flow = item_aug_flow.iterate() | IcoOperator(collate)
+    flow = item_aug_flow.stream() | IcoOperator(collate)
 
     if share_tensors:
         flow = flow | IcoOperator(to_shared_memory)

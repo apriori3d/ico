@@ -5,8 +5,12 @@ from typing import NamedTuple
 from apriori.ico.core.meta.utils import format_ico_type
 from apriori.ico.core.runtime.state import IcoRuntimeState
 
+# ────────────────────────────────────────────────
+# Signature descriptions
+# ────────────────────────────────────────────────
 
-class IcoForm(NamedTuple):
+
+class IcoSignature(NamedTuple):
     """
     A representation of the ICO form of an operator in DSL.
     Possible types are type[Any] or typing generics."""
@@ -16,13 +20,18 @@ class IcoForm(NamedTuple):
     o: object
 
     def format(self) -> str:
-        if self.c is None:
+        if self.c is None or self.c is type(None):
             return f"{format_ico_type(self.i)} → {format_ico_type(self.o)}"
         return f"{format_ico_type(self.i)}, {format_ico_type(self.c)} → {format_ico_type(self.o)}"
 
     @property
     def name(self) -> str:
         return self.format()
+
+
+# ────────────────────────────────────────────────
+# Meta-descriptions
+# ────────────────────────────────────────────────
 
 
 class IcoRuntimeNodeMeta(NamedTuple):
@@ -49,7 +58,7 @@ class IcoNodeMeta(NamedTuple):
     name: str
     name_origin: str
     type_name: str
-    ico_form: IcoForm | None = None
+    ico_form: IcoSignature
     children: list[IcoNodeMeta] = list()
 
     runtime: IcoRuntimeNodeMeta | None = None

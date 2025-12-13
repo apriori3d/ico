@@ -224,7 +224,7 @@ class IcoRuntimeNode(ABC):
     # ────────────────────────────────────────────────
 
     def describe(self) -> None:
-        from apriori.ico.core.meta.describer import describe as describe_util
+        from apriori.ico.inspect.describer import describe as describe_util
 
         describe_util(self)
 

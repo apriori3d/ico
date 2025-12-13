@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from apriori.ico.core.context_operator import IcoContextOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.meta.ico_form_inference import IcoForm, infer_ico_form
+from apriori.ico.core.meta.signature import IcoSignature, infer_ico_form
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
@@ -18,7 +18,7 @@ from apriori.ico.utils.data.batcher import IcoBatcher
 def test_infer_form_operator_generics() -> None:
     op = IcoOperator[int, float](lambda x: float(x))
     form = infer_ico_form(op)
-    assert isinstance(form, IcoForm)
+    assert isinstance(form, IcoSignature)
     assert form.name == "int → float"
 
 
@@ -62,7 +62,7 @@ def test_infer_form_compose() -> None:
 
 def test_infer_form_map_and_stream() -> None:
     base = IcoOperator[int, float](lambda x: float(x))
-    iterate = base.iterate()
+    iterate = base.stream()
     streamed = IcoStream(base)
 
     assert infer_ico_form(iterate).name == "Iterator[int] → Iterator[float]"

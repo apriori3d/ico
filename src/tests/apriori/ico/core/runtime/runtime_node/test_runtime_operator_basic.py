@@ -36,7 +36,7 @@ def test_runtime_contour_executes_source_to_sink() -> None:
     sink = IcoSink[int](capture_output, name="capture")
 
     # Compose flow and wrap in contour
-    flow = source | op.iterate() | sink
+    flow = source | op.stream() | sink
     contour = IcoRuntimeContour(flow)
     contour.activate().run().deactivate()
 

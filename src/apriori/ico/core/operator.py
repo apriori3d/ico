@@ -106,13 +106,13 @@ class IcoOperator(Generic[I, O], IcoNode):
         """Pipe composition: a | b == a.chain(b)."""
         return self.chain(other)
 
-    def iterate(self) -> IcoOperator[Iterator[I], Iterator[O]]:
+    def stream(self) -> IcoOperator[Iterator[I], Iterator[O]]:
         """Apply this operator elementwise over an iterable (lazy generator):
         Iterable[I] → Iterable[O]
         """
-        from apriori.ico.core.iteratator import iterate
+        from apriori.ico.core.stream import IcoStream
 
-        return iterate(self)
+        return IcoStream(self)
 
     # ────────────────────────────────────────────────
     # Runtime interface

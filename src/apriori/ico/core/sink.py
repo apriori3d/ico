@@ -25,7 +25,7 @@ class IcoSink(
     ) -> None:
         super().__init__(
             fn=self._sink_fn,
-            name=name or "sink",
+            name=name,
             original_fn=consume_fn,
         )
         self.consume_fn = consume_fn

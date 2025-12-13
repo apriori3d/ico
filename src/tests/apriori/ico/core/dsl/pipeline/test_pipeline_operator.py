@@ -44,7 +44,7 @@ def test_pipeline_inside_map_operator() -> None:
     total_op = IcoOperator[Iterator[float], float](sum)
 
     # Apply iterate() and reduce-like composition
-    flow = square_op.iterate() | total_op
+    flow = square_op.stream() | total_op
     result = flow(iter([1.0, 2.0, 3.0]))
     assert result == 14  # 1² + 2² + 3²
 

@@ -1,3 +1,6 @@
+# In this module me infer ICO forms for possibly untyped callables,
+# and have to disable categories of errors related to using Any type in inspect api.
+# mypy: disable-error-code=misc
 from __future__ import annotations
 
 import inspect
@@ -15,26 +18,21 @@ from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChainOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.iteratator import IcoIterateOperator
-from apriori.ico.core.meta.node_meta import IcoForm
+from apriori.ico.core.meta.meta import IcoSignature
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
 
-# In this module me infer ICO forms for possibly untyped callables,
-# and have to disable categories of errors related to using Any type in inspect api.
-# mypy: disable-error-code=misc
+# ────────────────────────────────────────────────
+# Inference strategy dispatcher
+# ────────────────────────────────────────────────
 
 
-# ─── Inference dispatcher ───
-
-
-def infer_ico_form(obj: object) -> IcoForm:
-    ico_form: IcoForm | None = None
+def infer_signature(obj: object) -> IcoSignature:
+    ico_form: IcoSignature | None = None
 
     for strategy in _ALL_STRATEGIES:
         ico_form = strategy(obj, ico_form)
@@ -43,13 +41,15 @@ def infer_ico_form(obj: object) -> IcoForm:
         return ico_form
 
     # Fallback to Any → Any
-    return IcoForm(Any, None, Any)
+    return IcoSignature(Any, None, Any)
 
 
 # ─── Strategy: from __orig_class__ ───
 
 
-def infer_from_generic(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
+def infer_from_generic(
+    obj: object, ico_form: IcoSignature | None
+) -> IcoSignature | None:
     if ico_form is not None:
         return ico_form
 
@@ -62,11 +62,11 @@ def infer_from_generic(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
 
     match len(args):
         case 1:
-            return IcoForm(args[0], None, args[0])
+            return IcoSignature(args[0], None, args[0])
         case 2:
-            return IcoForm(args[0], None, args[1])
+            return IcoSignature(args[0], None, args[1])
         case 3:
-            return IcoForm(args[0], args[1], args[2])
+            return IcoSignature(args[0], args[1], args[2])
         case _:
             pass
     return None
@@ -75,7 +75,9 @@ def infer_from_generic(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
 # ─── Strategy: structural node decomposition ───
 
 
-def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
+def infer_from_node_structure(
+    obj: object, ico_form: IcoSignature | None
+) -> IcoSignature | None:
     if ico_form is not None:
         return ico_form
 
@@ -83,42 +85,47 @@ def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm 
         return None
 
     match obj:
-        case IcoStream():
-            assert len(obj.children) == 1
-            return infer_ico_form(obj.children[0])
+        case IcoSink():
+            body_form = infer_signature(obj.original_fn)
+            return IcoSignature(
+                i=_wrap_iterator(body_form.i),
+                c=type(None),
+                o=type(None),
+            )
 
-        case IcoAsyncStream():
+        case IcoStream() | IcoAsyncStream():
             assert len(obj.children) == 1
-            return infer_ico_form(obj.children[0])
-
-        case IcoIterateOperator():
-            assert len(obj.children) == 1
-            return infer_ico_form(obj.children[0])
+            body_form = infer_signature(obj.children[0])
+            return IcoSignature(
+                i=_wrap_iterator(body_form.i),
+                c=_wrap_iterator(body_form.c),
+                o=_wrap_iterator(body_form.o),
+            )
 
         case IcoChainOperator():
             assert len(obj.children) == 2
-            a = infer_ico_form(obj.children[0])
-            b = infer_ico_form(obj.children[1])
-            return IcoForm(a.i, None, b.o)
+            a = infer_signature(obj.children[0])
+            b = infer_signature(obj.children[1])
+            return IcoSignature(a.i, None, b.o)
 
         case IcoPipeline():
             assert len(obj.children) >= 1
-            return infer_ico_form(obj.children[0])
+            return infer_signature(obj.children[0])
 
         case IcoProcess():
             assert len(obj.children) == 1
-            body = infer_ico_form(obj.children[0])
-            return IcoForm(body.i, None, body.o)
+            body = infer_signature(obj.children[0])
+            return IcoSignature(body.i, None, body.o)
 
         case IcoContextPipeline():
             assert len(obj.children) >= 1
-            return infer_ico_form(obj.children[0])
+            return infer_signature(obj.children[0])
 
         case IcoEpoch():
             assert len(obj.children) == 2
-            source_form = infer_ico_form(obj.children[0])
-            context_form = infer_ico_form(obj.children[1])
-            return IcoForm(source_form.o, context_form.c, context_form.o)
+            source_form = infer_signature(obj.children[0])
+            context_form = infer_signature(obj.children[1])
+            return IcoSignature(source_form.o, context_form.c, context_form.o)
 
         case _:
             pass
@@ -126,44 +133,21 @@ def infer_from_node_structure(obj: object, ico_form: IcoForm | None) -> IcoForm 
     return None
 
 
-# ─── Strategy: add iterator annotations for inferred types ───
-
-
-def annotate_iterator_nodes(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
-    if ico_form is None:
-        return None
-
-    if not isinstance(ico_form.i, type) or not isinstance(ico_form.o, type):
-        return ico_form
-
-    ico_form_i = ico_form.i
-    ico_form_o = ico_form.o
-
-    if get_origin(ico_form.i) is not Iterator:
-        ico_form_i = Iterator[ico_form.i]  # type: ignore
-
-    if get_origin(ico_form.o) is not Iterator:
-        ico_form_o = Iterator[ico_form.o]  # type: ignore
-
-    match obj:
-        case IcoStream() | IcoAsyncStream() | IcoIterateOperator():
-            return IcoForm(ico_form_i, None, ico_form_o)
-        case IcoSource():
-            return IcoForm(type(None), None, ico_form_o)
-
-        case IcoSink():
-            return IcoForm(ico_form_i, None, type(None))
-
-        case _:
-            pass
-
-    return ico_form
+def _wrap_iterator(tp: object) -> object:
+    if tp is None or tp is type(None):
+        return tp
+    return Iterator[tp]  # type: ignore
 
 
 # ─── Strategy: from operator function ───
 
 
-def infer_from_ico_target(obj: object, ico_form: IcoForm | None) -> IcoForm | None:
+def infer_from_ico_target(
+    obj: object, ico_form: IcoSignature | None
+) -> IcoSignature | None:
+    if ico_form is not None:
+        return ico_form
+
     if not isinstance(obj, IcoNode):
         return ico_form
 
@@ -172,7 +156,7 @@ def infer_from_ico_target(obj: object, ico_form: IcoForm | None) -> IcoForm | No
         return ico_form
 
     if isinstance(fn, IcoOperator):
-        return infer_ico_form(fn)  # pyright: ignore[reportUnknownArgumentType]
+        return infer_signature(fn)  # pyright: ignore[reportUnknownArgumentType]
 
     if not callable(fn):
         return ico_form
@@ -186,7 +170,12 @@ def infer_from_ico_target(obj: object, ico_form: IcoForm | None) -> IcoForm | No
 # ─── Strategy: from function annotations ───
 
 
-def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
+def infer_from_callable(
+    fn: object, ico_form: IcoSignature | None
+) -> IcoSignature | None:
+    if ico_form is not None:
+        return ico_form
+
     if not callable(fn):
         return ico_form
 
@@ -232,7 +221,7 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
                     o = o_args[2]
                 case _:
                     pass
-            return IcoForm(i, c, o)
+            return IcoSignature(i, c, o)
 
         # Special case: item type may be inferered from generic ICO form, but origin, like Iterator, is lost.
         # Yet it may be restored here from function hints.
@@ -245,9 +234,9 @@ def infer_from_callable(fn: object, ico_form: IcoForm | None) -> IcoForm | None:
             if o is not None and ico_form.o is not None:
                 o = replace_deepest_typevar(o, O, ico_form.o)
 
-            return IcoForm(i, ico_form.c, o)
+            return IcoSignature(i, ico_form.c, o)
 
-        return IcoForm(i, c, o)
+        return IcoSignature(i, c, o)
 
     except Exception:
         return ico_form
@@ -276,5 +265,4 @@ _ALL_STRATEGIES = [
     infer_from_node_structure,
     infer_from_ico_target,
     infer_from_callable,
-    annotate_iterator_nodes,
 ]

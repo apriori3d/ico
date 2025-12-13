@@ -4,14 +4,16 @@ from dataclasses import replace
 from types import FunctionType
 from typing import cast
 
-from apriori.ico.core.meta.ico_form_inference import infer_ico_form
-from apriori.ico.core.meta.node_meta import IcoNodeMeta, IcoRuntimeNodeMeta
+from apriori.ico.core.meta.inspect.signature import infer_signature
+from apriori.ico.core.meta.meta import IcoNodeMeta, IcoRuntimeNodeMeta
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
+
+# ──────────── Flow Nodes meta collector ────────────
 
 
 def collect_meta(
@@ -40,11 +42,12 @@ def collect_meta(
     ]
 
     node = cast(IcoNode, node)
-    ico_form = infer_ico_form(node)
+    ico_form = infer_signature(node)
 
     # Determine node name
+
     name = node.name
-    name_origin = "user" if name is not None else None
+    name_origin = "direct" if name is not None else None
 
     if (
         name is None
@@ -82,12 +85,12 @@ def collect_meta(
     return updated
 
 
-# ──────────── Runtime collector ────────────
+# ──────────── Runtime Nodes meta collector ────────────
 
 
 def collect_runtime_meta(node: IcoRuntimeNode) -> IcoRuntimeNodeMeta:
     name = node.runtime_name
-    name_origin = "user" if name is not None else None
+    name_origin = "direct" if name is not None else None
 
     if name is None:
         name = extract_class_name(node)  # type: ignore
