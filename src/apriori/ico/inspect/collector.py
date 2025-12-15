@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from types import FunctionType
 from typing import cast
 
 from apriori.ico.core.meta.inspect.signature import infer_signature
@@ -110,20 +109,3 @@ def collect_runtime_meta(node: IcoRuntimeNode) -> IcoRuntimeNodeMeta:
         state=replace(node.state),
         children=children,
     )
-
-
-# ──────────── Helpers  ────────────
-
-
-def extract_fn_name(fn: object) -> str | None:
-    cls = getattr(fn, "__class__", None)
-    if cls is FunctionType:
-        return getattr(fn, "__name__", None)
-    return None
-
-
-def extract_class_name(obj: object) -> str | None:
-    cls = getattr(obj, "__class__", None)
-    if cls:
-        return getattr(cls, "__name__", None)
-    return None

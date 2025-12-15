@@ -11,7 +11,6 @@ class IcoRuntimeWrapper(
     IcoRuntimeNode,
 ):
     type_name: ClassVar[str] = "Runtime Wrapper"
-
     operator: IcoOperator[I, O]
 
     def __init__(
@@ -26,7 +25,7 @@ class IcoRuntimeWrapper(
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
-            fn=self._wrapped_fn,
+            fn=self._wrapper_fn,
             name=name,
             original_fn=operator,
             children=[operator],
@@ -40,5 +39,5 @@ class IcoRuntimeWrapper(
         )
         self.operator = operator
 
-    def _wrapped_fn(self, item: I) -> O:
+    def _wrapper_fn(self, item: I) -> O:
         return self.operator(item)

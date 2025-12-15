@@ -82,12 +82,8 @@ class IcoOperator(Generic[I, O], IcoNode):
             name=name,
             parent=parent,
             children=children,
-            original_fn=original_fn or fn,
         )
         self.fn = fn
-
-    def __str__(self) -> str:
-        return self.name or type(self).type_name
 
     def __call__(self, item: I) -> O:
         return self.fn(item)

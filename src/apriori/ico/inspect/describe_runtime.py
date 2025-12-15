@@ -9,25 +9,18 @@ from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
-from apriori.ico.core.meta.inspect.collector import collect_meta, collect_runtime_meta
 from apriori.ico.core.meta.meta import IcoNodeMeta, IcoRuntimeNodeMeta
-from apriori.ico.core.meta.utils import format_ico_type
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import operator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.state import (
-    FaultState,
-    IcoRuntimeState,
-    ReadyState,
-    RunningState,
-)
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
+from apriori.ico.inspect.describe_utils import format_ico_type
 
 # ────────────────────────────────────────────────
-# Describer API
+# Plan API
 # ────────────────────────────────────────────────
 
 DiscribeFormat: TypeAlias = Literal["Tree", "Plan"]
@@ -35,7 +28,7 @@ SignatureFormat: TypeAlias = Literal["Full", "Input", "Output"]
 
 
 @overload
-def describe(
+def describe_runtime(
     node: IcoNode,
     *,
     format: DiscribeFormat | None = None,
@@ -46,14 +39,14 @@ def describe(
 
 
 @overload
-def describe(
+def describe_runtime(
     node: IcoRuntimeNode,
     *,
     console: Console | None = None,
 ) -> None: ...
 
 
-def describe(
+def describe_runtime(
     node: IcoNode | IcoRuntimeNode,
     *,
     format: DiscribeFormat | None = None,
@@ -218,7 +211,7 @@ def _build_stream_execution_flow(
 
     table.add_row(name_col, type_col, signature, None)
 
-    itrerate_over_text = Text("iterate", style=NameStyle.keyword.value)
+    itrerate_over_text = Text("iterate", style=NameStyles.keyword.value)
     iterate_name = indent.copy().append(Text("╭─ ")).append(itrerate_over_text)
     iterate_type = _get_signature_label(stream_meta, "Input")
 
@@ -233,7 +226,7 @@ def _build_stream_execution_flow(
         )
 
     yield_text = indent.copy().append(Text("╰─ "))
-    yield_text.append(Text("yield", style=NameStyle.keyword.value))
+    yield_text.append(Text("yield", style=NameStyles.keyword.value))
     yield_type = _get_signature_label(stream_meta, "Output")
 
     table.add_row(yield_text, None, yield_type, None)
@@ -340,22 +333,8 @@ def _construct_runtime_label(node_meta: IcoRuntimeNodeMeta) -> Text:
 # Label Colorization
 # ────────────────────────────────────────────────
 
-state_schemes = [
-    (ReadyState, "green"),
-    (RunningState, "yellow"),
-    (FaultState, "red"),
-    (IcoRuntimeState, "gray70"),
-]
 
-
-def _get_state_color(state: IcoRuntimeState) -> str:
-    for state_type, color in state_schemes:
-        if isinstance(state, state_type):  # type: ignore
-            return color
-    return "black"
-
-
-class NameStyle(Enum):
+class NameStyles(Enum):
     fn = "#A67F59"
     # class_ = "#9CDCFE"
     type = "#569CD6"
@@ -367,9 +346,9 @@ class NameStyle(Enum):
 
 
 name_origin_scheme = {
-    "fn": NameStyle.fn.value,
-    "class": NameStyle.class_.value,
-    "direct": NameStyle.text.value,
+    "fn": NameStyles.fn.value,
+    "class": NameStyles.class_.value,
+    "direct": NameStyles.text.value,
 }
 
 
@@ -472,4 +451,4 @@ if __name__ == "__main__":
     runtime.activate()
 
     # ──── 6. Visualize ────
-    describe(full_flow)
+    describe_runtime(full_flow)

@@ -5,7 +5,6 @@ from typing import final
 
 from rich.progress import Progress, TaskID
 
-from apriori.ico.core.meta.describer import describe
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.runtime.event import (
@@ -23,6 +22,7 @@ from apriori.ico.core.runtime.tool import (
 )
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
+from apriori.ico.inspect.describe_plan import describe_plan
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
 
 
@@ -116,8 +116,8 @@ if __name__ == "__main__":
 
     flow = numbers | (progress | mp_process1 | mp_process2).stream() | print_result
     flow.name = "Example Flow"
-    describe(flow)
-    describe(flow, include_runtime=True)
+    describe_plan(flow)
+    describe_plan(flow, include_runtime=True)
 
     with Progress() as progress:
         console = progress.console
@@ -126,12 +126,12 @@ if __name__ == "__main__":
 
         runtime = flow.runtime().add_tool(progress_tool)
         runtime.activate()
-        describe(runtime, console=console)
+        describe_plan(runtime, console=console)
 
         progress_tool.discover()
-        describe(runtime, console=console)
+        describe_plan(runtime, console=console)
 
         runtime.run()
 
         runtime.deactivate()
-        describe(runtime, console=console)
+        describe_plan(runtime, console=console)

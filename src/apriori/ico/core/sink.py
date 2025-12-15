@@ -17,22 +17,19 @@ class IcoSink(
     """
 
     type_name: ClassVar[str] = "Sink"
+    consumer: Callable[[I], None]
 
     def __init__(
         self,
-        consume_fn: Callable[[I], None],
+        consumer: Callable[[I], None],
         name: str | None = None,
     ) -> None:
-        super().__init__(
-            fn=self._sink_fn,
-            name=name,
-            original_fn=consume_fn,
-        )
-        self.consume_fn = consume_fn
+        super().__init__(fn=self._sink_fn, name=name)
+        self.consumer = consumer
 
     def _sink_fn(self, items: Iterator[I]) -> None:
         for item in items:
-            self.consume_fn(item)
+            self.consumer(item)
 
 
 # ─────────────────────────────────────────────
@@ -40,8 +37,11 @@ class IcoSink(
 # ─────────────────────────────────────────────
 
 
-def sink() -> Callable[[Callable[[I], None]], IcoSink[I]]:
+def sink(
+    *,
+    name: str | None = None,
+) -> Callable[[Callable[[I], None]], IcoSink[I]]:
     def decorator(fn: Callable[[I], None]) -> IcoSink[I]:
-        return IcoSink(fn)
+        return IcoSink(fn, name=name)
 
     return decorator

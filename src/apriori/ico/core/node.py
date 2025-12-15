@@ -12,17 +12,14 @@ class IcoNode:
     name: str | None
     parent: IcoNode | None
     children: Sequence[IcoNode]
-    original_fn: object | None
 
     def __init__(
         self,
         name: str | None = None,
-        original_fn: object | None = None,
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ) -> None:
         self.name = name
-        self.original_fn = original_fn
         self.parent = parent
         self.children = children or []
 
@@ -30,7 +27,7 @@ class IcoNode:
             child.parent = self
 
     def __str__(self) -> str:
-        return self.name or self.type_name
+        return type(self).__name__
 
     # ────────────────────────────────────────────────
     # Describe util interface
@@ -42,7 +39,9 @@ class IcoNode:
         show_ico_form: bool = True,
         include_runtime: bool = False,
     ) -> None:
-        from apriori.ico.core.meta.describer import describe as describe_util
+        from apriori.ico.inspect.describe_plan import (
+            describe_plan as describe_util,
+        )
 
         describe_util(
             self,

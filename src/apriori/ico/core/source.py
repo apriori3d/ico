@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import ClassVar, Generic, final
 
 from apriori.ico.core.operator import (
@@ -29,25 +29,19 @@ class IcoSource(
     """
 
     type_name: ClassVar[str] = "Source"
-
-    iterator: Callable[[], Iterator[O]]
+    provider: Callable[[], Iterable[O]]
 
     def __init__(
         self,
-        fn: Callable[[], Iterator[O]],
+        provider: Callable[[], Iterable[O]],
         *,
         name: str | None = None,
     ):
-        super().__init__(
-            fn=self._iterator_fn,
-            name=name,
-            original_fn=fn,
-            children=[],
-        )
-        self.iterator = fn
+        super().__init__(fn=self._iterator_fn, name=name)
+        self.provider = provider
 
     def _iterator_fn(self, _: None) -> Iterator[O]:
-        yield from self.iterator()
+        yield from self.provider()
 
 
 # ─────────────────────────────────────────────
@@ -55,8 +49,11 @@ class IcoSource(
 # ─────────────────────────────────────────────
 
 
-def source() -> Callable[[Callable[[], Iterator[O]]], IcoSource[O]]:
-    def decorator(fn: Callable[[], Iterator[O]]) -> IcoSource[O]:
-        return IcoSource(fn)
+def source(
+    *,
+    name: str | None = None,
+) -> Callable[[Callable[[], Iterable[O]]], IcoSource[O]]:
+    def decorator(fn: Callable[[], Iterable[O]]) -> IcoSource[O]:
+        return IcoSource(fn, name=name)
 
     return decorator

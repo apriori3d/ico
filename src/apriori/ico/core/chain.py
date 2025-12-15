@@ -3,7 +3,7 @@ from typing import ClassVar, Generic
 from apriori.ico.core.operator import O2, I, IcoOperator, O
 
 
-class IcoChainOperator(
+class IcoChain(
     Generic[I, O, O2],
     IcoOperator[I, O2],
 ):
@@ -33,4 +33,4 @@ class IcoChainOperator(
 
 
 def chain(a: IcoOperator[I, O], b: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-    return IcoChainOperator(a, b)
+    return IcoChain(a, b)
