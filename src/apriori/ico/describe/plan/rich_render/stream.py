@@ -1,12 +1,14 @@
+from dataclasses import replace
+
 from rich.text import Text
 
+from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import operator
 from apriori.ico.describe.plan.rich_render.group_renderer import (
     GroupPartRenderer,
     GroupRenderer,
 )
 from apriori.ico.describe.plan.rich_render.options import RenderOptions
-from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
 from apriori.ico.describe.plan.rich_render.utils import PlanStyle
 
 
@@ -14,18 +16,38 @@ class IcoStreamRenderer(GroupRenderer):
     def __init__(self, options: RenderOptions) -> None:
         super().__init__()
 
-        self.node_renderer = RowRenderer(options=options)
+        self.node_renderer = None
 
-        self.entry_renderer = GroupPartRenderer(
-            flow_text=Text("iterate", style=PlanStyle.keyword.value),
-            group_part="entry",
-            options=options,
+        self.header_renderer = StreamGroupPartRenderer(
+            flow_text=Text("iterate in ", style=PlanStyle.keyword.value),
+            options=replace(options),
+            render_node=True,
         )
-        self.exit_renderer = GroupPartRenderer(
+        self.footer_renderer = StreamGroupPartRenderer(
             flow_text=Text("yield", style=PlanStyle.keyword.value),
-            group_part="exit",
-            options=options,
+            options=replace(options, signature_format="Output"),
         )
+
+
+class StreamGroupPartRenderer(GroupPartRenderer):
+    def __init__(
+        self,
+        flow_text: Text,
+        options: RenderOptions,
+        render_node: bool = False,
+    ) -> None:
+        super().__init__(
+            flow_text=flow_text,
+            options=options,
+            render_node=render_node,
+        )
+
+    def render_signature_column(self, node: IcoNode) -> Text:
+        signature = super().render_signature_column(node)
+        # Add dim styling to the Iterator[...] parts
+        signature.stylize("dim", 0, len("Iterator["))
+        signature.stylize("dim", len(signature) - 1, len(signature))
+        return signature
 
 
 if __name__ == "__main__":

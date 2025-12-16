@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from types import FunctionType, GenericAlias
 from typing import (
     Any,
     Literal,
-    NamedTuple,
     TypeVar,
     Union,
     cast,
@@ -23,20 +23,22 @@ from apriori.ico.core.chain import IcoChain
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ────────────────────────────────────────────────
 # Signature descriptions
 # ────────────────────────────────────────────────
 
 
-class IcoSignature(NamedTuple):
+@dataclass(slots=True)
+class IcoSignature:
     """
     A representation of the ICO form of an operator in DSL.
     Possible types are type[Any] or typing generics."""
@@ -54,6 +56,18 @@ class IcoSignature(NamedTuple):
     def name(self) -> str:
         return self.format()
 
+    @property
+    def has_input(self) -> bool:
+        return self.i is not None and self.i is not type(None)
+
+    @property
+    def has_context(self) -> bool:
+        return self.c is not None and self.c is not type(None)
+
+    @property
+    def has_output(self) -> bool:
+        return self.o is not None and self.o is not type(None)
+
 
 # ────────────────────────────────────────────────
 # Inference strategy dispatcher
@@ -61,54 +75,24 @@ class IcoSignature(NamedTuple):
 
 
 def infer_signature(obj: object) -> IcoSignature:
-    ico_form: IcoSignature | None = None
+    signature: IcoSignature | None = None
 
     for strategy in _ALL_STRATEGIES:
-        ico_form = strategy(obj, ico_form)
+        signature = strategy(obj)
 
-    if ico_form is not None:
-        return ico_form
+        if signature is not None:
+            return signature
 
     # Fallback to Any → Any
     return IcoSignature(Any, None, Any)
 
 
-# ─── Strategy: from __orig_class__ ───
+# ─── Strategy: Node-specific inference ───
 
 
-def infer_from_generic(
-    obj: object, ico_form: IcoSignature | None
-) -> IcoSignature | None:
-    if ico_form is not None:
-        return ico_form
-
-    args = get_args(getattr(obj, "__orig_class__", None))
-    if not args:
-        return None
-
-    if any((type(a) is TypeVar) for a in args):
-        return None
-
-    match len(args):
-        case 1:
-            return IcoSignature(args[0], None, args[0])
-        case 2:
-            return IcoSignature(args[0], None, args[1])
-        case 3:
-            return IcoSignature(args[0], args[1], args[2])
-        case _:
-            pass
-    return None
-
-
-# ─── Strategy: structural node decomposition ───
-
-
-def infer_from_node_structure(
-    obj: object, ico_form: IcoSignature | None
-) -> IcoSignature | None:
-    if ico_form is not None:
-        return ico_form
+def infer_by_node_type(obj: object) -> IcoSignature | None:
+    # if signature is not None:
+    #    return signature
 
     if not isinstance(obj, IcoNode):
         return None
@@ -116,19 +100,19 @@ def infer_from_node_structure(
     match obj:
         case IcoSource():
             source = cast(IcoSource[Any], obj)
-            signature = infer_from_callable(source.provider, ico_form)
+            provider_form = infer_from_callable(source.provider)
 
-            if signature is None:
+            if provider_form is None:
                 return IcoSignature(
                     i=type(None),
                     c=type(None),
                     o=Iterator[Any],
                 )
 
-            # Provader returns an Iterable[T], we need to convert it to Iterator[T]
+            # Provider returns an Iterable[T], we need to convert it to Iterator[T]
             # to match IcoSource signature
-            if isinstance(signature.o, GenericAlias):
-                o_args = get_args(signature.o)
+            if isinstance(provider_form.o, GenericAlias):
+                o_args = get_args(provider_form.o)
 
                 return IcoSignature(
                     i=type(None),
@@ -136,7 +120,7 @@ def infer_from_node_structure(
                     o=Iterator[o_args],
                 )
 
-            return signature
+            return None
 
         case IcoSink():
             sink = cast(IcoSink[Any], obj)
@@ -179,14 +163,53 @@ def infer_from_node_structure(
             assert len(obj.children) == 2
             source_form = infer_signature(obj.children[0])
             context_form = infer_signature(obj.children[1])
-            return IcoSignature(source_form.o, context_form.c, context_form.o)
+            return IcoSignature(
+                source_form.o,
+                context_form.c,
+                context_form.o,
+            )
 
         case MPProcess():
             process = cast(MPProcess[Any, Any], obj)
             return infer_from_flow_factory(process.flow_factory)
+
+        case IcoBatcher():
+            # Generic parameter for batcher dosn't include Iterators
+            batcher = cast(IcoBatcher[Any], obj)
+            signature = infer_from_generic(batcher)
+
+            if signature is not None:
+                return IcoSignature(
+                    i=_wrap_iterator(signature.i),
+                    c=None,
+                    o=_wrap_iterator(_wrap_iterator(signature.o)),
+                )
         case _:
             pass
 
+    return None
+
+
+# ─── Strategy: from __orig_class__ ───
+
+
+def infer_from_generic(obj: object) -> IcoSignature | None:
+    args = get_args(getattr(obj, "__orig_class__", None))
+    if not args:
+        return None
+
+    if any((type(a) is TypeVar) for a in args):
+        return None
+
+    match len(args):
+        case 1:
+            return IcoSignature(args[0], None, args[0])
+        case 2:
+            return IcoSignature(args[0], None, args[1])
+        case 3:
+            return IcoSignature(args[0], args[1], args[2])
+        case _:
+            pass
     return None
 
 
@@ -210,14 +233,9 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
 # ─── Strategy: from function annotations ───
 
 
-def infer_from_callable(
-    obj: object, ico_form: IcoSignature | None
-) -> IcoSignature | None:
-    if ico_form is not None:
-        return ico_form
-
+def infer_from_callable(obj: object) -> IcoSignature | None:
     if not callable(obj):
-        return ico_form
+        return None
 
     if isinstance(obj, IcoOperator):
         fn = cast(Callable[[Any], Any], obj.fn)  # type: ignore
@@ -235,18 +253,18 @@ def infer_from_callable(
     c = hints.get(params[1].name, None) if len(params) > 1 else None
     o = hints.get("return", None)
 
-    # No hints, return existing ico form.
+    # No hints
     if i is None and o is None:
-        return ico_form
+        return None
 
-    # Both input and output are unresolved, return existing ico form.
+    # Both input and output are unresolved
     if (
         i is not None
         and isinstance(i, TypeVar)
         and o is not None
         and isinstance(o, TypeVar)
     ):
-        return ico_form
+        return None
 
     # Special case: method can be a flow factory.
     # In this case we try to extract ico form from return value annotation.
@@ -274,43 +292,44 @@ def infer_from_callable(
     # Yet it may be restored here from function hints.
     # In order to get complete ico form here both sources are combined.
 
-    if ico_form is not None:
-        if i is not None and ico_form.i is not None:
-            i = replace_deepest_typevar(i, I, ico_form.i)
+    # if ico_form is not None:
+    #     if i is not None and ico_form.i is not None:
+    #         i = replace_deepest_typevar(i, I, ico_form.i)
 
-        if o is not None and ico_form.o is not None:
-            o = replace_deepest_typevar(o, O, ico_form.o)
+    #     if o is not None and ico_form.o is not None:
+    #         o = replace_deepest_typevar(o, O, ico_form.o)
 
-        return IcoSignature(i, ico_form.c, o)
+    #     return IcoSignature(i, ico_form.c, o)
 
     return IcoSignature(i, c, o)
+
+    # return None
 
     # except Exception:
     #    return ico_form
 
 
-def replace_deepest_typevar(
-    type: GenericAlias,
-    target: TypeVar,
-    replacement: object,
-) -> object:
-    args = get_args(type)
-    if not args:
-        return replacement
-    else:
-        origin = get_origin(type)
-        new_args = tuple(
-            replace_deepest_typevar(arg, target, replacement) for arg in args
-        )
-        return origin[new_args]  # type: ignore
+# def replace_deepest_typevar(
+#     type: GenericAlias,
+#     target: TypeVar,
+#     replacement: object,
+# ) -> object:
+#     args = get_args(type)
+#     if not args:
+#         return replacement
+#     else:
+#         origin = get_origin(type)
+#         new_args = tuple(
+#             replace_deepest_typevar(arg, target, replacement) for arg in args
+#         )
+#         return origin[new_args]  # type: ignore
 
 
 # ─── Strategy list ───
 
 _ALL_STRATEGIES = [
+    infer_by_node_type,
     infer_from_generic,
-    infer_from_node_structure,
-    # infer_from_ico_target,
     infer_from_callable,
 ]
 

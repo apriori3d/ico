@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from rich.text import Text
 
 from apriori.ico.core.operator import IcoOperator, operator
@@ -6,7 +8,6 @@ from apriori.ico.describe.plan.rich_render.group_renderer import (
     GroupRenderer,
 )
 from apriori.ico.describe.plan.rich_render.options import RenderOptions
-from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
 from apriori.ico.describe.plan.rich_render.utils import PlanStyle
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
 
@@ -15,17 +16,16 @@ class MPProcessRenderer(GroupRenderer):
     def __init__(self, options: RenderOptions) -> None:
         super().__init__()
 
-        self.node_renderer = RowRenderer(options=options)
+        self.node_renderer = None
 
-        self.entry_renderer = GroupPartRenderer(
-            flow_text=Text("send", style=PlanStyle.keyword.value),
-            group_part="entry",
+        self.header_renderer = GroupPartRenderer(
+            flow_text=Text("send to ", style=PlanStyle.keyword.value),
             options=options,
+            render_node=True,
         )
-        self.exit_renderer = GroupPartRenderer(
+        self.footer_renderer = GroupPartRenderer(
             flow_text=Text("receive", style=PlanStyle.keyword.value),
-            group_part="exit",
-            options=options,
+            options=replace(options, signature_format="Output"),
         )
 
 

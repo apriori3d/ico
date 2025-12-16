@@ -16,7 +16,7 @@ from apriori.ico.describe.plan.rich_render.utils import (
     PlanStyle,
     get_state_color,
 )
-from apriori.ico.inspect.signature import infer_signature
+from apriori.ico.inspect.signature import format_ico_type, infer_signature
 from apriori.ico.inspect.utils import (
     extract_class_display_name,
     extract_fn_display_name,
@@ -47,7 +47,13 @@ class RowRenderer:
             return args_info or Text("", style=PlanStyle.dimmed.value)
 
         node = cast(IcoNode, node)
-        return self._render_node_class(node, args_info=args_info)
+        text = self._render_node_class(node, args_info=args_info)
+
+        if self.options.show_node_icons:
+            icon = self.options.node_icons.get(type(node))
+            if icon:
+                text = Text(icon) + text
+        return text
 
     def render_name_column(self, node: IcoNode) -> Text:
         return Text(node.name or "", style=PlanStyle.text.value)
@@ -71,7 +77,41 @@ class RowRenderer:
     def render_signature_column(self, node: IcoNode) -> Text:
         signature = infer_signature(node)
 
-        return Text(signature.format(), style=PlanStyle.signature.value)
+        i = format_ico_type(signature.i) if signature.has_input else None
+        c = format_ico_type(signature.c) if signature.has_context else None
+        o = format_ico_type(signature.o) if signature.has_output else None
+        prefix_length = 0
+
+        if o is not None and not (i is None and c is None):
+            if i is not None:
+                prefix_length = same_prefix_length(i, o)
+            if c is not None:
+                prefix_length = max(prefix_length, same_prefix_length(c, o))
+
+        i_text = Text(i, style=PlanStyle.signature.value) if i is not None else None
+        c_text = Text(c, style=PlanStyle.signature.value) if c is not None else None
+        o_text = Text(o, style=PlanStyle.signature.value) if o is not None else None
+
+        text = Text("")
+
+        if i_text is not None and self.options.signature_format in ("Full", "Input"):
+            if prefix_length > 0:
+                i_text.stylize("dim", 0, prefix_length)
+            text += i_text
+
+        if c_text is not None and self.options.signature_format in ("Full", "Input"):
+            if prefix_length > 0:
+                c_text.stylize("dim", 0, prefix_length)
+            text += Text(", ") + c_text
+
+        if o_text is not None and self.options.signature_format in ("Full", "Output"):
+            if prefix_length > 0:
+                o_text.stylize("dim", 0, prefix_length)
+            text += Text(" → ") + o_text
+        else:
+            text = Text(" → ") + text
+
+        return text
 
     def render_state_column(self, node: IcoNode) -> Text:
         if not isinstance(node, IcoRuntimeNode):
@@ -120,3 +160,11 @@ class RowRenderer:
             return Text(f"{name}()", style=PlanStyle.class_.value)
 
         return Text("Unknown", style=PlanStyle.dimmed.value)
+
+
+def same_prefix_length(s1: str, s2: str) -> int:
+    length = min(len(s1), len(s2))
+    for i in range(length):
+        if s1[i] != s2[i]:
+            return i
+    return length

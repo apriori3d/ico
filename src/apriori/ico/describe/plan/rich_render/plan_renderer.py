@@ -9,6 +9,7 @@ from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
 from apriori.ico.core.types import HasSubflowFactory
+from apriori.ico.describe.plan.rich_render.batcher import IcoBatcherRender
 from apriori.ico.describe.plan.rich_render.group_renderer import (
     DefaultGroupRenderer,
     GroupRenderer,
@@ -22,6 +23,7 @@ from apriori.ico.describe.plan.rich_render.sink import IcoSinkRender
 from apriori.ico.describe.plan.rich_render.source import IcoSourceRender
 from apriori.ico.describe.plan.rich_render.stream import IcoStreamRenderer
 from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.utils.data.batcher import IcoBatcher
 
 RendererTypes: TypeAlias = RowRenderer | GroupRenderer
 
@@ -50,6 +52,7 @@ class PlanRenderer:
             IcoSink: IcoSinkRender(options=self.options),
             IcoStream: IcoStreamRenderer(options=self.options),
             MPProcess: MPProcessRenderer(options=self.options),
+            IcoBatcher: IcoBatcherRender(options=self.options),
         }
         self._default_renderer = RowRenderer(options=self.options)
         self._default_group_renderer = DefaultGroupRenderer(options=self.options)
@@ -91,7 +94,8 @@ class PlanRenderer:
             return
 
         # Render subflow as a group element
-        self._render_row(renderer.node_renderer, node)
+        if renderer.node_renderer is not None:
+            self._render_row(renderer.node_renderer, node)
 
         if not self.options.expand_subflows:
             return
@@ -102,7 +106,7 @@ class PlanRenderer:
         ):
             return
 
-        self._render_row(renderer.entry_renderer, node, indent=Text("╭── "))
+        self._render_row(renderer.header_renderer, node, indent=Text("╭── "))
         self._group_indents.append(Text("│   "))
 
         if isinstance(node, HasSubflowFactory):
@@ -114,7 +118,7 @@ class PlanRenderer:
                 self(child)
 
         self._group_indents.pop()
-        self._render_row(renderer.exit_renderer, node, indent=Text("╰─▸ "))
+        self._render_row(renderer.footer_renderer, node, indent=Text("╰─▸ "))
 
     def _render_row(
         self,
