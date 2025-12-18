@@ -7,6 +7,7 @@ from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
+from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
@@ -20,7 +21,7 @@ SignatureFormat: TypeAlias = Literal["Full", "Input", "Output"]
 
 @dataclass(slots=True)
 class RenderOptions:
-    include_runtime: bool = True
+    show_runtime_nodes: bool = True
     callable_format: CallableFormat = "__name__"
     dim_ico_nodes: bool = False
     query_iterable_size: bool = True
@@ -34,7 +35,12 @@ class RenderOptions:
     )
 
     flatten_node_type: set[type[IcoNode]] = field(
-        default_factory=lambda: {IcoChain, IcoPipeline, IcoContextPipeline}
+        default_factory=lambda: {
+            IcoChain,
+            IcoPipeline,
+            IcoContextPipeline,
+            IcoRuntimeWrapper,
+        }
     )
 
     show_node_icons: bool = True

@@ -1,6 +1,5 @@
 import time
 from collections.abc import Iterator
-from functools import partial
 from typing import final
 
 from rich.progress import Progress, TaskID
@@ -22,7 +21,7 @@ from apriori.ico.core.runtime.tool import (
 )
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
-from apriori.ico.inspect.describe_plan import describe_plan
+from apriori.ico.describe.describe import describe
 from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 
 
@@ -71,7 +70,7 @@ class RichProgressTool(IcoRuntimeTool):
         return super().on_event(event)
 
 
-def create_item_flow(name: str) -> IcoOperator[int, int]:
+def create_item_flow() -> IcoOperator[int, int]:
     num_iters = 10
 
     @operator()
@@ -85,12 +84,11 @@ def create_item_flow(name: str) -> IcoOperator[int, int]:
         res = x + 1
         return res
 
-    progress = IcoProgress[int](total=num_iters, name=name)
+    progress = IcoProgress[int](total=num_iters)
 
     return IcoProcess[int](
         double | shift | progress,
         num_iterations=num_iters,
-        name=name,
     )
 
 
@@ -109,15 +107,15 @@ if __name__ == "__main__":
 
     progress = IcoProgress[int](total=total, name="Overall Progress")
 
-    mp_process1 = MPAgent[int, int](partial(create_item_flow, name="Process 1"))
-    mp_process2 = MPAgent[int, int](partial(create_item_flow, name="Process 2"))
+    mp_process1 = MPAgent[int, int](create_item_flow)
+    mp_process2 = MPAgent[int, int](create_item_flow)
 
     # item_flow = create_item_flow()
 
     flow = numbers | (progress | mp_process1 | mp_process2).stream() | print_result
     flow.name = "Example Flow"
-    describe_plan(flow)
-    describe_plan(flow, include_runtime=True)
+    describe(flow)
+    describe(flow, show_runtime_nodes=True)
 
     with Progress() as progress:
         console = progress.console
@@ -126,12 +124,12 @@ if __name__ == "__main__":
 
         runtime = flow.runtime().add_tool(progress_tool)
         runtime.activate()
-        describe_plan(runtime, console=console)
+        describe(flow, console=console)
 
         progress_tool.discover()
-        describe_plan(runtime, console=console)
+        describe(flow, console=console)
 
         runtime.run()
 
         runtime.deactivate()
-        describe_plan(runtime, console=console)
+        describe(flow, console=console)

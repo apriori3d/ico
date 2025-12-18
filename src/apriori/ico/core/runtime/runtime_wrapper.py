@@ -27,7 +27,6 @@ class IcoRuntimeWrapper(
             self,
             fn=self._wrapper_fn,
             name=name,
-            original_fn=operator,
             children=[operator],
         )
 

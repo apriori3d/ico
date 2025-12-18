@@ -76,18 +76,18 @@ if __name__ == "__main__":
     flow.name = "Example Flow"
 
     flow.describe()
-    flow.describe(include_runtime=True)
+    flow.describe(show_runtime_nodes=True)
 
-    console = Console()
-    printer_tool = RichPrinterTool(console)
+    # console = Console()
+    # printer_tool = RichPrinterTool(console)
 
-    runtime = flow.runtime().add_tool(printer_tool)
-    runtime.describe()
-    runtime.activate().describe()
-    printer_tool.discover().describe()
+    # runtime = flow.runtime().add_tool(printer_tool)
+    # runtime.describe()
+    # runtime.activate().describe()
+    # printer_tool.discover().describe()
 
-    flow.describe(include_runtime=True)
+    # flow.describe(show_runtime_nodes=True)
 
-    runtime.run()
+    # runtime.run()
 
-    runtime.deactivate().describe()
+    # runtime.deactivate().describe()

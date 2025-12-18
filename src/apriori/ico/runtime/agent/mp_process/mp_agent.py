@@ -52,7 +52,7 @@ class MPAgent(
             name=name,
         )
 
-        IcoAgentNode.__init__(self, name=name)
+        IcoAgentNode.__init__(self, name=name, runtime_children=[printer])
 
         self.subflow_factory = subflow_factory
         self._mp_context = get_context("spawn")

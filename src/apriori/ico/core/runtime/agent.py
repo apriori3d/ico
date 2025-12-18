@@ -1,4 +1,5 @@
 from abc import ABC
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -51,9 +52,15 @@ class AgentStateModel(BaseStateModel):
 class IcoAgentNode(IcoRuntimeNode, ABC):
     runtime_type_name: ClassVar[str] = "Agent"
 
-    def __init__(self, *, name: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        runtime_children: Sequence[IcoRuntimeNode] | None = None,
+    ) -> None:
         IcoRuntimeNode.__init__(
             self,
             runtime_name=name,
+            runtime_children=runtime_children,
             state_model=AgentStateModel(),
         )

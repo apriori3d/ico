@@ -22,12 +22,16 @@ class GroupRenderer:
         self.node_renderer = node_renderer
 
         self.header_renderer = header_renderer or RowRenderer(
-            flow_column_prefix=Text("Subflow Entry", style=PlanStyle.dimmed.value),
+            flow_column_prefix=Text("Subflow Entry ", style=PlanStyle.dimmed.value),
             options=replace(options, signature_format="Input"),
         )
         self.footer_renderer = footer_renderer or RowRenderer(
             flow_column_prefix=Text("Subflow Exit", style=PlanStyle.dimmed.value),
             options=replace(options, signature_format="Output"),
+            show_name_column=False,
+            show_type_column=False,
+            show_state_column=False,
+            flow_includes_node_info=False,
         )
 
 

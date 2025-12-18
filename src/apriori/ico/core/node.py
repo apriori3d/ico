@@ -36,18 +36,11 @@ class IcoNode:
     def describe(
         self,
         *,
-        show_ico_form: bool = True,
-        include_runtime: bool = False,
+        show_runtime_nodes: bool = False,
     ) -> None:
-        from apriori.ico.inspect.describe_plan import (
-            describe_plan as describe_util,
-        )
+        from apriori.ico.describe.describe import describe
 
-        describe_util(
-            self,
-            show_ico_form=show_ico_form,
-            include_runtime=include_runtime,
-        )
+        describe(self, show_runtime_nodes=show_runtime_nodes)
 
 
 def iterate_nodes(
