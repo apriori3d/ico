@@ -1,14 +1,16 @@
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
+from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChain
+from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 from apriori.ico.utils.data.batcher import IcoBatcher
 
 RenderColumn: TypeAlias = Literal["Flow", "Name", "Type", "Signature", "State"]
@@ -32,16 +34,17 @@ class RenderOptions:
     )
 
     flatten_node_type: set[type[IcoNode]] = field(
-        default_factory=lambda: {IcoChain, IcoPipeline}
+        default_factory=lambda: {IcoChain, IcoPipeline, IcoContextPipeline}
     )
 
     show_node_icons: bool = True
 
     node_icons: dict[type[IcoNode], str] = field(
         default_factory=lambda: {
-            MPProcess: "👷",
+            MPAgent: "👷",
             IcoBatcher: "📦",
             IcoStream: "🎞️ ",
+            IcoAsyncStream: "🚀",
             IcoProcess: "🔁",
             IcoSource: "📚",
             IcoSink: "🏁",

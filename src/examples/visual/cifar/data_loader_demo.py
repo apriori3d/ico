@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 from apriori.ico.utils.data.batcher import IcoBatcher
 from examples.visual.cifar.data_flow import (
     CifarBatch,
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     print(f"Single process data flow took {single_time:.2f} seconds.")
 
     # 2. Run augmentation in multiple MP processes
-    workers_pool = [MPProcess(create_augmentation_flow) for _ in range(num_workers)]
+    workers_pool = [MPAgent(create_augmentation_flow) for _ in range(num_workers)]
 
     async_stream = IcoAsyncStream(
         workers_pool, ordered=False, name="Async Augmentation Stream"
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     input_flow_indices.name = "CIFAR10 Indices Input Flow"
 
     augmentation_flow_factory = IndexedAugmentationFlowFactory(dataset)
-    workers_pool = [MPProcess(augmentation_flow_factory) for _ in range(num_workers)]
+    workers_pool = [MPAgent(augmentation_flow_factory) for _ in range(num_workers)]
 
     async_stream = IcoAsyncStream(
         workers_pool, ordered=False, name="Async Augmentation Stream"

@@ -1,0 +1,85 @@
+from dataclasses import replace
+
+from rich.text import Text
+
+from apriori.ico.core.node import IcoNode
+from apriori.ico.core.operator import operator
+from apriori.ico.core.stream import IcoStream
+from apriori.ico.describe.plan.options import RenderOptions
+from apriori.ico.describe.plan.rich_render.group_renderer import (
+    GroupRenderer,
+)
+from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
+from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
+from apriori.ico.describe.plan.rich_render.utils import PlanStyle
+
+
+@register_renderer(IcoStream)
+class IcoStreamRenderer(GroupRenderer):
+    def __init__(self, options: RenderOptions) -> None:
+        super().__init__(
+            options=options,
+            header_renderer=StreamGroupPartRenderer(
+                flow_column_prefix=Text("for each in ", style=PlanStyle.keyword.value),
+                options=replace(options, signature_format="Input"),
+            ),
+            footer_renderer=StreamGroupPartRenderer(
+                flow_column_prefix=Text("yield", style=PlanStyle.keyword.value),
+                options=replace(options, signature_format="Output"),
+                show_name_column=False,
+                show_type_column=False,
+                show_state_column=False,
+                flow_includes_node_info=False,
+            ),
+        )
+
+
+class StreamGroupPartRenderer(RowRenderer):
+    def __init__(
+        self,
+        flow_column_prefix: Text,
+        options: RenderOptions,
+        show_name_column: bool = True,
+        show_signature_column: bool = True,
+        show_type_column: bool = True,
+        show_state_column: bool = True,
+        flow_includes_node_info: bool = True,
+    ) -> None:
+        super().__init__(
+            flow_column_prefix=flow_column_prefix,
+            options=options,
+            show_name_column=show_name_column,
+            show_signature_column=show_signature_column,
+            show_type_column=show_type_column,
+            show_state_column=show_state_column,
+            flow_includes_node_info=flow_includes_node_info,
+        )
+
+    def render_signature_column(self, node: IcoNode) -> Text:
+        signature = super().render_signature_column(node)
+        # Add dim styling to the Iterator[...] parts
+        signature.stylize("dim", 0, len("Iterator["))
+        signature.stylize("dim", len(signature) - 1, len(signature))
+        return signature
+
+
+if __name__ == "__main__":
+    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+
+    @operator()
+    def produce_data_item(index: int) -> float:
+        return 1
+
+    # ──── 2. Define augmentation & collation pipelines per item ────
+
+    @operator()
+    def scale(x: float) -> float:
+        return x * 1.1
+
+    @operator()
+    def shift(x: float) -> float:
+        return x + 0.1
+
+    stream = (produce_data_item | scale).stream()
+    plan_renderer = PlanRenderer()
+    plan_renderer.render(stream)

@@ -1,11 +1,12 @@
 from collections.abc import Iterable, Iterator
 
+from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ──── 1. Define a batched data source ────
@@ -40,7 +41,7 @@ def collate_max(batch: Iterator[float]) -> str:
     return f"max={max(batch)}"
 
 
-def create_augment_flow() -> IcoOperator[Iterator[Iterator[int]], Iterator[str]]:
+def create_augment_flow() -> IcoOperator[Iterator[int], str]:
     augment = IcoPipeline(
         scale,
         shift,
@@ -48,11 +49,8 @@ def create_augment_flow() -> IcoOperator[Iterator[Iterator[int]], Iterator[str]]
     )
 
     # Augment each item in the batch, then collate to single value (mimic data loader collate)
-    augment_batch = (fetch_data_item | augment).stream()
-    augment_batch.name = "Augment stream"
-
-    augment_stream = (augment_batch | collate_max).stream()
-    augment_stream.name = "Train data stream"
+    augment_stream = (fetch_data_item | augment).stream() | collate_max
+    augment_stream.name = "Train Batch producer"
 
     return augment_stream
 
@@ -71,9 +69,13 @@ if __name__ == "__main__":
     """
 
     batcher = IcoBatcher[int](batch_size=3)
-    worker = MPProcess(create_augment_flow)
+    workers_pool = IcoAsyncStream(
+        lambda: MPAgent(create_augment_flow),
+        pool_size=2,
+        name="Workers pool",
+    )
 
-    data_stream = indices | batcher | worker
+    data_stream = indices | batcher | workers_pool
     data_stream.name = "Data stream"
 
     # ──── 4. Define training pipeline ────

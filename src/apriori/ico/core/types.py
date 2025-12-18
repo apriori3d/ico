@@ -6,4 +6,4 @@ from apriori.ico.core.operator import IcoOperator
 
 @runtime_checkable
 class HasSubflowFactory(Protocol):
-    flow_factory: Callable[[], IcoOperator[Any, Any]]
+    subflow_factory: Callable[[], IcoOperator[Any, Any]]

@@ -42,6 +42,13 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
 # ─────────────────────────────────────────────
 
 
+def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, C, C]]:
+    def decorator(fn: Callable[[I, C], C]) -> IcoContextOperator[I, C, C]:
+        return wrap_context_operator(fn)
+
+    return decorator
+
+
 @overload
 def wrap_context_operator(
     fn: IcoContextOperator[I, C, O],

@@ -7,7 +7,7 @@ import pytest
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 
 # ───────────────────────────────────────────────
 # Helpers
@@ -44,7 +44,7 @@ def test_single_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
     num = 5
     data = list(range(1, num + 1))
-    mp_process = MPProcess(flow_double).activate()
+    mp_process = MPAgent(flow_double).activate()
     try:
         source = IcoSource(lambda: iter(data))
         flow = source | IcoAsyncStream([mp_process])
@@ -58,8 +58,8 @@ def test_slow_then_fast_unordered_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
 
     pool = [
-        MPProcess(flow_slow_tripple, name="slow_tripple").activate(),
-        MPProcess(flow_double, name="double").activate(),
+        MPAgent(flow_slow_tripple, name="slow_tripple").activate(),
+        MPAgent(flow_double, name="double").activate(),
     ]
 
     try:
@@ -77,8 +77,8 @@ def test_slow_then_fast_ordered_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
     num = 2
     pool = [
-        MPProcess(flow_slow_tripple).activate(),
-        MPProcess(flow_double).activate(),
+        MPAgent(flow_slow_tripple).activate(),
+        MPAgent(flow_double).activate(),
     ]
     try:
         data = list(range(1, num + 1))

@@ -7,6 +7,7 @@ from rich.text import Text
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.source import IcoSource, source
+from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
 from apriori.ico.describe.plan.rich_render.row_renderer import (
     RowRenderer,
 )
@@ -15,12 +16,13 @@ from apriori.ico.describe.plan.rich_render.utils import (
 )
 
 
+@register_renderer(IcoSource)
 class IcoSourceRender(RowRenderer):
     def _render_node_args_info(self, node: IcoNode) -> Text:
         assert isinstance(node, IcoSource)
         source = cast(IcoSource[Any], node)
 
-        provider_info = self._render_callable(source.provider)
+        provider_info = self.render_callable(source.provider)
 
         # Add size info if required
         if self.options.query_iterable_size:

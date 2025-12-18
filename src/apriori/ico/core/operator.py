@@ -74,7 +74,6 @@ class IcoOperator(Generic[I, O], IcoNode):
         fn: Callable[[I], O],
         *,
         name: str | None = None,
-        original_fn: object | None = None,
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ):

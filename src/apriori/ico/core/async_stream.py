@@ -1,6 +1,6 @@
 import asyncio
-from collections.abc import AsyncIterator, Iterator, Sequence
-from typing import ClassVar, Generic, TypeVar, final
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from typing import ClassVar, Generic, TypeVar, final, overload
 
 from apriori.ico.core.async_operator import IcoAsyncOperator
 from apriori.ico.core.operator import I, IcoOperator, O
@@ -32,7 +32,7 @@ class IcoAsyncStream(
     """
 
     __slots__ = (
-        "operators",
+        "pool",
         "ordered",
         "_num_executors",
         "_has_job",
@@ -42,9 +42,11 @@ class IcoAsyncStream(
 
     type_name: ClassVar[str] = "Async Stream"
 
-    operators: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
+    pool: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
+    subflow_factory: Callable[[], IcoOperator[I, O] | IcoAsyncOperator[I, O]] | None
     ordered: bool
-    _num_executors: int
+    has_factory: bool
+    pool_size: int
 
     # ─── Async iterator state ───
 
@@ -52,21 +54,50 @@ class IcoAsyncStream(
     _next_index: int  # Handle ordered result emission
     _ordering_buffer: dict[int, O | Exception]
 
+    @overload
     def __init__(
         self,
-        operators: Sequence[IcoOperator[I, O] | IcoAsyncOperator[I, O]],
+        pool: Sequence[IcoOperator[I, O] | IcoAsyncOperator[I, O]],
         *,
         ordered: bool = False,
         name: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        pool: Callable[[], IcoOperator[I, O] | IcoAsyncOperator[I, O]],
+        *,
+        pool_size: int | None = None,
+        ordered: bool = False,
+        name: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        pool: Sequence[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
+        | Callable[[], IcoOperator[I, O] | IcoAsyncOperator[I, O]],
+        *,
+        pool_size: int | None = None,
+        ordered: bool = False,
+        name: str | None = None,
     ) -> None:
-        super().__init__(
-            fn=self._run_stream,
-            name=name or "async_stream",
-            children=[op for op in operators],
-        )
-        self.operators = list(operators)
+        if callable(pool):
+            if pool_size is None:
+                raise ValueError(
+                    "Pool_size must be specified when providing a flow factory."
+                )
+            worker_pool = [pool() for _ in range(pool_size)]
+            self.subflow_factory = pool
+        else:
+            worker_pool = list(pool)
+            pool_size = len(worker_pool)
+            self.subflow_factory = None
+
+        super().__init__(fn=self._run_stream, name=name, children=worker_pool)
+        self.pool = list(worker_pool)
         self.ordered = ordered
-        self._num_executors = len(self.operators)
+        self.pool_size = pool_size
 
         # Async iterator state
         self._has_job = False
@@ -100,15 +131,13 @@ class IcoAsyncStream(
         self._reset_iterator_state()
 
         # Max concurrency = number of operators
-        input_queue = asyncio.Queue[tuple[int, I] | None](maxsize=self._num_executors)
-        results_queue = asyncio.Queue[tuple[int, O | Exception]](
-            maxsize=self._num_executors
-        )
+        input_queue = asyncio.Queue[tuple[int, I] | None](maxsize=self.pool_size)
+        results_queue = asyncio.Queue[tuple[int, O | Exception]](maxsize=self.pool_size)
 
         # Create one worker task per operator
         executors = [
             asyncio.create_task(self._execute_operator(op, input_queue, results_queue))
-            for op in self.operators
+            for op in self.pool
         ]
 
         # Set indicator results buffer size is below max_concurrency
@@ -175,7 +204,7 @@ class IcoAsyncStream(
                     result = self._ordering_buffer.pop(self._next_index)
 
                     # update results buffer flag
-                    if len(self._ordering_buffer) < self._num_executors:
+                    if len(self._ordering_buffer) < self.pool_size:
                         ordering_buffer_ready.set()
                     else:
                         ordering_buffer_ready.clear()
@@ -209,7 +238,7 @@ class IcoAsyncStream(
             await in_queue.put((i, item))
 
         # Send termination signals for all executors
-        for _ in range(self._num_executors):
+        for _ in range(self.pool_size):
             await in_queue.put(None)
 
     # ─── Executor coroutine ───

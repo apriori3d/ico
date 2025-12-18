@@ -23,7 +23,7 @@ from apriori.ico.core.runtime.tool import (
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.inspect.describe_plan import describe_plan
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 
 
 @final
@@ -109,8 +109,8 @@ if __name__ == "__main__":
 
     progress = IcoProgress[int](total=total, name="Overall Progress")
 
-    mp_process1 = MPProcess[int, int](partial(create_item_flow, name="Process 1"))
-    mp_process2 = MPProcess[int, int](partial(create_item_flow, name="Process 2"))
+    mp_process1 = MPAgent[int, int](partial(create_item_flow, name="Process 1"))
+    mp_process2 = MPAgent[int, int](partial(create_item_flow, name="Process 2"))
 
     # item_flow = create_item_flow()
 

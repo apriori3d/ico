@@ -18,7 +18,7 @@ from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.agent.mp_process.mp_process_agent import MPProcessAgent
+from apriori.ico.runtime.agent.mp_process.mp_worker import MPWorker
 from apriori.ico.runtime.channel.mp_queue.channel import (
     MPChannel,
 )
@@ -26,12 +26,12 @@ from apriori.ico.tools.printer.node import IcoPrinter
 
 
 @final
-class MPProcess(
+class MPAgent(
     Generic[I, O],
     IcoOperator[I, O],
     IcoAgentNode,
 ):
-    flow_factory: Callable[[], IcoOperator[I, O]]
+    subflow_factory: Callable[[], IcoOperator[I, O]]
     _agent_process: SpawnProcess | None
     _channel: IcoChannel[I, O] | None
     _mp_context: SpawnContext
@@ -39,7 +39,7 @@ class MPProcess(
 
     def __init__(
         self,
-        flow_factory: Callable[[], IcoOperator[I, O]],
+        subflow_factory: Callable[[], IcoOperator[I, O]],
         *,
         name: str | None = None,
     ) -> None:
@@ -49,13 +49,12 @@ class MPProcess(
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             fn=self._portal_fn,
-            original_fn=flow_factory,
             name=name,
         )
 
         IcoAgentNode.__init__(self, name=name)
 
-        self.flow_factory = flow_factory
+        self.subflow_factory = subflow_factory
         self._mp_context = get_context("spawn")
         self._channel = None
         self._agent_process = None
@@ -135,9 +134,9 @@ class MPProcess(
         assert self._channel is not None and isinstance(self._channel, MPChannel)
         # Invert channel for agent
 
-        self._agent_process = MPProcessAgent[I, O].spawn(
+        self._agent_process = MPWorker[I, O].spawn(
             channel=self._channel.make_agent_channel(),
-            flow_factory=self.flow_factory,
+            flow_factory=self.subflow_factory,
             mp_context=self._mp_context,
             name=f"{self} Agent",
         )

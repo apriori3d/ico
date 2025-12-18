@@ -5,97 +5,109 @@ from rich.table import Table
 from rich.text import Text
 
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
-from apriori.ico.core.stream import IcoStream
 from apriori.ico.core.types import HasSubflowFactory
-from apriori.ico.describe.plan.rich_render.batcher import IcoBatcherRender
-from apriori.ico.describe.plan.rich_render.group_renderer import (
-    DefaultGroupRenderer,
-    GroupRenderer,
-)
-from apriori.ico.describe.plan.rich_render.mp_process import MPProcessRenderer
-from apriori.ico.describe.plan.rich_render.options import (
+from apriori.ico.describe.plan.options import (
     RenderOptions,
 )
+from apriori.ico.describe.plan.rich_render.custom_renderer import CustomRenderer
+from apriori.ico.describe.plan.rich_render.group_renderer import (
+    GroupRenderer,
+)
+from apriori.ico.describe.plan.rich_render.renderer_registry import (
+    RendererRegistry,
+    import_all_renderers,
+)
 from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
-from apriori.ico.describe.plan.rich_render.sink import IcoSinkRender
-from apriori.ico.describe.plan.rich_render.source import IcoSourceRender
-from apriori.ico.describe.plan.rich_render.stream import IcoStreamRenderer
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
-from apriori.ico.utils.data.batcher import IcoBatcher
 
-RendererTypes: TypeAlias = RowRenderer | GroupRenderer
+RendererTypes: TypeAlias = RowRenderer | GroupRenderer | CustomRenderer
 
 
 class PlanRenderer:
     options: RenderOptions
     console: Console
-    renderers: dict[type[IcoNode], RendererTypes]
 
-    _table: Table
+    _table: Table | None
     _group_indents: list[Text]
     _default_renderer: RowRenderer
-    _default_group_renderer: DefaultGroupRenderer
+    _default_group_renderer: GroupRenderer
+    _selected_renderers: dict[type[IcoNode], RendererTypes]
 
     def __init__(
         self,
         options: RenderOptions | None = None,
         console: Console | None = None,
-        renderers: dict[type[IcoNode], RendererTypes] | None = None,
     ) -> None:
         self.options = options or RenderOptions()
         self.console = console or Console()
 
-        self.renderers = renderers or {
-            IcoSource: IcoSourceRender(options=self.options),
-            IcoSink: IcoSinkRender(options=self.options),
-            IcoStream: IcoStreamRenderer(options=self.options),
-            MPProcess: MPProcessRenderer(options=self.options),
-            IcoBatcher: IcoBatcherRender(options=self.options),
-        }
         self._default_renderer = RowRenderer(options=self.options)
-        self._default_group_renderer = DefaultGroupRenderer(options=self.options)
+        self._default_group_renderer = GroupRenderer(options=self.options)
+        self._table = None
+        self._group_indents = []
+        self._selected_renderers = {}
 
+        import_all_renderers("apriori.ico.describe.plan.rich_render.node")
+
+    def _create_table(self) -> Table:
         table = Table(show_lines=False, show_edge=False, box=None)
-
         for column in self.options.columns:
             table.add_column(column, no_wrap=True)
-
-        self._table = table
-
-        self._group_indents = []
+        return table
 
     def render(self, root: IcoNode) -> None:
-        self(root)
+        self._table = self._create_table()
+
+        self.render_node(root)
         self.console.rule(f"[bold blue]Flow plan: {root}", style="dim blue")
         self.console.print(self._table)
 
-    # ──────────── RichRenderTarget Protocol  ────────────
+    def _select_renderer(
+        self,
+        node: IcoNode,
+    ) -> RendererTypes:
+        renderer = self._selected_renderers.get(type(node))
+        if renderer is not None:
+            return renderer
 
-    def __call__(self, node: IcoNode) -> None:
-        # Do not render nodes responsible for flow structure - focus on the actual order of operations
-        if type(node) in self.options.flatten_node_type:
-            for child in node.children:
-                self(child)
-            return
+        renderer_class = RendererRegistry.get(type(node))
 
-        renderer = self.renderers.get(type(node))
-        if renderer is None:
+        if renderer_class is not None:
+            renderer = renderer_class(self.options)
+        else:
             renderer = (
                 self._default_renderer
                 if len(node.children) == 0
                 else self._default_group_renderer
             )
 
+        self._selected_renderers[type(node)] = renderer
+        return renderer
+
+    def render_node(self, node: IcoNode) -> None:
+        # Do not render nodes responsible for flow structure - focus on the actual order of operations
+        if type(node) in self.options.flatten_node_type:
+            for child in node.children:
+                self.render_node(child)
+            return
+
+        renderer = self._select_renderer(node)
+
         # Render node as a single row element
         if isinstance(renderer, RowRenderer):
-            self._render_row(renderer, node)
+            self.render_row(renderer, node)
+            return
+
+        # Custom rendering logic (for IcoEpoch, etc)
+        if isinstance(renderer, CustomRenderer):
+            renderer.render(self, node)
             return
 
         # Render subflow as a group element
+        assert isinstance(renderer, GroupRenderer)
+
+        # Render node info is required
         if renderer.node_renderer is not None:
-            self._render_row(renderer.node_renderer, node)
+            self.render_row(renderer.node_renderer, node)
 
         if not self.options.expand_subflows:
             return
@@ -106,27 +118,38 @@ class PlanRenderer:
         ):
             return
 
-        self._render_row(renderer.header_renderer, node, indent=Text("╭── "))
-        self._group_indents.append(Text("│   "))
+        # Expand subflow
+
+        # Render header
+        self.render_row(renderer.header_renderer, node, indent=Text("╭── "))
+        self.push_group_indent(Text("│   "))
 
         if isinstance(node, HasSubflowFactory):
             # Special case for nodes with subflows - render the subflow inside the group
-            subflow = node.flow_factory()
-            self(subflow)
+            subflow = node.subflow_factory()
+            self.render_node(subflow)
         else:
             for child in node.children:
-                self(child)
+                self.render_node(child)
 
+        self.pop_group_indent()
+        self.render_row(renderer.footer_renderer, node, indent=Text("╰─▸ "))
+
+    def push_group_indent(self, indent: Text) -> None:
+        self._group_indents.append(indent)
+
+    def pop_group_indent(self) -> None:
         self._group_indents.pop()
-        self._render_row(renderer.footer_renderer, node, indent=Text("╰─▸ "))
 
-    def _render_row(
+    def render_row(
         self,
         row_renderer: RowRenderer,
         node: IcoNode,
         indent: Text | None = None,
     ) -> None:
-        columns = [row_renderer(node, column) for column in self.options.columns]
+        assert self._table is not None
+
+        columns = [row_renderer.render(node, column) for column in self.options.columns]
 
         indentation = self._gather_indentation(indent)
         if indentation:

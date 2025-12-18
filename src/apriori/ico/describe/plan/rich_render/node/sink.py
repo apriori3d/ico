@@ -6,17 +6,19 @@ from rich.text import Text
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.sink import IcoSink, sink
+from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
 from apriori.ico.describe.plan.rich_render.row_renderer import (
     RowRenderer,
 )
 
 
+@register_renderer(IcoSink)
 class IcoSinkRender(RowRenderer):
     def _render_node_args_info(self, node: IcoNode) -> Text:
         assert isinstance(node, IcoSink)
         sink = cast(IcoSink[Any], node)
 
-        return self._render_callable(sink.consumer)
+        return self.render_callable(sink.consumer)
 
 
 if __name__ == "__main__":

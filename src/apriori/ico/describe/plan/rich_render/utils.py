@@ -21,6 +21,7 @@ class PlanStyle(Enum):
     text = "#4EB169"
     string = "#DD1616"
     signature = "cyan"
+    semantic_meta = "#8446F7 italic"
 
 
 state_styles = [

@@ -7,6 +7,7 @@ from rich.text import Text
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.source import source
+from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
 from apriori.ico.describe.plan.rich_render.row_renderer import (
     RowRenderer,
 )
@@ -16,6 +17,7 @@ from apriori.ico.describe.plan.rich_render.utils import (
 from apriori.ico.utils.data.batcher import IcoBatcher
 
 
+@register_renderer(IcoBatcher)
 class IcoBatcherRender(RowRenderer):
     def _render_node_args_info(self, node: IcoNode) -> Text:
         assert isinstance(node, IcoBatcher)

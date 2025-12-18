@@ -16,8 +16,8 @@ from apriori.ico.core.runtime.event import (
     IcoHearbeatEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.agent.mp_process.mp_process import (
-    MPProcess,
+from apriori.ico.runtime.agent.mp_process.mp_agent import (
+    MPAgent,
 )
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
 
@@ -58,7 +58,7 @@ def op_fail_on_three(x: float) -> float:
 def test_agent_basic_roundtrip() -> None:
     """Agent spawned by MPProcessAgentHost should process data using remote flow."""
 
-    mp_process = MPProcess(op_double)
+    mp_process = MPAgent(op_double)
     mp_process.activate()
 
     result = mp_process(21)
@@ -74,7 +74,7 @@ def test_agent_basic_roundtrip() -> None:
 def test_agent_multiple_items() -> None:
     """Agent should correctly process multiple items in sequence."""
 
-    mp_process = MPProcess(op_double)
+    mp_process = MPAgent(op_double)
     mp_process.activate()
 
     try:
@@ -92,7 +92,7 @@ def test_agent_multiple_items() -> None:
 def test_agent_exception_propagation() -> None:
     """If agent raises IcoRuntimeError, host should receive corresponding runtime event."""
 
-    mp_process = MPProcess(op_fail_factory)
+    mp_process = MPAgent(op_fail_factory)
     mp_process.activate()
 
     # normal items ok
@@ -117,7 +117,7 @@ def test_agent_command_propagation() -> None:
     # Attach recording runtime to channel
     end_runtime = RecordingRuntimeNode()
 
-    mp_process = MPProcess(op_identity)
+    mp_process = MPAgent(op_identity)
     mp_process.connect_runtime(end_runtime)
 
     # channel is a parent runtime of the agent host runtime
@@ -141,7 +141,7 @@ def test_agent_event_propagation() -> None:
     """Agent should bubble events back to host runtime."""
 
     main_runtime = RecordingRuntimeNode()
-    mp_process = MPProcess(op_identity)
+    mp_process = MPAgent(op_identity)
     main_runtime.connect_runtime(mp_process)
 
     main_runtime.activate()
@@ -174,7 +174,7 @@ def test_agent_mp_process_end_to_end() -> None:
     src = IcoOperator[None, float](lambda _: 7)
     dst = IcoOperator[float, None](collect_output)
 
-    flow = src | MPProcess(op_double) | dst
+    flow = src | MPAgent(op_double) | dst
 
     runtime = IcoRuntimeContour(flow)
     runtime.activate().run().deactivate()
@@ -190,7 +190,7 @@ def test_agent_mp_process_end_to_end() -> None:
 def test_agent_clean_shutdown() -> None:
     """Agent spawned by host should terminate on deactivate."""
 
-    mp_process = MPProcess(op_identity)
+    mp_process = MPAgent(op_identity)
     mp_process.activate()
 
     assert mp_process.is_alive

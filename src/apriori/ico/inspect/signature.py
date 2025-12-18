@@ -20,6 +20,7 @@ from typing import (
 
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChain
+from apriori.ico.core.context_operator import IcoContextOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
 from apriori.ico.core.node import IcoNode
@@ -29,7 +30,7 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.runtime.agent.mp_process.mp_process import MPProcess
+from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
 from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ────────────────────────────────────────────────
@@ -132,7 +133,7 @@ def infer_by_node_type(obj: object) -> IcoSignature | None:
             )
 
         case IcoStream() | IcoAsyncStream():
-            assert len(obj.children) == 1
+            assert len(obj.children) >= 1
             body_form = infer_signature(obj.children[0])
             return IcoSignature(
                 i=_wrap_iterator(body_form.i),
@@ -160,18 +161,18 @@ def infer_by_node_type(obj: object) -> IcoSignature | None:
             return infer_signature(obj.children[0])
 
         case IcoEpoch():
-            assert len(obj.children) == 2
-            source_form = infer_signature(obj.children[0])
-            context_form = infer_signature(obj.children[1])
+            epoch = cast(IcoEpoch[Any, Any], obj)
+            # source_form = infer_signature(obj.children[0])
+            context_form = infer_signature(epoch.context_operator)
             return IcoSignature(
-                source_form.o,
-                context_form.c,
+                context_form.o,
+                None,
                 context_form.o,
             )
 
-        case MPProcess():
-            process = cast(MPProcess[Any, Any], obj)
-            return infer_from_flow_factory(process.flow_factory)
+        case MPAgent():
+            process = cast(MPAgent[Any, Any], obj)
+            return infer_from_flow_factory(process.subflow_factory)
 
         case IcoBatcher():
             # Generic parameter for batcher dosn't include Iterators
@@ -239,6 +240,8 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
 
     if isinstance(obj, IcoOperator):
         fn = cast(Callable[[Any], Any], obj.fn)  # type: ignore
+    elif isinstance(obj, IcoContextOperator):
+        fn = cast(Callable[[Any, Any], Any], obj.fn)  # type: ignore
     elif type(obj) is not FunctionType:
         fn = obj.__call__
     else:

@@ -12,7 +12,7 @@ from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
 
 
 @final
-class MPProcessAgent(
+class MPWorker(
     IcoAgentNode,
     Generic[I, O],
 ):
@@ -93,7 +93,7 @@ class MPProcessAgent(
         name: str | None = None,
     ) -> SpawnProcess:
         process = mp_context.Process(
-            target=MPProcessAgent[I, O]._process_fn,
+            target=MPWorker[I, O]._process_fn,
             args=(channel, flow_factory, name),
         )
         process.start()
@@ -105,7 +105,7 @@ class MPProcessAgent(
         flow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
     ) -> None:
-        agent = MPProcessAgent[I, O](
+        agent = MPWorker[I, O](
             channel=channel,
             flow_factory=flow_factory,
             name=name,
