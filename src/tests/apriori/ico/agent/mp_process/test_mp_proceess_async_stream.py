@@ -7,7 +7,7 @@ import pytest
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 # ───────────────────────────────────────────────
 # Helpers

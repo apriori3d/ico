@@ -9,7 +9,7 @@ import pytest
 
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.channel.mp_queue.channel import MPChannel
+from apriori.ico.runtime.agent.mp.mp_channel import MPChannel
 from tests.apriori.ico.channel.mp_queue.utils import MPProcessMock
 
 # ───────────────────────────────────────────────
@@ -65,7 +65,7 @@ def test_send_receive_roundtrip_flow_basic() -> None:
     """Ensure data passes through full MPChannel roundtrip."""
     channel = MPChannel[int, int](get_context("spawn"))
     mp_process_mock = MPProcessMock[int, int](channel)
-    agent_process = start_mp_process_agent(channel.make_agent_channel(), flow_identity)
+    agent_process = start_mp_process_agent(channel.invert(), flow_identity)
     try:
         result = mp_process_mock(42)
         assert result == 42
@@ -84,7 +84,7 @@ def test_send_receive_roundtrip_transform() -> None:
     """Verify that data transformation inside remote flow works."""
     channel = MPChannel[int, int](get_context("spawn"))
     mp_process_mock = MPProcessMock[int, int](channel)
-    agent_process = start_mp_process_agent(channel.make_agent_channel(), flow_double)
+    agent_process = start_mp_process_agent(channel.invert(), flow_double)
 
     try:
         result = mp_process_mock(21)
@@ -105,9 +105,7 @@ def test_send_receive_multiple_items() -> None:
     channel = MPChannel[int, int](get_context("spawn"))
     num_queries = 5
     mp_process_mock = MPProcessMock[int, int](channel)
-    agent_process = start_mp_process_agent(
-        channel.make_agent_channel(), flow_double, n=num_queries
-    )
+    agent_process = start_mp_process_agent(channel.invert(), flow_double, n=num_queries)
 
     try:
         results = [mp_process_mock(i) for i in range(num_queries)]
@@ -122,9 +120,7 @@ def test_send_receive_stream() -> None:
     channel = MPChannel[int, int](get_context("spawn"))
     num_queries = 5
     mp_process_mock = MPProcessMock[int, int](channel)
-    agent_process = start_mp_process_agent(
-        channel.make_agent_channel(), flow_double, n=num_queries
-    )
+    agent_process = start_mp_process_agent(channel.invert(), flow_double, n=num_queries)
 
     try:
         src = IcoSource(lambda: iter(range(num_queries)))

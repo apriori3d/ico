@@ -16,7 +16,7 @@ from apriori.ico.core.runtime.event import (
     IcoHearbeatEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.agent.mp_process.mp_agent import (
+from apriori.ico.runtime.agent.mp.mp_agent import (
     MPAgent,
 )
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode

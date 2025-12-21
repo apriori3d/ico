@@ -3,27 +3,27 @@ from dataclasses import replace
 from rich.text import Text
 
 from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.describe.plan.options import RenderOptions
-from apriori.ico.describe.plan.rich_render.group_renderer import (
+from apriori.ico.describe.plan.options import PlanRendererOptions
+from apriori.ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
 )
-from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
-from apriori.ico.describe.plan.rich_render.utils import PlanStyle
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
+from apriori.ico.describe.rich_style import DescribeStyle
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @register_renderer(MPAgent)
 class MPProcessRenderer(GroupRenderer):
-    def __init__(self, options: RenderOptions) -> None:
+    def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,
             header_renderer=RowRenderer(
-                flow_column_prefix=Text("send to ", style=PlanStyle.keyword.value),
+                flow_column_prefix=Text("send to ", style=DescribeStyle.keyword.value),
                 options=replace(options, signature_format="Input"),
             ),
             footer_renderer=RowRenderer(
-                flow_column_prefix=Text("receive", style=PlanStyle.keyword.value),
+                flow_column_prefix=Text("receive", style=DescribeStyle.keyword.value),
                 options=replace(options, signature_format="Output"),
                 show_name_column=False,
                 show_type_column=False,
@@ -34,7 +34,7 @@ class MPProcessRenderer(GroupRenderer):
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     @operator()
     def fetch_data_item(index: int) -> float:

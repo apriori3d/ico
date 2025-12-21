@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Iterator, Sequence
 from enum import Enum, auto
-from typing import ClassVar
 
 from typing_extensions import Self
 
@@ -53,6 +52,7 @@ DEFAULT_COMMAND_TO_STATE = {
     IcoResumeCommand: IcoRuntimeStateOld.ready,
 }
 
+
 # ────────────────────────────────────────────────
 # Runtime node
 # ────────────────────────────────────────────────
@@ -60,8 +60,6 @@ DEFAULT_COMMAND_TO_STATE = {
 
 class IcoRuntimeNode(ABC):
     """Structural attributes for graph representation of ICO operators."""
-
-    runtime_type_name: ClassVar[str] = "Runtime Node"
 
     __slots__ = (
         "state_model",
@@ -102,7 +100,7 @@ class IcoRuntimeNode(ABC):
         return self._runtime_parent
 
     @property
-    def runtime_children(self) -> Sequence[IcoRuntimeNode]:
+    def runtime_children(self) -> list[IcoRuntimeNode]:
         """Children nodes in the runtime tree."""
         return self._runtime_children
 
@@ -125,7 +123,14 @@ class IcoRuntimeNode(ABC):
         self.state_model.update(command)
         return command
 
-    def broadcast_command(
+    def broadcast_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+        match command.broadcast_order:
+            case "Pre-order":
+                return self.broadcast_command_pre_order(command)
+            case "Post-order":
+                return self.broadcast_command_post_order(command)
+
+    def broadcast_command_pre_order(
         self,
         command: IcoRuntimeCommand,
     ) -> IcoRuntimeCommand:
@@ -216,7 +221,7 @@ class IcoRuntimeNode(ABC):
 
     def deactivate(self) -> Self:
         """Broadcast 'deactivate' event through the entire flow."""
-        self.broadcast_command_post_order(IcoDeactivateCommand())
+        self.broadcast_command(IcoDeactivateCommand())
         return self
 
     # ────────────────────────────────────────────────
@@ -237,22 +242,20 @@ class IcoRuntimeNode(ABC):
         tool.connect_runtime(self)
         return tool
 
+    # ────────────────────────────────────────────────
+    # Hirarchy Iteration
+    # ────────────────────────────────────────────────
 
-def iterate_nodes(
-    node: IcoRuntimeNode,
-) -> Iterator[IcoRuntimeNode]:
-    """Recursively yield all children operators in the flow tree."""
-    yield node
-    for c in node.runtime_children:
-        yield from iterate_nodes(c)
+    def iterate_nodes(self) -> Iterator[IcoRuntimeNode]:
+        """Recursively yield all children operators in the flow tree."""
+        yield self
+        for c in self.runtime_children:
+            yield from c.iterate_nodes()
 
+    def iterate_parents(self) -> Iterator[IcoRuntimeNode]:
+        """Recursively yield all parent operators in the flow tree."""
+        if self.runtime_parent is None:
+            return
 
-def iterate_parents(
-    node: IcoRuntimeNode,
-) -> Iterator[IcoRuntimeNode]:
-    """Recursively yield all parent operators in the flow tree."""
-    if node.runtime_parent is None:
-        return
-
-    yield node.runtime_parent
-    yield from iterate_parents(node.runtime_parent)
+        yield self.runtime_parent
+        yield from self.runtime_parent.iterate_parents()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import ClassVar, Generic, TypeVar, overload
+from typing import Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import I, O
@@ -18,8 +18,6 @@ C = TypeVar("C")
 
 
 class IcoContextOperator(Generic[I, C, O], IcoNode):
-    type_name: ClassVar[str] = "Context Operator"
-
     fn: Callable[[I, C], O]
 
     def __init__(

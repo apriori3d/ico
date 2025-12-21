@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import final
+from typing import Literal, final
 
 
 class IcoRuntimeCommandType(Enum):
@@ -15,7 +15,10 @@ class IcoRuntimeCommandType(Enum):
     stop = auto()
 
 
-@dataclass(slots=True, frozen=True)
+CommandBroadcastOrder = Literal["Pre-order", "Post-order"]
+
+
+@dataclass(slots=True)
 class IcoRuntimeCommand:
     """
     Runtime commands controlling activation and resource lifecycle
@@ -30,46 +33,50 @@ class IcoRuntimeCommand:
         • stop       - Stop signal for iterative or streaming operators
     """
 
-    pass
+    broadcast_order: CommandBroadcastOrder = field(init=False)
+
+    def __post_init__(self):
+        self.broadcast_order = "Pre-order"
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoActivateCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoRunCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoDeactivateCommand(IcoRuntimeCommand):
-    pass
+    def __post_init__(self):
+        self.broadcast_order = "Post-order"
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoPauseCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoResumeCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoResetCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoStopCommand(IcoRuntimeCommand):
     pass

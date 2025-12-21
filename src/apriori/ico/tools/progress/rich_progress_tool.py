@@ -21,8 +21,7 @@ from apriori.ico.core.runtime.tool import (
 )
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
-from apriori.ico.describe.describe import describe
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @final
@@ -70,29 +69,37 @@ class RichProgressTool(IcoRuntimeTool):
         return super().on_event(event)
 
 
-def create_item_flow() -> IcoOperator[int, int]:
-    num_iters = 10
+class WorkerFlow:
+    name: str | None = None
+    num_iters: int
 
-    @operator()
-    def double(x: int) -> int:
-        time.sleep(0.1)
-        res = x * 2
-        return res
+    def __init__(self, num_iters: int = 10, name: str | None = None):
+        self.name = name
+        self.num_iters = num_iters
 
-    @operator()
-    def shift(x: int) -> int:
-        res = x + 1
-        return res
+    def __call__(self) -> IcoOperator[int, int]:
+        @operator()
+        def double(x: int) -> int:
+            time.sleep(0.1)
+            res = x * 2
+            return res
 
-    progress = IcoProgress[int](total=num_iters)
+        @operator()
+        def shift(x: int) -> int:
+            res = x + 1
+            return res
 
-    return IcoProcess[int](
-        double | shift | progress,
-        num_iterations=num_iters,
-    )
+        progress = IcoProgress[int](total=self.num_iters, name=self.name)
+
+        return IcoProcess[int](
+            double | shift | progress,
+            num_iterations=self.num_iters,
+        )
 
 
 if __name__ == "__main__":
+    from apriori.ico.describe.describe import describe
+
     total = 10
 
     @source()
@@ -107,29 +114,27 @@ if __name__ == "__main__":
 
     progress = IcoProgress[int](total=total, name="Overall Progress")
 
-    mp_process1 = MPAgent[int, int](create_item_flow)
-    mp_process2 = MPAgent[int, int](create_item_flow)
-
-    # item_flow = create_item_flow()
+    mp_process1 = MPAgent[int, int](WorkerFlow(name="Worker 1"))
+    mp_process2 = MPAgent[int, int](WorkerFlow(name="Worker 2"))
 
     flow = numbers | (progress | mp_process1 | mp_process2).stream() | print_result
     flow.name = "Example Flow"
-    describe(flow)
-    describe(flow, show_runtime_nodes=True)
 
     with Progress() as progress:
         console = progress.console
 
+        describe(flow, console=console)
+
         progress_tool = RichProgressTool(progress)
 
         runtime = flow.runtime().add_tool(progress_tool)
-        runtime.activate()
-        describe(flow, console=console)
+        # runtime.activate()
+        describe(runtime, console=console)
 
-        progress_tool.discover()
-        describe(flow, console=console)
+        # progress_tool.discover()
+        # describe(flow, console=console)
 
-        runtime.run()
+        # runtime.run()
 
-        runtime.deactivate()
-        describe(flow, console=console)
+        # runtime.deactivate()
+        # describe(flow, console=console)

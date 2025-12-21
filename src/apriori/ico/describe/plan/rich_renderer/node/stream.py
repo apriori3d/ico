@@ -5,26 +5,28 @@ from rich.text import Text
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import operator
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.describe.plan.options import RenderOptions
-from apriori.ico.describe.plan.rich_render.group_renderer import (
+from apriori.ico.describe.plan.options import PlanRendererOptions
+from apriori.ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
 )
-from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
-from apriori.ico.describe.plan.rich_render.utils import PlanStyle
+from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
+from apriori.ico.describe.rich_style import DescribeStyle
 
 
 @register_renderer(IcoStream)
 class IcoStreamRenderer(GroupRenderer):
-    def __init__(self, options: RenderOptions) -> None:
+    def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,
             header_renderer=StreamGroupPartRenderer(
-                flow_column_prefix=Text("for each in ", style=PlanStyle.keyword.value),
+                flow_column_prefix=Text(
+                    "for each in ", style=DescribeStyle.keyword.value
+                ),
                 options=replace(options, signature_format="Input"),
             ),
             footer_renderer=StreamGroupPartRenderer(
-                flow_column_prefix=Text("yield", style=PlanStyle.keyword.value),
+                flow_column_prefix=Text("yield", style=DescribeStyle.keyword.value),
                 options=replace(options, signature_format="Output"),
                 show_name_column=False,
                 show_type_column=False,
@@ -38,7 +40,7 @@ class StreamGroupPartRenderer(RowRenderer):
     def __init__(
         self,
         flow_column_prefix: Text,
-        options: RenderOptions,
+        options: PlanRendererOptions,
         show_name_column: bool = True,
         show_signature_column: bool = True,
         show_type_column: bool = True,
@@ -64,7 +66,7 @@ class StreamGroupPartRenderer(RowRenderer):
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     @operator()
     def produce_data_item(index: int) -> float:

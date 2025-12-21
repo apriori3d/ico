@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import ClassVar
 
 
 class IcoNode:
     """Structural attributes for graph representation of ICO operators."""
-
-    type_name: ClassVar[str] = "Node"
 
     name: str | None
     parent: IcoNode | None
@@ -40,7 +37,7 @@ class IcoNode:
     ) -> None:
         from apriori.ico.describe.describe import describe
 
-        describe(self, show_runtime_nodes=show_runtime_nodes)
+        describe(self)
 
 
 def iterate_nodes(

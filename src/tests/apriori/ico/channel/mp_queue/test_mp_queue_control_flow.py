@@ -16,7 +16,7 @@ from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.runtime.channel.mp_queue.channel import MPChannel
+from apriori.ico.runtime.agent.mp.mp_channel import MPChannel
 from tests.apriori.ico.channel.mp_queue.utils import MPProcessMock
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
 
@@ -101,7 +101,7 @@ def test_runtime_flow_propagation() -> None:
     process: SpawnProcess = ctx.Process(
         target=recording_agent,
         args=(
-            channel.make_agent_channel(),
+            channel.invert(),
             3,  # first run for 'report', second for 'error', third to test clean exit
         ),
         daemon=True,

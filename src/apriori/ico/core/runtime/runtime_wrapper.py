@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import ClassVar, Generic
+from typing import Generic
 
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -10,7 +10,6 @@ class IcoRuntimeWrapper(
     IcoOperator[I, O],
     IcoRuntimeNode,
 ):
-    type_name: ClassVar[str] = "Runtime Wrapper"
     operator: IcoOperator[I, O]
 
     def __init__(

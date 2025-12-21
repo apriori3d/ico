@@ -7,32 +7,39 @@ from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
+from apriori.ico.core.runtime.agent import IcoAgent
+from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.progress import IcoProgress
 from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.describe.options import RendererOptions
 from apriori.ico.utils.data.batcher import IcoBatcher
 
-RenderColumn: TypeAlias = Literal["Flow", "Name", "Type", "Signature", "State"]
+PlanRendererColumn: TypeAlias = Literal["Flow", "Signature", "Name"]
 CallableFormat: TypeAlias = Literal["__name__", "str()"]
 SignatureFormat: TypeAlias = Literal["Full", "Input", "Output"]
 
 
 @dataclass(slots=True)
-class RenderOptions:
-    show_runtime_nodes: bool = True
+class PlanRendererOptions(RendererOptions):
+    columns: list[PlanRendererColumn] = field(
+        default_factory=lambda: ["Flow", "Signature", "Name"]
+    )
+    renderers_paths: list[str] = field(
+        default_factory=lambda: ["apriori.ico.describe.plan.rich_renderer.node"]
+    )
+
     callable_format: CallableFormat = "__name__"
+    signature_format: SignatureFormat = "Full"
+
     dim_ico_nodes: bool = False
     query_iterable_size: bool = True
     show_ico_operator: bool = False
-    expand_subflows: bool = True
-    expand_subflow_factories: bool = True
-    signature_format: SignatureFormat = "Full"
+    show_node_icons: bool = True
 
-    columns: list[RenderColumn] = field(
-        default_factory=lambda: ["Flow", "Signature", "State", "Name"]
-    )
+    expand_subflow_factories: bool = True
 
     flatten_node_type: set[type[IcoNode]] = field(
         default_factory=lambda: {
@@ -43,16 +50,15 @@ class RenderOptions:
         }
     )
 
-    show_node_icons: bool = True
-
-    node_icons: dict[type[IcoNode], str] = field(
+    node_icons: dict[type[IcoNode | IcoRuntimeNode], str] = field(
         default_factory=lambda: {
-            MPAgent: "👷",
+            IcoAgent: "👷",
             IcoBatcher: "📦",
             IcoStream: "🎞️ ",
             IcoAsyncStream: "🚀",
             IcoProcess: "🔁",
             IcoSource: "📚",
             IcoSink: "🏁",
+            IcoProgress: "⏳",
         }
     )

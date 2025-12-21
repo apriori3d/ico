@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterable, Iterator
-from typing import ClassVar, Generic, final
+from typing import Generic, final
 
 from apriori.ico.core.operator import (
     IcoOperator,
@@ -28,7 +28,6 @@ class IcoSource(
         12.0
     """
 
-    type_name: ClassVar[str] = "Source"
     provider: Callable[[], Iterable[O]]
 
     def __init__(

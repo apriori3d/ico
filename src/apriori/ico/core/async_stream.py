@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
-from typing import ClassVar, Generic, TypeVar, final, overload
+from typing import Generic, TypeVar, final, overload
 
 from apriori.ico.core.async_operator import IcoAsyncOperator
 from apriori.ico.core.operator import I, IcoOperator, O
@@ -39,8 +39,6 @@ class IcoAsyncStream(
         "_next_index",
         "_ordering_buffer",
     )
-
-    type_name: ClassVar[str] = "Async Stream"
 
     pool: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
     subflow_factory: Callable[[], IcoOperator[I, O] | IcoAsyncOperator[I, O]] | None

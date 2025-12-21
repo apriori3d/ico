@@ -19,7 +19,7 @@ from apriori.ico.tools.printer.node import (
     IcoPrinter,
     IcoPrinterRegistrationEvent,
     IcoPrintEvent,
-    printer,
+    use_printer,
 )
 
 
@@ -53,21 +53,21 @@ if __name__ == "__main__":
     def numbers() -> Iterator[int]:
         yield from range(3)
 
-    @printer(print)
+    @use_printer(print)
     @operator()
     def double(x: int) -> int:
         res = x * 2
         print(f"Doubling {x} to get {res}")
         return res
 
-    @printer(print)
+    @use_printer(print)
     @operator()
     def shift(x: int) -> int:
         res = x + 1
         print(f"Shifting {x} to get {res}")
         return res
 
-    @printer(print)
+    @use_printer(print)
     @sink()
     def print_result(x: int) -> None:
         print(f"Sink received: {x}")
@@ -76,18 +76,17 @@ if __name__ == "__main__":
     flow.name = "Example Flow"
 
     flow.describe()
-    flow.describe(show_runtime_nodes=True)
 
-    # console = Console()
-    # printer_tool = RichPrinterTool(console)
+    console = Console()
+    printer_tool = RichPrinterTool(console)
 
-    # runtime = flow.runtime().add_tool(printer_tool)
+    runtime = flow.runtime().add_tool(printer_tool)
     # runtime.describe()
-    # runtime.activate().describe()
-    # printer_tool.discover().describe()
+    runtime.activate()  # .describe()
+    printer_tool.discover()  # .describe()
 
     # flow.describe(show_runtime_nodes=True)
 
-    # runtime.run()
+    runtime.run()
 
-    # runtime.deactivate().describe()
+    runtime.deactivate()  # .describe()

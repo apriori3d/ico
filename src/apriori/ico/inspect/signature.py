@@ -27,10 +27,11 @@ from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
+from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ────────────────────────────────────────────────
@@ -185,6 +186,11 @@ def infer_by_node_type(obj: object) -> IcoSignature | None:
                     c=None,
                     o=_wrap_iterator(_wrap_iterator(signature.o)),
                 )
+
+        case IcoRuntimeWrapper():
+            wrapper = cast(IcoRuntimeWrapper[Any, Any], obj)
+            return infer_signature(wrapper.operator)
+
         case _:
             pass
 
@@ -223,6 +229,9 @@ def _wrap_iterator(tp: object) -> object:
 def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     if not callable(fn):
         return None
+
+    if type(fn) is not FunctionType:
+        fn = fn.__call__
 
     hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
     return_hint = hints.get("return", None)

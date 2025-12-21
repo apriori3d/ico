@@ -7,12 +7,13 @@ from rich.text import Text
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.source import IcoSource, source
-from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_render.row_renderer import (
+from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
-from apriori.ico.describe.plan.rich_render.utils import (
-    PlanStyle,
+from apriori.ico.describe.rich_style import DescribeStyle
+from apriori.ico.describe.rich_utils import (
+    render_callable,
 )
 
 
@@ -22,7 +23,7 @@ class IcoSourceRender(RowRenderer):
         assert isinstance(node, IcoSource)
         source = cast(IcoSource[Any], node)
 
-        provider_info = self.render_callable(source.provider)
+        provider_info = render_callable(source.provider, options=self.options)
 
         # Add size info if required
         if self.options.query_iterable_size:
@@ -30,14 +31,14 @@ class IcoSourceRender(RowRenderer):
 
             if isinstance(data_source, Sized):
                 provider_info += Text(
-                    f", size={len(data_source)}", style=PlanStyle.meta.value
+                    f", size={len(data_source)}", style=DescribeStyle.meta.value
                 )
 
         return provider_info
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     data = [0.5, 1.0, 1.5, 2.0, 0.8, 0.2, 1.0, 1.2, 0.9]
 

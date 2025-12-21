@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from typing import ClassVar, Generic
+from typing import Generic
 
 from apriori.ico.core.operator import (
     I,
@@ -16,7 +16,6 @@ class IcoSink(
         Iterator[I] → ()
     """
 
-    type_name: ClassVar[str] = "Sink"
     consumer: Callable[[I], None]
 
     def __init__(

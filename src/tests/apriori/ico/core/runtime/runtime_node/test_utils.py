@@ -57,7 +57,7 @@ class RecordingContour(IcoRuntimeContour):
         self,
         closure: IcoOperator[None, None],
     ):
-        super().__init__(closure=closure, name="state_recording_contour")
+        super().__init__(flow=closure, name="state_recording_contour")
         self.recorded_states = [self._state]
         self.recorded_commands = []
         self.recorded_events = []

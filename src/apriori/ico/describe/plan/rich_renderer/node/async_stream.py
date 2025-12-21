@@ -8,16 +8,16 @@ from rich.text import Text
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.describe.plan.options import RenderOptions
-from apriori.ico.describe.plan.rich_render.custom_renderer import CustomRenderer
-from apriori.ico.describe.plan.rich_render.node.stream import (
+from apriori.ico.describe.plan.options import PlanRendererOptions
+from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
+from apriori.ico.describe.plan.rich_renderer.node.stream import (
     StreamGroupPartRenderer,
 )
-from apriori.ico.describe.plan.rich_render.render_target import RenderTarget
-from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_render.row_renderer import FlowTextRowRenderer
-from apriori.ico.describe.plan.rich_render.utils import PlanStyle
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.describe.plan.rich_renderer.render_target import PlanRenderTarget
+from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import FlowTextRowRenderer
+from apriori.ico.describe.rich_style import DescribeStyle
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @register_renderer(IcoAsyncStream)
@@ -25,11 +25,13 @@ class IcoAsyncStreamRenderer(CustomRenderer):
     _header_renderer: IcoAsyncStreamNodeRender
     _footer_renderer: IcoAsyncStreamFooterRender
 
-    def __init__(self, options: RenderOptions) -> None:
+    def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,
         )
-        header_text = Text("╭── ") + Text("for each in ", style=PlanStyle.keyword.value)
+        header_text = Text("╭── ") + Text(
+            "for each in ", style=DescribeStyle.keyword.value
+        )
         self._header_renderer = IcoAsyncStreamNodeRender(
             flow_column_prefix=header_text,
             options=replace(options, signature_format="Input"),
@@ -37,10 +39,10 @@ class IcoAsyncStreamRenderer(CustomRenderer):
 
         self._desc_renderer = FlowTextRowRenderer(
             options=options,
-            flow_column_prefix=Text("⚙️ parallel", style=PlanStyle.meta.value),
+            flow_column_prefix=Text("⚙️ parallel", style=DescribeStyle.meta.value),
         )
 
-        footer_text = Text("╰─▸ ") + Text("yield", style=PlanStyle.keyword.value)
+        footer_text = Text("╰─▸ ") + Text("yield", style=DescribeStyle.keyword.value)
         self._footer_renderer = IcoAsyncStreamFooterRender(
             flow_column_prefix=footer_text,
             options=replace(options, signature_format="Output"),
@@ -50,7 +52,7 @@ class IcoAsyncStreamRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
-    def render(self, plan: RenderTarget, node: IcoNode) -> None:
+    def render(self, plan: PlanRenderTarget, node: IcoNode) -> None:
         assert isinstance(node, IcoAsyncStream)
         astream = cast(IcoAsyncStream[Any, Any], node)
 
@@ -59,10 +61,10 @@ class IcoAsyncStreamRenderer(CustomRenderer):
         plan.push_group_indent(Text("│   "))
 
         self._desc_renderer.flow_column_prefix = Text(
-            "parallel", style=PlanStyle.semantic_meta.value
+            "parallel", style=DescribeStyle.semantic_meta.value
         ) + Text(
             f"(pool_size={astream.pool_size}, ordered={astream.ordered})",
-            style=PlanStyle.meta.value,
+            style=DescribeStyle.meta.value,
         )
         # plan.render_row(self._desc_renderer, astream)
 
@@ -83,7 +85,7 @@ class IcoAsyncStreamNodeRender(StreamGroupPartRenderer):
         astream = cast(IcoAsyncStream[Any, Any], node)
         return Text(
             f"pool_size={astream.pool_size}",
-            style=PlanStyle.meta.value,
+            style=DescribeStyle.meta.value,
         )
 
 
@@ -94,9 +96,9 @@ class IcoAsyncStreamFooterRender(StreamGroupPartRenderer):
 
         return (
             self.flow_column_prefix
-            + Text("(", style=PlanStyle.keyword.value)
+            + Text("(", style=DescribeStyle.keyword.value)
             + args_info
-            + Text(")", style=PlanStyle.keyword.value)
+            + Text(")", style=DescribeStyle.keyword.value)
         )
 
     def _render_node_args_info(self, node: IcoNode) -> Text:
@@ -104,7 +106,7 @@ class IcoAsyncStreamFooterRender(StreamGroupPartRenderer):
         astream = cast(IcoAsyncStream[Any, Any], node)
         return Text(
             f"ordered={astream.ordered}",
-            style=PlanStyle.meta.value,
+            style=DescribeStyle.meta.value,
         )
 
 
@@ -128,7 +130,7 @@ def create_worker_flow() -> IcoOperator[float, float]:
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     pool = [MPAgent(create_worker_flow) for _ in range(4)]
 

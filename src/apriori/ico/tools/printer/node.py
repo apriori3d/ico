@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar, overload
+from typing import overload
 
 from typing_extensions import final
 
@@ -25,8 +25,6 @@ class IcoPrintEvent(IcoRuntimeEvent):
 
 @final
 class IcoPrinter(IcoDiscovarableNode):
-    type_name: ClassVar[str] = "Printer"
-
     def __call__(self, message: str) -> None:
         self.state_model.running()
         assert self.registered_id is not None
@@ -40,13 +38,18 @@ class IcoPrinter(IcoDiscovarableNode):
 # ─────────────────────────────────────────────
 
 
-def printer(
+def use_printer(
     printer: IcoPrinter,
 ) -> Callable[[IcoOperator[I, O]], IcoOperator[I, O]]:
     def decorator(operator: IcoOperator[I, O]) -> IcoOperator[I, O]:
+        if isinstance(operator, IcoRuntimeWrapper):
+            operator.runtime_children.append(printer)
+            return operator
+
         return IcoRuntimeWrapper[I, O](
             operator,
             runtime_children=[printer],
+            name=operator.name,
         )
 
     return decorator

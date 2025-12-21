@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import ClassVar, Generic, final
+from typing import Generic, final
 
 from apriori.ico.core.operator import (
     I,
@@ -15,8 +15,6 @@ class IcoPipeline(
     Generic[I],
     IcoOperator[I, I],
 ):
-    type_name: ClassVar[str] = "Pipeline"
-
     __slots__ = "body"
 
     body: Sequence[IcoOperator[I, I]]

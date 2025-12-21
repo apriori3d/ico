@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import ClassVar, Generic, TypeVar, overload
+from typing import Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -65,7 +65,6 @@ class IcoOperator(Generic[I, O], IcoNode):
     """
 
     # Note: do not use __slots__ here to allow dynamic inference of ICO-form attributes
-    type_name: ClassVar[str] = "Operator"
 
     fn: Callable[[I], O]
 
@@ -77,7 +76,8 @@ class IcoOperator(Generic[I, O], IcoNode):
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ):
-        super().__init__(
+        IcoNode.__init__(
+            self,
             name=name,
             parent=parent,
             children=children,

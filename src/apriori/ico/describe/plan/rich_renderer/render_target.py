@@ -3,10 +3,10 @@ from typing import Protocol
 from rich.text import Text
 
 from apriori.ico.core.node import IcoNode
-from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 
 
-class RenderTarget(Protocol):
+class PlanRenderTarget(Protocol):
     def render_node(self, node: IcoNode) -> None: ...
 
     def render_row(

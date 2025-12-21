@@ -77,7 +77,7 @@ explicit_package_bases = true
 plugins = []
 
 [[tool.mypy.overrides]]
-module = "apriori.ico.tools.progress.*"
+#module = "apriori.ico.tools.progress.*"
 disable_error_code = ["misc"]
 
 # ───────────────────────────────────────────────

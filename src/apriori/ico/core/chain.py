@@ -1,4 +1,4 @@
-from typing import ClassVar, Generic
+from typing import Generic
 
 from apriori.ico.core.operator import O2, I, IcoOperator, O
 
@@ -8,8 +8,6 @@ class IcoChain(
     IcoOperator[I, O2],
 ):
     """Chained ICO Operator: (I → O, O → O2) == I → O2."""
-
-    type_name: ClassVar[str] = "Chain"
 
     _first: IcoOperator[I, O]
     _second: IcoOperator[O, O2]

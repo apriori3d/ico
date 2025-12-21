@@ -6,7 +6,7 @@ from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ──── 1. Define a batched data source ────
@@ -56,7 +56,7 @@ def create_augment_flow() -> IcoOperator[Iterator[int], str]:
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     """
     ──── 3. Compose into a full data stream ────

@@ -27,7 +27,7 @@ from apriori.ico.core.runtime.state import (
 # ────────────────────────────────────────────────
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class IcoDiscoveryCommand(IcoRuntimeCommand):
     node_types: set[type[IcoDiscovarableNode]]
     register_id: int = 0
@@ -75,8 +75,6 @@ class DiscoverableStateModel(BaseStateModel):
 
 
 class IcoDiscovarableNode(IcoRuntimeNode):
-    runtime_type_name: ClassVar[str] = "Discoverable Node"
-
     __slots__ = ("registered_id",)
 
     registered_id: int | None
@@ -134,8 +132,6 @@ class IcoDiscovarableNode(IcoRuntimeNode):
 
 
 class IcoRuntimeTool(IcoRuntimeNode, ABC):
-    runtime_type_name: ClassVar[str] = "Runtime Tool"
-
     __slots__ = ("registry",)
 
     registry: dict[int, IcoRegistrationEvent]

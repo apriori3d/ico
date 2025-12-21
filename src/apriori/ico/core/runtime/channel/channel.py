@@ -79,6 +79,9 @@ class IcoChannel(Generic[I, O], ABC):
         self.strict_accept = strict_accept
         self._message_id = 0
 
+    @abstractmethod
+    def invert(self) -> IcoChannel[O, I]: ...
+
     # ────────────────────────────────
     # Send + Acknowledge logic
     # ────────────────────────────────
@@ -182,13 +185,7 @@ class IcoChannel(Generic[I, O], ABC):
             return  # Ignore command, wait for actual data item
 
         if self.runtime_port is not None:
-            if isinstance(message.command, IcoDeactivateCommand):
-                # Use post-order traversal for deactivation commands
-                next_command = self.runtime_port.broadcast_command_post_order(
-                    message.command
-                )
-            else:
-                next_command = self.runtime_port.broadcast_command(message.command)
+            next_command = self.runtime_port.broadcast_command(message.command)
         else:
             next_command = message.command
 

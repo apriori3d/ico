@@ -7,23 +7,24 @@ from rich.text import Text
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.types import HasSubflowFactory
 from apriori.ico.describe.plan.options import (
-    RenderOptions,
+    PlanRendererOptions,
 )
-from apriori.ico.describe.plan.rich_render.custom_renderer import CustomRenderer
-from apriori.ico.describe.plan.rich_render.group_renderer import (
+from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
+from apriori.ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
 )
-from apriori.ico.describe.plan.rich_render.renderer_registry import (
+from apriori.ico.describe.plan.rich_renderer.renderer_registry import (
     RendererRegistry,
-    import_all_renderers,
 )
-from apriori.ico.describe.plan.rich_render.row_renderer import RowRenderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
+from apriori.ico.describe.rich_style import DescribeStyle
+from apriori.ico.describe.utils import import_all_renderers
 
 RendererTypes: TypeAlias = RowRenderer | GroupRenderer | CustomRenderer
 
 
 class PlanRenderer:
-    options: RenderOptions
+    options: PlanRendererOptions
     console: Console
 
     _table: Table | None
@@ -34,10 +35,10 @@ class PlanRenderer:
 
     def __init__(
         self,
-        options: RenderOptions | None = None,
+        options: PlanRendererOptions | None = None,
         console: Console | None = None,
     ) -> None:
-        self.options = options or RenderOptions()
+        self.options = options or PlanRendererOptions()
         self.console = console or Console()
 
         self._default_renderer = RowRenderer(options=self.options)
@@ -46,7 +47,8 @@ class PlanRenderer:
         self._group_indents = []
         self._selected_renderers = {}
 
-        import_all_renderers("apriori.ico.describe.plan.rich_render.node")
+        for path in self.options.renderers_paths:
+            import_all_renderers(path)
 
     def _create_table(self) -> Table:
         table = Table(show_lines=False, show_edge=False, box=None)
@@ -85,27 +87,29 @@ class PlanRenderer:
 
     def render_node(self, node: IcoNode) -> None:
         # Do not render nodes responsible for flow structure - focus on the actual order of operations
-        if type(node) in self.options.flatten_node_type:
+        if (
+            type(node) in self.options.flatten_node_type
+        ):  # or isinstance(node, IcoMonitor):
             for child in node.children:
                 self.render_node(child)
             return
 
         renderer = self._select_renderer(node)
 
-        # Render node as a single row element
-        if isinstance(renderer, RowRenderer):
-            self.render_row(renderer, node)
-            return
-
         # Custom rendering logic (for IcoEpoch, etc)
         if isinstance(renderer, CustomRenderer):
             renderer.render(self, node)
             return
 
+        if isinstance(renderer, RowRenderer):
+            # Render node as a single row element
+            self.render_row(renderer, node)
+            return
+
         # Render subflow as a group element
         assert isinstance(renderer, GroupRenderer)
 
-        # Render node info is required
+        # Render node info if required
         if renderer.node_renderer is not None:
             self.render_row(renderer.node_renderer, node)
 
@@ -121,8 +125,13 @@ class PlanRenderer:
         # Expand subflow
 
         # Render header
-        self.render_row(renderer.header_renderer, node, indent=Text("╭── "))
-        self.push_group_indent(Text("│   "))
+        self.render_row(
+            renderer.header_renderer,
+            node,
+            indent=Text("╭── ", style=DescribeStyle.group.value),
+        )
+
+        self.push_group_indent(Text("│   ", style=DescribeStyle.group.value))
 
         if isinstance(node, HasSubflowFactory):
             # Special case for nodes with subflows - render the subflow inside the group
@@ -133,7 +142,12 @@ class PlanRenderer:
                 self.render_node(child)
 
         self.pop_group_indent()
-        self.render_row(renderer.footer_renderer, node, indent=Text("╰─▸ "))
+
+        self.render_row(
+            renderer.footer_renderer,
+            node,
+            indent=Text("╰─▸ ", style=DescribeStyle.group.value),
+        )
 
     def push_group_indent(self, indent: Text) -> None:
         self._group_indents.append(indent)

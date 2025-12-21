@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import ClassVar, Generic, final
+from typing import Generic, final
 
 from apriori.ico.core.context_operator import (
     C,
@@ -21,8 +21,6 @@ class IcoContextPipeline(
     Generic[I, C, O],
     IcoContextOperator[I, C, O],
 ):
-    type_name: ClassVar[str] = "Context Pipeline"
-
     __slots__ = ("apply", "body")
 
     apply: IcoContextOperator[I, C, O]

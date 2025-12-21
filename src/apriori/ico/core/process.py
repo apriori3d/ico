@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import ClassVar, Generic, final
+from typing import Generic, final
 
 from apriori.ico.core.context_operator import C
 from apriori.ico.core.operator import (
@@ -35,8 +35,6 @@ class IcoProcess(
         process[C → C]
         └── operator[fib_step]
     """
-
-    type_name: ClassVar[str] = "Process"
 
     __slots__ = ("num_iterations", "body")
 

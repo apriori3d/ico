@@ -1,8 +1,20 @@
-from abc import ABC
-from collections.abc import Sequence
-from dataclasses import dataclass
-from typing import ClassVar
+from __future__ import annotations
 
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import ClassVar, Generic
+
+from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.runtime.channel.channel import IcoChannel
+from apriori.ico.core.runtime.command import (
+    IcoActivateCommand,
+    IcoDeactivateCommand,
+    IcoRuntimeCommand,
+)
+from apriori.ico.core.runtime.contour import IcoRuntimeContour
+from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
+from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.state import (
     BaseStateModel,
@@ -29,11 +41,6 @@ class SendingState(ReadyState):
 class AgentStateModel(BaseStateModel):
     """State model for runtime agents."""
 
-    def pending(self) -> None:
-        if self.state.is_ready():
-            raise RuntimeError("Cannot transition to Pending state from Ready state.")
-        self.state = PendingState()
-
     def waiting(self) -> None:
         if not self.state.is_ready():
             raise RuntimeError(
@@ -49,18 +56,192 @@ class AgentStateModel(BaseStateModel):
         self.state = SendingState()
 
 
-class IcoAgentNode(IcoRuntimeNode, ABC):
-    runtime_type_name: ClassVar[str] = "Agent"
+class AgentWorkerStateModel(AgentStateModel):
+    """State model for runtime agent workers."""
+
+    def pending(self) -> None:
+        if self.state.is_ready():
+            raise RuntimeError("Cannot transition to Pending state from Ready state.")
+        self.state = PendingState()
+
+
+class IcoAgent(
+    Generic[I, O],
+    IcoOperator[I, O],
+    IcoRuntimeNode,
+    ABC,
+):
+    channel: IcoChannel[I, O] | None
+    subflow_factory: Callable[[], IcoOperator[I, O]]
 
     def __init__(
         self,
         *,
+        channel: IcoChannel[I, O] | None = None,
+        subflow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
+        state_model: BaseStateModel | None = None,
     ) -> None:
+        # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
+        IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
+            self, fn=self._portal_fn, name=name
+        )
         IcoRuntimeNode.__init__(
             self,
             runtime_name=name,
             runtime_children=runtime_children,
-            state_model=AgentStateModel(),
+            state_model=state_model or AgentStateModel(),
         )
+        self.channel = channel
+        self.subflow_factory = subflow_factory
+
+    @abstractmethod
+    def worker_factory(self) -> IcoAgentWorker[I, O]: ...
+
+    @abstractmethod
+    def _activate_worker(self) -> None: ...
+
+    @abstractmethod
+    def _deactivate_worker(self) -> None: ...
+
+    def _portal_fn(self, input: I) -> O:
+        assert self.channel is not None
+        assert isinstance(self.state_model, AgentStateModel)
+
+        try:
+            # Send item to agent process
+            self.state_model.sending()
+            self.channel.send(input)
+
+            # Wait for result from agent process
+            self.state_model.waiting()
+            output = self.channel.wait_for_item()
+
+            self.state_model.ready()
+
+            # MPProcess should always receive an output here
+            assert output is not None
+            return output
+
+        except Exception:
+            self.state_model.fault()
+            raise
+
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+        match command:
+            case IcoActivateCommand():
+                assert self.channel is None
+
+                # Spawn agent before sending a command downstream
+                self._activate_worker()
+                assert self.channel is not None
+
+                next_command = self.channel.send_command(command)
+
+            case IcoDeactivateCommand():
+                assert self.channel is not None
+
+                # Use post-order propagation to ensure children are deactivated before parents
+                assert command.broadcast_order == "post-order"
+                next_command = self.channel.send_command(command)
+
+                self._deactivate_worker()
+
+                # Close channel queues
+                self.channel.close()
+                self.channel = None
+
+            case _:
+                assert self.channel is not None
+                next_command = self.channel.send_command(command)
+
+        return super().on_command(next_command)
+
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+        if isinstance(event, IcoFaultEvent):
+            # Raise exception received from agent process
+            raise IcoRuntimeError(
+                f"Agent event fault received: {event.info['message']}"
+            )
+        return super().on_event(event)
+
+
+class IcoAgentWorker(
+    Generic[I, O],
+    IcoRuntimeContour[I, O],
+    ABC,
+):
+    channel: IcoChannel[O, I]
+
+    def __init__(
+        self,
+        *,
+        channel: IcoChannel[O, I],
+        flow_factory: Callable[[], IcoOperator[I, O]],
+        runtime_parent: IcoRuntimeNode | None = None,
+        runtime_children: Sequence[IcoRuntimeNode] | None = None,
+        state_model: BaseStateModel | None = None,
+        name: str | None = None,
+    ) -> None:
+        IcoRuntimeContour.__init__(  # pyright: ignore[reportUnknownMemberType]
+            self,
+            flow_factory(),
+            name=name,
+            runtime_parent=runtime_parent,
+            runtime_children=runtime_children,
+            state_model=state_model or AgentStateModel(),
+        )
+        self.channel = channel
+
+        # Connect to runtime port to enable command and event handling for remote runtime
+        channel.runtime_port = self
+
+    def run_loop(self) -> None:
+        """
+        Main execution loop of the process agent.
+
+        The agent runs a blocking loop, continuously executing its runtime contour.
+        Each iteration processes one input payload received from the input channel
+        and produces one output payload via the output channel.
+
+        The loop terminates on runtime commands:
+            - stop
+            - reset
+            - deactivate
+        """
+        assert isinstance(self.state_model, AgentWorkerStateModel)
+
+        # Agent is now pending activation
+        self.state_model.pending()
+
+        while True:
+            try:
+                # Blocks internally until new input arrives in the input channel.
+                input_item = self.channel.wait_for_item()
+
+                if input_item is None:
+                    self.state_model.idle()
+                    break  # Exit loop on deactivate command
+
+                # Process input item through flow
+                self.state_model.running()
+                output = self.flow(input_item)
+
+                # Send output item upstream
+                self.state_model.sending()
+                self.channel.send(output)
+
+                # Wait for the next item
+                self.state_model.waiting()
+
+            except Exception as e:
+                # Report runtime errors downstream to output channel and terminate
+                self.state_model.fault()
+                self.bubble_event(IcoFaultEvent.exception(e))
+                continue
+
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+        # Send event to upstream runtime
+        self.channel.send_event(event)
+        return super().on_event(event)

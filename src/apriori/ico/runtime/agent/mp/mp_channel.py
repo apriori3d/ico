@@ -90,19 +90,16 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         )
         self.mp_context = mp_context
 
-    def make_agent_channel(self) -> MPChannel[O, I]:
+    def invert(self) -> MPChannel[O, I]:
         """Create inverted channel pair for agent process."""
         assert isinstance(self.sender, MPQueueSendEndpoint)
         assert isinstance(self.receiver, MPQueueReceiveEndpoint)
 
-        send_endpoint = MPQueueSendEndpoint[O](self.receiver.queue)
-        receive_endpoint = MPQueueReceiveEndpoint[I](self.sender.queue)
-
         return MPChannel[O, I](
             mp_context=self.mp_context,
-            send_endpoint=send_endpoint,
-            receive_endpoint=receive_endpoint,
-            accept_commands=True,
-            accept_events=False,
-            strict_accept=True,
+            send_endpoint=MPQueueSendEndpoint[O](self.receiver.queue),
+            receive_endpoint=MPQueueReceiveEndpoint[I](self.sender.queue),
+            accept_commands=not self.accept_commands,
+            accept_events=not self.accept_events,
+            strict_accept=self.strict_accept,
         )

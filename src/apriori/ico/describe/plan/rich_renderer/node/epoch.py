@@ -12,26 +12,26 @@ from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.source import source
-from apriori.ico.describe.plan.options import RenderOptions
-from apriori.ico.describe.plan.rich_render.custom_renderer import CustomRenderer
-from apriori.ico.describe.plan.rich_render.node.stream import StreamGroupPartRenderer
-from apriori.ico.describe.plan.rich_render.render_target import RenderTarget
-from apriori.ico.describe.plan.rich_render.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_render.row_renderer import (
+from apriori.ico.describe.plan.options import PlanRendererOptions
+from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
+from apriori.ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
+from apriori.ico.describe.plan.rich_renderer.render_target import PlanRenderTarget
+from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from apriori.ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
-from apriori.ico.describe.plan.rich_render.utils import PlanStyle
-from apriori.ico.runtime.agent.mp_process.mp_agent import MPAgent
+from apriori.ico.describe.rich_style import DescribeStyle
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @register_renderer(IcoEpoch)
 class IcoEpochRenderer(CustomRenderer):
-    def __init__(self, options: RenderOptions) -> None:
+    def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(options=options)
         self._row_renderer = RowRenderer(options=options)
 
         source_header = Text("╭── ") + Text(
-            "for each in ", style=PlanStyle.keyword.value
+            "for each in ", style=DescribeStyle.keyword.value
         )
         self._source_header_renderer = StreamGroupPartRenderer(
             flow_column_prefix=source_header,
@@ -42,7 +42,7 @@ class IcoEpochRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
-        context_header = Text("├─▸ ") + Text("apply", style=PlanStyle.keyword.value)
+        context_header = Text("├─▸ ") + Text("apply", style=DescribeStyle.keyword.value)
         self._context_header_renderer = RowRenderer(
             flow_column_prefix=context_header,
             options=replace(options, signature_format="Input"),
@@ -52,7 +52,7 @@ class IcoEpochRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
-        footer_text = Text("╰─▸ ") + Text("emit", style=PlanStyle.keyword.value)
+        footer_text = Text("╰─▸ ") + Text("emit", style=DescribeStyle.keyword.value)
         self._footer_renderer = RowRenderer(
             flow_column_prefix=footer_text,
             options=replace(options, signature_format="Output"),
@@ -62,7 +62,7 @@ class IcoEpochRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
-    def render(self, plan: RenderTarget, node: IcoNode) -> None:
+    def render(self, plan: PlanRenderTarget, node: IcoNode) -> None:
         assert isinstance(node, IcoEpoch)
         epoch = cast(IcoEpoch[Any, Any], node)
 
@@ -87,7 +87,7 @@ class IcoAsyncStreamNodeRender(RowRenderer):
     def _render_node_args_info(self, node: IcoNode) -> Text:
         assert isinstance(node, IcoAsyncStream)
         astream = cast(IcoAsyncStream[Any, Any], node)
-        return Text(f"pool_size={len(astream.pool)}", style=PlanStyle.meta.value)
+        return Text(f"pool_size={len(astream.pool)}", style=DescribeStyle.meta.value)
 
 
 @source()
@@ -128,7 +128,7 @@ def logging_step(context: TrainContext) -> TrainContext:
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_render.plan_renderer import PlanRenderer
+    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     """
     IcoEpoch()

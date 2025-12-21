@@ -13,7 +13,7 @@ from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.channel.utils import wait_for_item
 from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.channel.mp_queue.channel import MPQueueChannel
+from apriori.ico.runtime.agent.mp.mp_channel import MPQueueChannel
 
 # ───────────────────────────────────────────────
 # Helpers
