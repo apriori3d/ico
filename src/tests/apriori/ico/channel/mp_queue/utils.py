@@ -34,9 +34,9 @@ class MPProcessMock(
         assert item is not None
         return item
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+    def on_command(self, command: IcoRuntimeCommand) -> None:
         super().on_command(command)
-        return self._channel.send_command(command)
+        self._channel.send_command(command)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoFaultEvent):

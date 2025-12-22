@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Literal, final
+from typing import ClassVar, Literal, final
+
+from apriori.ico.core.tree_utils import TreePathIndex
 
 
 class IcoRuntimeCommandType(Enum):
@@ -15,10 +17,10 @@ class IcoRuntimeCommandType(Enum):
     stop = auto()
 
 
-CommandBroadcastOrder = Literal["Pre-order", "Post-order"]
+CommandBroadcastOrder = Literal["pre", "post"]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoRuntimeCommand:
     """
     Runtime commands controlling activation and resource lifecycle
@@ -33,50 +35,47 @@ class IcoRuntimeCommand:
         • stop       - Stop signal for iterative or streaming operators
     """
 
-    broadcast_order: CommandBroadcastOrder = field(init=False)
-
-    def __post_init__(self):
-        self.broadcast_order = "Pre-order"
+    broadcast_order: ClassVar[CommandBroadcastOrder] = "pre"
+    path: TreePathIndex  # = field(default_factory=TreePathIndex)
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoActivateCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoRunCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoDeactivateCommand(IcoRuntimeCommand):
-    def __post_init__(self):
-        self.broadcast_order = "Post-order"
+    broadcast_order: ClassVar[CommandBroadcastOrder] = "post"
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoPauseCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoResumeCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoResetCommand(IcoRuntimeCommand):
     pass
 
 
 @final
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoStopCommand(IcoRuntimeCommand):
     pass

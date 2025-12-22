@@ -33,8 +33,8 @@ class RuntimeRendererOptions(RendererOptions):
             {
                 RichProgressTool: "⏳",
                 IcoProgress: "⏳",
-                RichPrinterTool: "🖨️",
-                IcoPrinter: "🖨️",
+                RichPrinterTool: "🖨️ ",
+                IcoPrinter: "🖨️ ",
                 IcoAgent: "👷",
                 IcoAgentWorker: "🤖",
                 IcoRuntimeContour: "🏃",

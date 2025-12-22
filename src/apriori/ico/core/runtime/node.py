@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC
 from collections.abc import Iterator, Sequence
+from dataclasses import replace
 from enum import Enum, auto
 
 from typing_extensions import Self
@@ -113,7 +114,7 @@ class IcoRuntimeNode(ABC):
     # Commands
     # ────────────────────────────────────────────────
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+    def on_command(self, command: IcoRuntimeCommand) -> None:
         """
         Handle a single runtime command.
 
@@ -121,45 +122,39 @@ class IcoRuntimeNode(ABC):
         (e.g., resource allocation, reset hooks, or teardown logic).
         """
         self.state_model.update(command)
-        return command
 
-    def broadcast_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
-        match command.broadcast_order:
-            case "Pre-order":
-                return self.broadcast_command_pre_order(command)
-            case "Post-order":
-                return self.broadcast_command_post_order(command)
+    def broadcast_command(self, command: IcoRuntimeCommand) -> None:
+        match type(command).broadcast_order:
+            case "pre":
+                self._traverse_tree_pre_order(command)
+            case "post":
+                self._traverse_tree_post_order(command)
+            case _:
+                raise ValueError(
+                    f"Unknown broadcast order '{type(command).broadcast_order}'"
+                )
 
-    def broadcast_command_pre_order(
-        self,
-        command: IcoRuntimeCommand,
-    ) -> IcoRuntimeCommand:
+    def _traverse_tree_pre_order(self, command: IcoRuntimeCommand) -> None:
         """
         Recursively propagate a runtime command through the operator tree.
         """
-        next_command = self.on_command(command)
+        self.on_command(command)
 
-        for child in self._runtime_children:
-            next_command = child.broadcast_command(next_command)
+        for i, child in enumerate(self._runtime_children):
+            child_command = replace(command, path=command.path.child(i))
+            child.broadcast_command(child_command)
 
-        return next_command
-
-    def broadcast_command_post_order(
-        self,
-        command: IcoRuntimeCommand,
-    ) -> IcoRuntimeCommand:
+    def _traverse_tree_post_order(self, command: IcoRuntimeCommand) -> None:
         """
         Recursively propagate a runtime command through the operator tree.
         Use post-order traversal to ensure children receive commands before parents.
         Applicable for deactivation and teardown sequences.
         """
+        for i, child in enumerate(self._runtime_children):
+            child_command = replace(command, path=command.path.child(i))
+            child.broadcast_command(child_command)
 
-        for child in self._runtime_children:
-            next_command = child.broadcast_command(command)
-
-        next_command = self.on_command(command)
-
-        return next_command
+        self.on_command(command)
 
     # ────────────────────────────────────────────────
     # Events
@@ -229,7 +224,7 @@ class IcoRuntimeNode(ABC):
     # ────────────────────────────────────────────────
 
     def describe(self) -> None:
-        from apriori.ico.inspect.describer import describe as describe_util
+        from apriori.ico.describe.describer import describe as describe_util
 
         describe_util(self)
 

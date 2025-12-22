@@ -128,24 +128,27 @@ class IcoAgent(
             self.state_model.fault()
             raise
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+    def on_command(self, command: IcoRuntimeCommand) -> None:
+        if command.broadcast_order == "pre":
+            super().on_command(command)
+
         match command:
             case IcoActivateCommand():
+                assert command.broadcast_order == "pre"
+                # Spawn an agent in pre-order, before sending a command downstream
                 assert self.channel is None
-
-                # Spawn agent before sending a command downstream
                 self._activate_worker()
                 assert self.channel is not None
 
-                next_command = self.channel.send_command(command)
+                self.channel.send_command(command)
 
             case IcoDeactivateCommand():
+                assert command.broadcast_order == "post"
                 assert self.channel is not None
 
-                # Use post-order propagation to ensure children are deactivated before parents
-                assert command.broadcast_order == "post-order"
-                next_command = self.channel.send_command(command)
+                self.channel.send_command(command)
 
+                # Deactivate worker in post-order, to ensure proper shutdown
                 self._deactivate_worker()
 
                 # Close channel queues
@@ -154,9 +157,10 @@ class IcoAgent(
 
             case _:
                 assert self.channel is not None
-                next_command = self.channel.send_command(command)
+                self.channel.send_command(command)
 
-        return super().on_command(next_command)
+        if command.broadcast_order == "post":
+            super().on_command(command)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoFaultEvent):

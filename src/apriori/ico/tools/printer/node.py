@@ -7,7 +7,7 @@ from typing_extensions import final
 from apriori.ico.core.operator import I, IcoOperator, O, wrap_operator
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
-from apriori.ico.core.runtime.tool import IcoDiscovarableNode, IcoRegistrationEvent
+from apriori.ico.core.runtime.tool import IcoDiscoverableNode, IcoRegistrationEvent
 
 
 @final
@@ -24,7 +24,7 @@ class IcoPrintEvent(IcoRuntimeEvent):
 
 
 @final
-class IcoPrinter(IcoDiscovarableNode):
+class IcoPrinter(IcoDiscoverableNode):
     def __call__(self, message: str) -> None:
         self.state_model.running()
         assert self.registered_id is not None

@@ -9,7 +9,7 @@ from apriori.ico.core.runtime.event import (
 )
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.tool import (
-    IcoDiscovarableNode,
+    IcoDiscoverableNode,
     IcoRegistrationEvent,
     IcoRuntimeTool,
 )
@@ -31,7 +31,7 @@ class RichPrinterTool(IcoRuntimeTool):
         IcoRuntimeNode.__init__(self)
         self._console = console
 
-    def get_discoverable_node_types(self) -> set[type[IcoDiscovarableNode]]:
+    def get_discoverable_node_types(self) -> set[type[IcoDiscoverableNode]]:
         return {IcoPrinter}
 
     def get_registration_event_types(self) -> set[type[IcoRegistrationEvent]]:

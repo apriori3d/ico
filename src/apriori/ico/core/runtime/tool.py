@@ -21,32 +21,26 @@ from apriori.ico.core.runtime.state import (
     ReadyState,
     StateTransitionMap,
 )
+from apriori.ico.core.tree_utils import TreePathIndex
 
 # ────────────────────────────────────────────────
 # Discovery Protocol: Command and Event
 # ────────────────────────────────────────────────
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IcoDiscoveryCommand(IcoRuntimeCommand):
-    node_types: set[type[IcoDiscovarableNode]]
-    register_id: int = 0
+    node_types: set[type[IcoDiscoverableNode]]
 
     def match(self, node: IcoRuntimeNode) -> bool:
         return any(isinstance(node, node_type) for node_type in self.node_types)
 
-    def next(self) -> IcoDiscoveryCommand:
-        return IcoDiscoveryCommand(
-            node_types=self.node_types,
-            register_id=self.register_id + 1,
-        )
-
 
 @dataclass(slots=True, frozen=True)
 class IcoRegistrationEvent(IcoRuntimeEvent):
-    node_type: type[IcoDiscovarableNode]
+    node_type: type[IcoDiscoverableNode]
     node_name: str | None
-    node_id: int
+    node_path: TreePathIndex
 
 
 # ────────────────────────────────────────────────
@@ -74,10 +68,10 @@ class DiscoverableStateModel(BaseStateModel):
 # ────────────────────────────────────────────────
 
 
-class IcoDiscovarableNode(IcoRuntimeNode):
+class IcoDiscoverableNode(IcoRuntimeNode):
     __slots__ = ("registered_id",)
 
-    registered_id: int | None
+    registered_id: TreePathIndex | None
 
     def __init__(
         self,
@@ -94,24 +88,21 @@ class IcoDiscovarableNode(IcoRuntimeNode):
         self.state_model = DiscoverableStateModel()
         self.registered_id = None
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+    def on_command(self, command: IcoRuntimeCommand) -> None:
         # Discard command if it is a discovery command that does not match
         if isinstance(command, IcoDiscoveryCommand) and not command.match(self):
-            return command
+            return
 
-        # Apply command handling if it is accepted
-        command = super().on_command(command)
+        # Apply command handling only if it is matched
+        super().on_command(command)
 
         # Register node upon discovery command if it matches
         if isinstance(command, IcoDiscoveryCommand):
-            self.registered_id = command.register_id
+            self.registered_id = command.path
             self._register_node()
-            command = command.next()
 
         elif isinstance(command, IcoDeactivateCommand):
             self.registered_id = None
-
-        return command
 
     def _register_node(self) -> None:
         """Implement discovery contract"""
@@ -121,7 +112,7 @@ class IcoDiscovarableNode(IcoRuntimeNode):
             IcoRegistrationEvent(
                 node_type=type(self),
                 node_name=self.runtime_name,
-                node_id=self.registered_id,
+                node_path=self.registered_id,
             )
         )
 
@@ -134,7 +125,7 @@ class IcoDiscovarableNode(IcoRuntimeNode):
 class IcoRuntimeTool(IcoRuntimeNode, ABC):
     __slots__ = ("registry",)
 
-    registry: dict[int, IcoRegistrationEvent]
+    registry: dict[TreePathIndex, IcoRegistrationEvent]
 
     def __init__(
         self,
@@ -151,7 +142,7 @@ class IcoRuntimeTool(IcoRuntimeNode, ABC):
         self.registry = {}
 
     @abstractmethod
-    def get_discoverable_node_types(self) -> set[type[IcoDiscovarableNode]]:
+    def get_discoverable_node_types(self) -> set[type[IcoDiscoverableNode]]:
         """Get discoverable node types for this tool."""
         raise NotImplementedError()
 
@@ -164,7 +155,10 @@ class IcoRuntimeTool(IcoRuntimeNode, ABC):
         """Discover tool nodes in the runtime."""
 
         self.broadcast_command(
-            IcoDiscoveryCommand(node_types=self.get_discoverable_node_types())
+            IcoDiscoveryCommand(
+                node_types=self.get_discoverable_node_types(),
+                path=TreePathIndex(),
+            )
         )
         return self
 
@@ -181,7 +175,7 @@ class IcoRuntimeTool(IcoRuntimeNode, ABC):
 
         for event_type in self.get_registration_event_types():
             if isinstance(event, event_type):
-                self.registry[event.node_id] = event
+                self.registry[event.node_path] = event
                 return True
 
         return False

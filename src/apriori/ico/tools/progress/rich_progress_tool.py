@@ -15,7 +15,7 @@ from apriori.ico.core.runtime.progress import (
     IcoProgressRegistrationEvent,
 )
 from apriori.ico.core.runtime.tool import (
-    IcoDiscovarableNode,
+    IcoDiscoverableNode,
     IcoRegistrationEvent,
     IcoRuntimeTool,
 )
@@ -34,7 +34,7 @@ class RichProgressTool(IcoRuntimeTool):
         self._progress = progress
         self._tasks = {}
 
-    def get_discoverable_node_types(self) -> set[type[IcoDiscovarableNode]]:
+    def get_discoverable_node_types(self) -> set[type[IcoDiscoverableNode]]:
         return {IcoProgress}
 
     def get_registration_event_types(self) -> set[type[IcoRegistrationEvent]]:
@@ -43,19 +43,19 @@ class RichProgressTool(IcoRuntimeTool):
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoProgressRegistrationEvent):
             node_task = self._progress.add_task(
-                description=event.node_name or f"Progress {event.node_id}",
+                description=event.node_name or f"Progress {event.node_path}",
                 total=event.total,
             )
-            self._tasks[event.node_id] = node_task
+            self._tasks[event.node_path] = node_task
 
             self._progress.print(
-                f"Discovered progress node {event.node_name} with total={event.total}, id={event.node_id}"
+                f"Discovered progress node {event.node_name} with total={event.total}, id={event.node_path}"
             )
             # Stop propagation after handling log event
             return None
 
         if isinstance(event, IcoProgressEvent):
-            task_id = self._tasks[event.node_id]
+            task_id = self._tasks[event.node_path]
             task = self._progress.tasks[task_id]
 
             if task.finished:
@@ -98,7 +98,7 @@ class WorkerFlow:
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.describe import describe
+    from apriori.ico.describe.describer import describe
 
     total = 10
 

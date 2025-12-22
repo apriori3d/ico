@@ -7,7 +7,6 @@ from typing import Generic
 from apriori.ico.core.operator import I, O
 from apriori.ico.core.runtime.channel.messages import (
     AcknowledgeMessage,
-    CommandAcknowledgeMessage,
     CommandMessage,
     DataMessage,
     EventMessage,
@@ -92,15 +91,13 @@ class IcoChannel(Generic[I, O], ABC):
         self._send(message)
         self._wait_for_ack(message.id)
 
-    def send_command(self, payload: IcoRuntimeCommand) -> IcoRuntimeCommand:
+    def send_command(self, payload: IcoRuntimeCommand) -> None:
         """Send a payload and wait for acknowledgment."""
         message = CommandMessage(self._message_id, payload)
         self._send(message)
 
         # Runtime command may be updated by peer runtime
-        next_command = self._wait_for_ack(message.id)
-        assert next_command is not None
-        return next_command
+        self._wait_for_ack(message.id)
 
     def send_event(self, payload: IcoRuntimeEvent) -> None:
         """Send a payload and wait for acknowledgment."""
@@ -112,7 +109,7 @@ class IcoChannel(Generic[I, O], ABC):
         self._message_id += 1
         self.sender.send(message)
 
-    def _wait_for_ack(self, pending_message_id: int) -> IcoRuntimeCommand | None:
+    def _wait_for_ack(self, pending_message_id: int) -> None:
         input_item = self.wait_for_message()
 
         if not isinstance(input_item, AcknowledgeMessage):
@@ -123,10 +120,6 @@ class IcoChannel(Generic[I, O], ABC):
             raise RuntimeError(
                 f"Unexpected ACK: expected {pending_message_id}, got {input_item.message_id}"
             )
-        if isinstance(input_item, CommandAcknowledgeMessage):
-            return input_item.command
-
-        return None
 
     def wait_for_item(self) -> O | None:
         message = self.wait_for_message()
@@ -185,17 +178,9 @@ class IcoChannel(Generic[I, O], ABC):
             return  # Ignore command, wait for actual data item
 
         if self.runtime_port is not None:
-            next_command = self.runtime_port.broadcast_command(message.command)
-        else:
-            next_command = message.command
+            self.runtime_port.broadcast_command(message.command)
 
-        self._send(
-            CommandAcknowledgeMessage(
-                self._message_id,
-                message_id=message.id,
-                command=next_command,
-            )
-        )
+        self._send(AcknowledgeMessage(self._message_id, message_id=message.id))
 
     def _handle_input_event(self, message: EventMessage) -> None:
         if not self.accept_events:

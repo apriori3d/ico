@@ -44,8 +44,3 @@ class EventMessage(RuntimeMessage):
 @dataclass(slots=True, frozen=True)
 class AcknowledgeMessage(RuntimeMessage):
     message_id: int
-
-
-@dataclass(slots=True, frozen=True)
-class CommandAcknowledgeMessage(AcknowledgeMessage):
-    command: IcoRuntimeCommand
