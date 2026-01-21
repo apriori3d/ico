@@ -11,11 +11,11 @@ from apriori.ico.core.runtime.command import (
     IcoPauseCommand,
     IcoResumeCommand,
 )
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.event import (
     IcoHearbeatEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
+from apriori.ico.core.runtime.shell import IcoShell
 from apriori.ico.runtime.agent.mp.mp_agent import (
     MPAgent,
 )
@@ -118,7 +118,7 @@ def test_agent_command_propagation() -> None:
     end_runtime = RecordingRuntimeNode()
 
     mp_process = MPAgent(op_identity)
-    mp_process.connect_runtime(end_runtime)
+    mp_process.add_runtime_children(end_runtime)
 
     # channel is a parent runtime of the agent host runtime
     mp_process.activate().pause().resume().deactivate()
@@ -142,7 +142,7 @@ def test_agent_event_propagation() -> None:
 
     main_runtime = RecordingRuntimeNode()
     mp_process = MPAgent(op_identity)
-    main_runtime.connect_runtime(mp_process)
+    main_runtime.add_runtime_children(mp_process)
 
     main_runtime.activate()
     # flow = host.channel.send | host.channel.receive
@@ -176,7 +176,7 @@ def test_agent_mp_process_end_to_end() -> None:
 
     flow = src | MPAgent(op_double) | dst
 
-    runtime = IcoRuntimeContour(flow)
+    runtime = IcoShell(flow)
     runtime.activate().run().deactivate()
 
     assert collected == ["Received 14"]

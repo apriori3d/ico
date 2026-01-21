@@ -12,7 +12,6 @@ from apriori.ico.core.runtime.command import (
     IcoDeactivateCommand,
     IcoRuntimeCommand,
 )
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRuntimeNode
@@ -97,7 +96,7 @@ class IcoAgent(
         self.subflow_factory = subflow_factory
 
     @abstractmethod
-    def worker_factory(self) -> IcoAgentWorker[I, O]: ...
+    def worker_factory(self) -> Callable[[], IcoAgentWorker[I, O]]: ...
 
     @abstractmethod
     def _activate_worker(self) -> None: ...
@@ -173,7 +172,7 @@ class IcoAgent(
 
 class IcoAgentWorker(
     Generic[I, O],
-    IcoRuntimeContour[I, O],
+    IcoRuntimeNode[I, O],
     ABC,
 ):
     channel: IcoChannel[O, I]
@@ -188,7 +187,7 @@ class IcoAgentWorker(
         state_model: BaseStateModel | None = None,
         name: str | None = None,
     ) -> None:
-        IcoRuntimeContour.__init__(  # pyright: ignore[reportUnknownMemberType]
+        IcoRuntimeNode.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             flow_factory(),
             name=name,
@@ -242,7 +241,7 @@ class IcoAgentWorker(
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
                 self.state_model.fault()
-                self.bubble_event(IcoFaultEvent.exception(e))
+                self.bubble_event(IcoFaultEvent.create(e))
                 continue
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:

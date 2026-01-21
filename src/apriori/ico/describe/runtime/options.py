@@ -4,7 +4,6 @@ from typing import Literal, TypeAlias
 
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.progress import IcoProgress
 from apriori.ico.describe.options import RendererOptions
@@ -23,10 +22,6 @@ class RuntimeRendererOptions(RendererOptions):
     renderers_paths: list[str] = field(
         default_factory=lambda: ["apriori.ico.describe.runtime.rich_renderer.node"]
     )
-    dim_ico_nodes: bool = False
-    expand_subflows: bool = True
-    expand_subflow_factories: bool = True
-    show_node_icons: bool = True
 
     node_icons: dict[type[IcoNode | IcoRuntimeNode], str] = field(
         default_factory=lambda: OrderedDict(
@@ -37,7 +32,7 @@ class RuntimeRendererOptions(RendererOptions):
                 IcoPrinter: "🖨️ ",
                 IcoAgent: "👷",
                 IcoAgentWorker: "🤖",
-                IcoRuntimeContour: "🏃",
+                IcoRuntimeNode: "🏃",
             }
         )
     )

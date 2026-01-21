@@ -13,7 +13,6 @@ from apriori.ico.core.meta.meta import IcoNodeMeta, IcoRuntimeNodeMeta
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import operator
 from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
@@ -447,7 +446,7 @@ if __name__ == "__main__":
     full_flow = data_stream | train_stream | save_result
     full_flow.name = "Example flow"
 
-    runtime = IcoRuntimeContour(full_flow, name="full_flow_runtime")
+    runtime = IcoRuntimeNode(full_flow, name="full_flow_runtime")
     runtime.activate()
 
     # ──── 6. Visualize ────

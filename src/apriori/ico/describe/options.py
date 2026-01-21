@@ -14,5 +14,4 @@ class RendererOptions:
     backend: RenderBackend = "RichText"
     dim_ico_nodes: bool = False
     expand_subflows: bool = True
-    expand_subflow_factories: bool = True
     show_node_icons: bool = True

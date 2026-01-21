@@ -45,4 +45,4 @@ def discover_and_connect_runtime_nodes(
 ) -> None:
     """Discover and connect all runtime hosts within the given flow."""
     for nested_runtime in discover_runtime_subtrees(flow):
-        runtime.connect_runtime(nested_runtime)
+        runtime.add_runtime_children(nested_runtime)

@@ -7,7 +7,6 @@ from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
-from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.event import (
     IcoFaultEvent,
 )
@@ -50,19 +49,21 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     # ─── Agent process management ───
 
-    def worker_factory(self) -> IcoAgentWorker[I, O]:
-        channel = MPChannel[I, O](
-            mp_context=self._mp_context,
-            runtime_port=self,
-            accept_commands=False,
-            accept_events=True,
-            strict_accept=True,
-        )
-        return IcoAgentWorker[I, O](
-            channel=channel.invert(),  # Invert channel for worker
-            flow_factory=self.subflow_factory,
-            name=self.name,
-        )
+    def worker_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
+        assert self.channel is not None
+
+        worker_channel = self.channel.invert()  # Invert channel for worker
+        flow_factory = self.subflow_factory
+        name = self.name
+
+        def _create_worker():
+            return IcoAgentWorker[I, O](
+                channel=worker_channel,
+                flow_factory=flow_factory,
+                name=name,
+            )
+
+        return _create_worker
 
     def _activate_worker(self) -> None:
         self.channel = MPChannel[I, O](
@@ -99,7 +100,7 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
                     )
         except Exception as e:
             self._print(f"❌ Error while stopping agent {self}: {e}")
-            self.bubble_event(IcoFaultEvent.exception(e))
+            self.bubble_event(IcoFaultEvent.create(e))
 
         finally:
             if self._agent_process.is_alive():
@@ -110,22 +111,16 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     def spawn_worker(self) -> SpawnProcess:
         process = self._mp_context.Process(
-            target=MPAgent[I, O]._worker_start_fn,
-            args=(self.channel, self.subflow_factory, self.name),
+            target=MPAgent[I, O]._start_worker_process,
+            args=(self.worker_factory(),),
         )
         process.start()
         return process
 
     @staticmethod
-    def _worker_start_fn(
-        channel: IcoChannel[I, O],
-        flow_factory: Callable[[], IcoOperator[I, O]],
-        name: str | None = None,
+    def _start_worker_process(
+        worker_factory: Callable[[], IcoAgentWorker[I, O]],
     ) -> None:
-        worker = IcoAgentWorker[I, O](
-            channel=channel.invert(),  # Invert channel for worker
-            flow_factory=flow_factory,
-            name=name,
-        )
+        worker = worker_factory()
         # Run agent to start receiving and processing commands and items
         worker.run_loop()

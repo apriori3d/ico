@@ -30,12 +30,8 @@ class IcoNode:
     # Describe util interface
     # ────────────────────────────────────────────────
 
-    def describe(
-        self,
-        *,
-        show_runtime_nodes: bool = False,
-    ) -> None:
-        from apriori.ico.describe.describe import describe
+    def describe(self) -> None:
+        from apriori.ico.describe.describer import describe
 
         describe(self)
 

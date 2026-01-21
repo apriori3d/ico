@@ -1,51 +1,25 @@
 from __future__ import annotations
 
 import traceback
-from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum, auto
-from typing import NamedTuple, TypeAlias, final
+from typing import final
 
-# ──── Event types for runtime signaling ────
-
-
-class IcoRuntimeEventType(Enum):
-    fault = auto()
-    heartbeat = auto()
-    tool = auto()
-    print = auto()
-    log = auto()
-    progress = auto()
-
-
-# ───── Define payload types ─────
-
-
-class PrintEventMeta(NamedTuple):
-    message: str
-
-
-class ProgressEventMeta(NamedTuple):
-    total: int
-    advance: int
-
-
-# Union of all possible meta payloads
-RuntimeEventMeta: TypeAlias = PrintEventMeta | ProgressEventMeta | Mapping[str, object]
-
+from apriori.ico.core.tree_utils import TreePathIndex
 
 # ───── Event class ─────
 
 
 @dataclass(slots=True, frozen=True)
 class IcoRuntimeEvent:
-    pass
+    trace: TreePathIndex
 
 
 @final
 @dataclass(slots=True, frozen=True)
 class IcoHearbeatEvent(IcoRuntimeEvent):
-    pass
+    @staticmethod
+    def create() -> IcoHearbeatEvent:
+        return IcoHearbeatEvent(trace=TreePathIndex())
 
 
 @final
@@ -54,7 +28,7 @@ class IcoFaultEvent(IcoRuntimeEvent):
     info: dict[str, object]
 
     @staticmethod
-    def exception(e: Exception) -> IcoFaultEvent:
+    def create(e: Exception) -> IcoFaultEvent:
         # Extract exception metadata
         exc_type = type(e)
         tb = e.__traceback__
@@ -66,4 +40,4 @@ class IcoFaultEvent(IcoRuntimeEvent):
             "traceback": traceback.format_exception(exc_type, e, tb),
         }
 
-        return IcoFaultEvent(info=info)
+        return IcoFaultEvent(info=info, trace=TreePathIndex())

@@ -60,16 +60,16 @@ def recording_agent(
                 channel.send(report)
             elif item == "error":
                 channel.send_event(
-                    IcoFaultEvent.exception(IcoRuntimeError("Simulated agent error"))
+                    IcoFaultEvent.create(IcoRuntimeError("Simulated agent error"))
                 )
             else:
                 channel.send_event(
-                    IcoFaultEvent.exception(IcoRuntimeError("Unknown command"))
+                    IcoFaultEvent.create(IcoRuntimeError("Unknown command"))
                 )
 
             run_num += 1
         except Exception as e:
-            channel.send_event(IcoFaultEvent.exception(e))
+            channel.send_event(IcoFaultEvent.create(e))
 
 
 # ───────────────────────────────────────────────
@@ -109,7 +109,7 @@ def test_runtime_flow_propagation() -> None:
     process.start()
     time.sleep(0.05)
     mp_process_mock = MPProcessMock(channel)
-    host_runtime.connect_runtime(mp_process_mock)
+    host_runtime.add_runtime_children(mp_process_mock)
 
     try:
         # Send commands to remote agent

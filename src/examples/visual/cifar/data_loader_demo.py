@@ -63,7 +63,7 @@ if __name__ == "__main__":
     parallel_data_flow = data_input_flow | async_stream
     parallel_data_flow.name = "Parallel Data Flow with Augmentation"
 
-    runtime = parallel_data_flow.runtime()
+    runtime = parallel_data_flow.shell()
     runtime.activate()
     parallel_data_flow.describe()
 
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     parallel_data_flow_indices = input_flow_indices | async_stream
     parallel_data_flow_indices.name = "Parallel Data Flow with Augmentation by Indices"
 
-    runtime = parallel_data_flow_indices.runtime()
+    runtime = parallel_data_flow_indices.shell()
     runtime.activate()
     parallel_data_flow_indices.describe()
 

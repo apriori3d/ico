@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Generic, Literal, TypeVar, final
 
@@ -8,88 +8,139 @@ from typing import Generic, Literal, TypeVar, final
 @final
 @dataclass(slots=True, frozen=True)
 class TreePathIndex:
-    path: tuple[int, ...] = ()
+    path_index: tuple[int, ...] = ()
 
-    def child(self, index: int) -> TreePathIndex:
-        return TreePathIndex(path=self.path + (index,))
+    def add_child(self, index: int) -> TreePathIndex:
+        return TreePathIndex(path_index=self.path_index + (index,))
+
+    def reverse(self) -> TreePathIndex:
+        return TreePathIndex(path_index=self.path_index[::-1])
 
     def __str__(self) -> str:
-        return ".".join(map(str, self.path))
+        return ".".join(map(str, self.path_index))
 
 
 T = TypeVar("T")
-TraversalOrder = Literal["pre", "post"]
+C = TypeVar("C")
+TraversalOrder = Literal["pre", "post", "pre_post"]
+
+
+@dataclass(slots=True)
+class TraversalInfo(Generic[T, C]):
+    node: T
+    path: TreePathIndex
+    total_siblings: int
+    current_order: TraversalOrder = "pre"
+    context: C | None = None
+
+    @property
+    def is_last(self) -> bool:
+        if self.is_root:
+            return False
+        return self.path.path_index[-1] == self.total_siblings - 1
+
+    @property
+    def is_root(self) -> bool:
+        return len(self.path.path_index) == 0
+
+    @property
+    def node_path(self) -> tuple[T, TreePathIndex]:
+        return (self.node, self.path)
 
 
 @final
-class TreeTraversal(Generic[T]):
-    """
-    Depth-first traversal of a hierarchical tree structure.
+class TreeWalker(Generic[T, C]):
+    __slots__ = (
+        "get_children_fn",
+        "get_lazy_subtree_fn",
+        "initial_context",
+    )
 
-    Supports pre-order and post-order traversal via either:
-    - direct visiting (`__call__`)
-    - iteration (`iterate()`)
-
-    Example:
-        traverser = HirachyTraverse(children=get_children, visit=print, order="pre")
-        traverser(root)
-    """
-
-    __slots__ = ("stack", "children", "visit", "order")
-
-    children: Callable[[T], list[T]]
-    visit: Callable[[T], None]
-    order: TraversalOrder
-    stack: list[T]
+    get_children_fn: Callable[[T], Sequence[T]]
+    get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None
+    initial_context: C | None
 
     def __init__(
         self,
-        children: Callable[[T], list[T]],
-        visit: Callable[[T], None],
+        get_children_fn: Callable[[T], Sequence[T]],
+        get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None = None,
+        filter_fn: Callable[[T], bool] | None = None,
+        initial_context: C | None = None,
+    ) -> None:
+        self.get_children_fn = get_children_fn
+        self.get_lazy_subtree_fn = get_lazy_subtree_fn
+        self.initial_context = initial_context
+
+    def walk(
+        self,
+        root: T,
+        visit_fn: Callable[[TraversalInfo[T, C]], None],
         order: TraversalOrder = "pre",
     ) -> None:
-        self.children = children
-        self.visit = visit
-        self.order = order
+        for node_info in self.traverse(root, order=order):
+            visit_fn(node_info)
 
-    def __call__(self, root: T) -> None:
-        match self.order:
-            case "pre":
-                self._visit_dfs_pre(root)
-            case "post":
-                self._visit_dfs_post(root)
-            case _:
-                raise ValueError(f"Unsupported traversal order: {self.order}")
+    def iterate(self, root: T, order: TraversalOrder = "pre") -> Iterator[T]:
+        for node_info in self.traverse(root, order=order):
+            yield node_info.node
 
-    def _visit_dfs_pre(self, node: T) -> None:
-        self.visit(node)
+    def traverse(
+        self, root: T, order: TraversalOrder = "pre"
+    ) -> Iterator[TraversalInfo[T, C]]:
+        if order in ["pre", "post", "pre_post"]:
+            yield from self._traverse_dfs(root, order=order)
 
-        for child in self.children(node):
-            self._visit_dfs_pre(child)
+        raise ValueError(f"Unsupported traversal order: {order}")
 
-    def _visit_dfs_post(self, node: T) -> None:
-        for child in self.children(node):
-            self._visit_dfs_post(child)
+    def _traverse_dfs(
+        self, root: T, order: TraversalOrder
+    ) -> Iterator[TraversalInfo[T, C]]:
+        stack = [TraversalInfo[T, C](root, TreePathIndex(), 0)]
 
-        self.visit(node)
+        while len(stack) > 0:
+            node_info = stack[-1]
 
-    def iterate(self, node: T) -> Iterator[T]:
-        match self.order:
-            case "pre":
-                yield from self.iterate_pre(node)
-            case "post":
-                yield from self.iterate_post(node)
-            case _:
-                raise ValueError(f"Unsupported traversal order: {self.order}")
+            if node_info.current_order == "post":
+                assert order in ["post", "pre_post"]
+                # This is second visit in post-order traversal - pop the node from the stack
+                yield stack.pop()
+                continue
 
-    def iterate_pre(self, node: T) -> Iterator[T]:
-        yield node
+            match order:
+                case "pre":
+                    # This is the first visit of the node in pre-order traversal -
+                    # pop the node from stack
+                    yield stack.pop()
 
-        for child in self.children(node):
-            yield from self.iterate_pre(child)
+                case "pre_post":
+                    # This is the first visit in pre_post-order traversal -
+                    # yield node and mark for post-visit. Do not pop for post-visit yet.
+                    yield node_info
+                    node_info.current_order = "post"
 
-    def iterate_post(self, node: T) -> Iterator[T]:
-        for child in self.children(node):
-            yield from self.iterate_post(child)
+                case "post":
+                    # Mark for post-visit
+                    node_info.current_order = "post"
 
-        yield node
+            # Get children and push then to the stack in reverse order
+            children = self._get_all_children(node_info.node)
+            total = len(children)
+            stack += [
+                TraversalInfo(
+                    node=child,
+                    path=node_info.path.add_child(i),
+                    total_siblings=total,
+                    context=self.initial_context,
+                )
+                for i, child in enumerate(children[::-1])
+            ]
+
+    def _get_all_children(self, node: T) -> list[T]:
+        children = list(self.get_children_fn(node))
+        children += self._get_lazy_subtree(node)
+        return children
+
+    def _get_lazy_subtree(self, node: T) -> Sequence[T]:
+        if self.get_lazy_subtree_fn is None:
+            return []
+        return self.get_lazy_subtree_fn(node) or []

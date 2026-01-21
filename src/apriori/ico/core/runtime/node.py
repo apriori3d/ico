@@ -3,56 +3,19 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Iterator, Sequence
 from dataclasses import replace
-from enum import Enum, auto
+from typing import TypeAlias, cast
 
 from typing_extensions import Self
 
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
-    IcoPauseCommand,
-    IcoResetCommand,
-    IcoResumeCommand,
     IcoRunCommand,
     IcoRuntimeCommand,
 )
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.state import BaseStateModel, IcoRuntimeState
-
-# ────────────────────────────────────────────────
-# State of runtime node
-# ────────────────────────────────────────────────
-
-
-class IcoRuntimeStateOld(Enum):
-    """
-    Current runtime state of an agent and connected contour.
-
-    States:
-        • inactive - Operator uninitialized or fully released
-        • ready    - Initialized and ready to run
-        • running  - Currently executing or active
-        • paused   - Temporarily suspended, resources preserved
-        • error    - Faulted state after unrecoverable failure
-    """
-
-    inactive = auto()
-    ready = auto()
-    waiting = auto()
-    running = auto()
-    sending = auto()
-    paused = auto()
-    fault = auto()
-
-
-DEFAULT_COMMAND_TO_STATE = {
-    IcoActivateCommand: IcoRuntimeStateOld.ready,
-    IcoResetCommand: IcoRuntimeStateOld.ready,
-    IcoDeactivateCommand: IcoRuntimeStateOld.inactive,
-    IcoPauseCommand: IcoRuntimeStateOld.paused,
-    IcoResumeCommand: IcoRuntimeStateOld.ready,
-}
-
+from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
 
 # ────────────────────────────────────────────────
 # Runtime node
@@ -114,7 +77,7 @@ class IcoRuntimeNode(ABC):
     # Commands
     # ────────────────────────────────────────────────
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
+    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
         """
         Handle a single runtime command.
 
@@ -122,39 +85,19 @@ class IcoRuntimeNode(ABC):
         (e.g., resource allocation, reset hooks, or teardown logic).
         """
         self.state_model.update(command)
+        return command
+
+    def _on_broadcast_visit(self, node_info: BroadcastTraversalInfo) -> None:
+        assert node_info.context is not None
+        self.on_command(node_info.context)
 
     def broadcast_command(self, command: IcoRuntimeCommand) -> None:
-        match type(command).broadcast_order:
-            case "pre":
-                self._traverse_tree_pre_order(command)
-            case "post":
-                self._traverse_tree_post_order(command)
-            case _:
-                raise ValueError(
-                    f"Unknown broadcast order '{type(command).broadcast_order}'"
-                )
-
-    def _traverse_tree_pre_order(self, command: IcoRuntimeCommand) -> None:
-        """
-        Recursively propagate a runtime command through the operator tree.
-        """
-        self.on_command(command)
-
-        for i, child in enumerate(self._runtime_children):
-            child_command = replace(command, path=command.path.child(i))
-            child.broadcast_command(child_command)
-
-    def _traverse_tree_post_order(self, command: IcoRuntimeCommand) -> None:
-        """
-        Recursively propagate a runtime command through the operator tree.
-        Use post-order traversal to ensure children receive commands before parents.
-        Applicable for deactivation and teardown sequences.
-        """
-        for i, child in enumerate(self._runtime_children):
-            child_command = replace(command, path=command.path.child(i))
-            child.broadcast_command(child_command)
-
-        self.on_command(command)
+        walker = create_broadcast_walker(command)
+        walker.walk(
+            self,
+            visit_fn=self._on_broadcast_visit,
+            order=command.broadcast_order,
+        )
 
     # ────────────────────────────────────────────────
     # Events
@@ -169,35 +112,40 @@ class IcoRuntimeNode(ABC):
         """
         return event
 
-    def bubble_event(self, event: IcoRuntimeEvent) -> None:
+    def bubble_event(
+        self, event: IcoRuntimeEvent, from_child: IcoRuntimeNode
+    ) -> IcoRuntimeEvent | None:
         """
         Propagate a runtime event upward until a contour or agent host is reached.
         """
-        # If event is handled and should not propagate further, stop here
-        next_event = self.on_event(event)
 
-        if next_event is None:
-            return
+        child_index = self._runtime_children.index(from_child)
+        event = replace(event, trace=event.trace.add_child(child_index))
+
+        # If event is handled and should not propagate further, stop here
+        if not self.on_event(event):
+            return None
 
         if self._runtime_parent:
-            self._runtime_parent.bubble_event(next_event)
+            self._runtime_parent.bubble_event(event, from_child=self)
 
     # ────────────────────────────────────────────────
     # Runtime Tree Management
     # ────────────────────────────────────────────────
 
-    def connect_runtime(self, runtime: IcoRuntimeNode) -> Self:
+    def add_runtime_children(self, *children: IcoRuntimeNode) -> Self:
         """Connect to a runtime host for command propagation."""
-        if runtime not in self._runtime_children:
-            self._runtime_children.append(runtime)
-        runtime._runtime_parent = self
+        for child in children:
+            if child not in self._runtime_children:
+                self._runtime_children.append(child)
+            child._runtime_parent = self
         return self
 
-    def disconnect_runtime(self, runtime: IcoRuntimeNode) -> Self:
+    def remove_runtime_child(self, child: IcoRuntimeNode) -> Self:
         """Disconnect from a runtime host."""
-        if runtime in self._runtime_children:
-            self._runtime_children.remove(runtime)
-        runtime._runtime_parent = None
+        if child in self._runtime_children:
+            self._runtime_children.remove(child)
+        child._runtime_parent = None
         return self
 
     # ────────────────────────────────────────────────
@@ -206,17 +154,17 @@ class IcoRuntimeNode(ABC):
 
     def activate(self) -> Self:
         """Broadcast 'activate' event through the entire flow."""
-        self.broadcast_command(IcoActivateCommand())
+        self.broadcast_command(IcoActivateCommand.create())
         return self
 
     def run(self) -> Self:
         """Broadcast 'run' event through the entire flow."""
-        self.broadcast_command(IcoRunCommand())
+        self.broadcast_command(IcoRunCommand.create())
         return self
 
     def deactivate(self) -> Self:
         """Broadcast 'deactivate' event through the entire flow."""
-        self.broadcast_command(IcoDeactivateCommand())
+        self.broadcast_command(IcoDeactivateCommand.create())
         return self
 
     # ────────────────────────────────────────────────
@@ -227,15 +175,6 @@ class IcoRuntimeNode(ABC):
         from apriori.ico.describe.describer import describe as describe_util
 
         describe_util(self)
-
-    # ────────────────────────────────────────────────
-    # Tools
-    # ────────────────────────────────────────────────
-
-    def add_tool(self, tool: IcoRuntimeNode) -> IcoRuntimeNode:
-        """Attach a runtime tool to this node."""
-        tool.connect_runtime(self)
-        return tool
 
     # ────────────────────────────────────────────────
     # Hirarchy Iteration
@@ -254,3 +193,45 @@ class IcoRuntimeNode(ABC):
 
         yield self.runtime_parent
         yield from self.runtime_parent.iterate_parents()
+
+
+# ────────────────────────────────────────────────
+# Tree walker api
+# ────────────────────────────────────────────────
+
+
+BroadcastTreeWalker: TypeAlias = TreeWalker[IcoRuntimeNode, IcoRuntimeCommand]
+BroadcastTraversalInfo: TypeAlias = TraversalInfo[IcoRuntimeNode, IcoRuntimeCommand]
+
+
+def create_broadcast_walker(
+    command: IcoRuntimeCommand,
+) -> BroadcastTreeWalker:
+    return BroadcastTreeWalker(
+        get_children_fn=lambda node: node.runtime_children,
+        initial_context=command,
+    )
+
+
+RuntimeTreeWalker: TypeAlias = TreeWalker[IcoRuntimeNode, None]
+RuntimeTraversalInfo: TypeAlias = TraversalInfo[IcoRuntimeNode, None]
+
+
+def create_runtime_tree_walker(
+    *,
+    include_agent_worker: bool = True,
+) -> RuntimeTreeWalker:
+    """Get a tree walker for ICO runtime nodes."""
+    return RuntimeTreeWalker(
+        get_children_fn=lambda node: node.runtime_children,
+        get_lazy_subtree_fn=_create_worker_node if include_agent_worker else None,
+    )
+
+
+def _create_worker_node(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode] | None:
+    from apriori.ico.core.runtime.agent import IcoAgent
+
+    if isinstance(node, IcoAgent):
+        worker = cast(IcoRuntimeNode, node.worker_factory())
+        return [worker]
+    return None

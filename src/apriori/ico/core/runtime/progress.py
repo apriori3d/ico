@@ -1,31 +1,25 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Generic, final
 
 from apriori.ico.core.operator import I
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.monitor import IcoMonitor
-from apriori.ico.core.runtime.tool import IcoDiscoverableNode, IcoRegistrationEvent
 from apriori.ico.core.tree_utils import TreePathIndex
 
 
 @final
 @dataclass(slots=True, frozen=True)
-class IcoProgressRegistrationEvent(IcoRegistrationEvent):
-    total: float
-
-
-@final
-@dataclass(slots=True, frozen=True)
 class IcoProgressEvent(IcoRuntimeEvent):
-    node_path: TreePathIndex
     advance: float
 
+    @staticmethod
+    def create(advance: float = 1) -> IcoProgressEvent:
+        return IcoProgressEvent(trace=TreePathIndex(), advance=advance)
 
-class IcoProgress(
-    Generic[I],
-    IcoMonitor[I],
-    IcoDiscoverableNode,
-):
+
+class IcoProgress(Generic[I], IcoMonitor[I]):
     __slots__ = ("total",)
 
     total: float
@@ -39,26 +33,12 @@ class IcoProgress(
         IcoMonitor.__init__(  # pyright: ignore[reportUnknownMemberType]
             self, name=name
         )
-        IcoDiscoverableNode.__init__(self, runtime_name=name)
         self.total = total
 
     def _before_call(self, item: I) -> None:
-        assert self.registered_id is not None
-        self.state_model.running()
-        self.bubble_event(IcoProgressEvent(node_path=self.registered_id, advance=1))
+        super()._before_call(item)
+
+        self.bubble_event(IcoProgressEvent.create(advance=1), from_child=self)
 
     def _after_call(self, item: I) -> None:
         self.state_model.ready()
-
-    def _register_node(self):
-        """Implement discovery contract"""
-        assert self.registered_id is not None
-
-        self.bubble_event(
-            IcoProgressRegistrationEvent(
-                node_type=type(self),
-                node_name=self.runtime_name,
-                node_path=self.registered_id,
-                total=self.total,
-            )
-        )

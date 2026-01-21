@@ -1,11 +1,14 @@
-from typing import Any, TypeAlias, cast
+from typing import TypeAlias
 
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
 from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.tree_walker import (
+    RuntimeTraversalInfo,
+    create_runtime_tree_walker,
+)
 from apriori.ico.describe.rich_style import DescribeStyle
 from apriori.ico.describe.runtime.options import RuntimeRendererOptions
 from apriori.ico.describe.runtime.rich_renderer.custom_renderer import (
@@ -56,7 +59,15 @@ class RuntimeTreeRenderer:
     def render(self, root: IcoRuntimeNode) -> None:
         self._table = self._create_table()
 
-        self.render_node(root)
+        tree_walker = create_runtime_tree_walker(
+            include_agent_worker=self.options.expand_subflows
+        )
+        tree_walker.walk(
+            root,
+            visit_fn=self.render_node,
+            order="pre_post",  # Need post order to close subtree groups
+        )
+
         self.console.rule(f"[bold blue]Runtime tree: {root}", style="dim blue")
         self.console.print(self._table)
 
@@ -79,48 +90,37 @@ class RuntimeTreeRenderer:
 
         return renderer
 
-    def render_node(
-        self,
-        node: IcoRuntimeNode,
-        is_last: bool | None = None,
-    ) -> None:
-        if is_last is None:
-            branch = None
-        else:
-            branch = Text("└──" if is_last else "├──", style=DescribeStyle.tree.value)
+    def render_node(self, node_info: RuntimeTraversalInfo) -> None:
+        node = node_info.node
 
-        renderer = self._select_renderer(node)
+        if node_info.current_order == "pre":
+            renderer = self._select_renderer(node)
 
-        # Custom rendering logic
-        if isinstance(renderer, RuntimeCustomRenderer):
-            renderer.render(self, node)
-            return
+            # Custom rendering logic
+            if isinstance(renderer, RuntimeCustomRenderer):
+                renderer.render(self, node)
+                return
 
-        self.render_row(renderer, node, indent=branch)
+            if node_info.is_root:
+                branch = None
+            else:
+                branch = Text(
+                    "└──" if node_info.is_last else "├──",
+                    style=DescribeStyle.tree.value,
+                )
 
-        runtime_children = node.runtime_children.copy()
+            self.render_row(renderer, node, indent=branch)
 
-        # Add runtime nodes from subflow if applicable
-        if isinstance(node, IcoAgent) and self.options.expand_subflows:
-            worker = cast(IcoAgentWorker[Any, Any], node.worker_factory())
-            runtime_children.append(worker)
+            # Open subtree group for children.
+            if not node_info.is_root:
+                indent = Text(
+                    "    " if node_info.is_last else "│   ",
+                    style=DescribeStyle.tree.value,
+                )
+                self.push_group_indent(indent)
 
-        self._render_subtree(runtime_children, is_last=is_last)
-
-    def _render_subtree(
-        self,
-        children: list[IcoRuntimeNode],
-        is_last: bool | None = None,
-    ) -> None:
-        if is_last is not None:
-            indent = Text("    " if is_last else "│   ", style=DescribeStyle.tree.value)
-            self.push_group_indent(indent)
-
-        for i, child in enumerate(children):
-            is_last_child = i == len(children) - 1
-            self.render_node(child, is_last=is_last_child)
-
-        if is_last is not None:
+        elif node_info.current_order == "post" and not node_info.is_root:
+            # Close the subtree group
             self.pop_group_indent()
 
     def push_group_indent(self, indent: Text) -> None:

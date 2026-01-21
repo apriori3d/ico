@@ -36,19 +36,23 @@ class IcoRuntimeCommand:
     """
 
     broadcast_order: ClassVar[CommandBroadcastOrder] = "pre"
-    path: TreePathIndex  # = field(default_factory=TreePathIndex)
+    path: TreePathIndex
 
 
 @final
 @dataclass(slots=True, frozen=True)
 class IcoActivateCommand(IcoRuntimeCommand):
-    pass
+    @staticmethod
+    def create() -> IcoActivateCommand:
+        return IcoActivateCommand(path=TreePathIndex())
 
 
 @final
 @dataclass(slots=True, frozen=True)
 class IcoRunCommand(IcoRuntimeCommand):
-    pass
+    @staticmethod
+    def create() -> IcoActivateCommand:
+        return IcoActivateCommand(path=TreePathIndex())
 
 
 @final
@@ -56,26 +60,6 @@ class IcoRunCommand(IcoRuntimeCommand):
 class IcoDeactivateCommand(IcoRuntimeCommand):
     broadcast_order: ClassVar[CommandBroadcastOrder] = "post"
 
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoPauseCommand(IcoRuntimeCommand):
-    pass
-
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoResumeCommand(IcoRuntimeCommand):
-    pass
-
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoResetCommand(IcoRuntimeCommand):
-    pass
-
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoStopCommand(IcoRuntimeCommand):
-    pass
+    @staticmethod
+    def create() -> IcoDeactivateCommand:
+        return IcoDeactivateCommand(path=TreePathIndex())

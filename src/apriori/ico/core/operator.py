@@ -4,7 +4,6 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
@@ -113,11 +112,11 @@ class IcoOperator(Generic[I, O], IcoNode):
     # Runtime interface
     # ────────────────────────────────────────────────
 
-    def runtime(self) -> IcoRuntimeNode:
-        """Create a runtime contour for this operator."""
-        from apriori.ico.core.runtime.contour import IcoRuntimeContour
+    # def shell(self) -> IcoShell[I, O]:
+    #     """Create a runtime contour for this operator."""
+    #     from apriori.ico.core.runtime.shell import IcoShell
 
-        return IcoRuntimeContour(self)
+    #     return IcoShell(self)
 
 
 # ─────────────────────────────────────────────

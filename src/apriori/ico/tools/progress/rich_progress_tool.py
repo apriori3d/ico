@@ -1,6 +1,6 @@
 import time
 from collections.abc import Iterator
-from typing import final
+from typing import ClassVar, final
 
 from rich.progress import Progress, TaskID
 
@@ -9,15 +9,13 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
+from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.progress import (
     IcoProgress,
     IcoProgressEvent,
-    IcoProgressRegistrationEvent,
 )
-from apriori.ico.core.runtime.tool import (
-    IcoDiscoverableNode,
-    IcoRegistrationEvent,
-    IcoRuntimeTool,
+from apriori.ico.core.runtime.tools.tool_node import (
+    IcoTool,
 )
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
@@ -25,43 +23,27 @@ from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @final
-class RichProgressTool(IcoRuntimeTool):
-    _progress: Progress
+class RichProgressTool(IcoTool):
+    __slots__ = ("progress", "_tasks")
+    node_types: ClassVar[set[type[IcoRuntimeNode]]] = {IcoProgress}
+
+    progress: Progress
     _tasks: dict[int, TaskID]
 
     def __init__(self, progress: Progress):
-        IcoRuntimeTool.__init__(self)
-        self._progress = progress
+        IcoTool.__init__(self)
+        self.progress = progress
         self._tasks = {}
 
-    def get_discoverable_node_types(self) -> set[type[IcoDiscoverableNode]]:
-        return {IcoProgress}
-
-    def get_registration_event_types(self) -> set[type[IcoRegistrationEvent]]:
-        return {IcoProgressRegistrationEvent}
-
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        if isinstance(event, IcoProgressRegistrationEvent):
-            node_task = self._progress.add_task(
-                description=event.node_name or f"Progress {event.node_path}",
-                total=event.total,
-            )
-            self._tasks[event.node_path] = node_task
-
-            self._progress.print(
-                f"Discovered progress node {event.node_name} with total={event.total}, id={event.node_path}"
-            )
-            # Stop propagation after handling log event
-            return None
-
         if isinstance(event, IcoProgressEvent):
-            task_id = self._tasks[event.node_path]
-            task = self._progress.tasks[task_id]
+            task_id = self._tasks[event.trace.reverse()]
+            task = self.progress.tasks[task_id]
 
             if task.finished:
-                self._progress.reset(task_id)
+                self.progress.reset(task_id)
 
-            self._progress.advance(task_id, event.advance)
+            self.progress.advance(task_id, event.advance)
 
             # # Stop propagation after handling log event
             return None
@@ -127,9 +109,9 @@ if __name__ == "__main__":
 
         progress_tool = RichProgressTool(progress)
 
-        runtime = flow.runtime().add_tool(progress_tool)
-        # runtime.activate()
-        describe(runtime, console=console)
+        shell = flow.shell().add_tool(progress_tool)
+        shell.activate()
+        describe(shell, console=console)
 
         # progress_tool.discover()
         # describe(flow, console=console)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.contour import IcoRuntimeContour
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, IcoRuntimeStateOld
 
@@ -48,7 +47,7 @@ class RecordingRuntimeNode(IcoRuntimeNode):
         return super().on_event(event)
 
 
-class RecordingContour(IcoRuntimeContour):
+class RecordingContour(IcoRuntimeNode):
     recorded_commands: list[type[IcoRuntimeCommand]]
     recorded_events: list[type[IcoRuntimeEvent]]
     recorded_states: list[IcoRuntimeStateOld]
