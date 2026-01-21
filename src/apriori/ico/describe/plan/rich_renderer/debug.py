@@ -3,7 +3,6 @@ from collections.abc import Iterable, Iterator
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.runtime.shell import IcoShell
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
@@ -104,8 +103,8 @@ if __name__ == "__main__":
     full_flow = data_stream | train_stream | save_result
     full_flow.name = "Example flow"
 
-    runtime = IcoShell(full_flow, name="full_flow_runtime")
-    runtime.activate()
+    # runtime = IcoShell(full_flow, name="full_flow_runtime")
+    # runtime.activate()
 
     # ──── 6. Visualize ────
     renderer = PlanRenderer()

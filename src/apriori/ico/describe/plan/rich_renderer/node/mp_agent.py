@@ -20,7 +20,7 @@ class MPProcessRenderer(GroupRenderer):
             options=options,
             header_renderer=RowRenderer(
                 flow_column_prefix=Text("send to ", style=DescribeStyle.keyword.value),
-                options=replace(options, signature_format="Input"),
+                options=options,
             ),
             footer_renderer=RowRenderer(
                 flow_column_prefix=Text("receive", style=DescribeStyle.keyword.value),

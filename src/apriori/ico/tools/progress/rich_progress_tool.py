@@ -14,16 +14,13 @@ from apriori.ico.core.runtime.progress import (
     IcoProgress,
     IcoProgressEvent,
 )
-from apriori.ico.core.runtime.tools.tool_node import (
-    IcoTool,
-)
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @final
-class RichProgressTool(IcoTool):
+class RichProgressTool(IcoRuntimeNode):
     __slots__ = ("progress", "_tasks")
     node_types: ClassVar[set[type[IcoRuntimeNode]]] = {IcoProgress}
 

@@ -23,7 +23,7 @@ class IcoStreamRenderer(GroupRenderer):
                 flow_column_prefix=Text(
                     "for each in ", style=DescribeStyle.keyword.value
                 ),
-                options=replace(options, signature_format="Input"),
+                options=options,
             ),
             footer_renderer=StreamGroupPartRenderer(
                 flow_column_prefix=Text("yield", style=DescribeStyle.keyword.value),

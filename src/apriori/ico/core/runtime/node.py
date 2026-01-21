@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import replace
-from typing import TypeAlias, cast
+from typing import TypeAlias
 
-from typing_extensions import Self
+from typing_extensions import Protocol, Self, runtime_checkable
 
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
@@ -77,7 +77,7 @@ class IcoRuntimeNode(ABC):
     # Commands
     # ────────────────────────────────────────────────
 
-    def on_command(self, command: IcoRuntimeCommand) -> IcoRuntimeCommand:
+    def on_command(self, command: IcoRuntimeCommand) -> None:
         """
         Handle a single runtime command.
 
@@ -85,7 +85,6 @@ class IcoRuntimeNode(ABC):
         (e.g., resource allocation, reset hooks, or teardown logic).
         """
         self.state_model.update(command)
-        return command
 
     def _on_broadcast_visit(self, node_info: BroadcastTraversalInfo) -> None:
         assert node_info.context is not None
@@ -113,14 +112,16 @@ class IcoRuntimeNode(ABC):
         return event
 
     def bubble_event(
-        self, event: IcoRuntimeEvent, from_child: IcoRuntimeNode
+        self,
+        event: IcoRuntimeEvent,
+        from_child: IcoRuntimeNode | None = None,
     ) -> IcoRuntimeEvent | None:
         """
         Propagate a runtime event upward until a contour or agent host is reached.
         """
-
-        child_index = self._runtime_children.index(from_child)
-        event = replace(event, trace=event.trace.add_child(child_index))
+        if from_child is not None:
+            child_index = self._runtime_children.index(from_child)
+            event = replace(event, trace=event.trace.add_child(child_index))
 
         # If event is handled and should not propagate further, stop here
         if not self.on_event(event):
@@ -196,6 +197,16 @@ class IcoRuntimeNode(ABC):
 
 
 # ────────────────────────────────────────────────
+# Sub-tree factory protocol
+# ────────────────────────────────────────────────
+
+
+@runtime_checkable
+class HasSubTreeFactory(Protocol):
+    subtree_factory: Callable[[], IcoRuntimeNode]
+
+
+# ────────────────────────────────────────────────
 # Tree walker api
 # ────────────────────────────────────────────────
 
@@ -229,9 +240,6 @@ def create_runtime_tree_walker(
 
 
 def _create_worker_node(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode] | None:
-    from apriori.ico.core.runtime.agent import IcoAgent
-
-    if isinstance(node, IcoAgent):
-        worker = cast(IcoRuntimeNode, node.worker_factory())
-        return [worker]
+    if isinstance(node, HasSubTreeFactory):
+        return [node.subtree_factory()]
     return None

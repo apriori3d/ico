@@ -1,14 +1,13 @@
+from __future__ import annotations
+
 from typing import TypeAlias
 
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.tree_walker import (
-    FlowTraversalInfo,
-    FlowTreeWalkerContext,
-    create_flow_tree_walker,
+from apriori.ico.core.node import (
+    IcoNode,
 )
 from apriori.ico.describe.plan.options import (
     PlanRendererOptions,
@@ -16,6 +15,11 @@ from apriori.ico.describe.plan.options import (
 from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from apriori.ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
+)
+from apriori.ico.describe.plan.rich_renderer.render_target import (
+    PlanTraversalInfo,
+    PlanTreeWalkerContext,
+    create_plan_tree_walker,
 )
 from apriori.ico.describe.plan.rich_renderer.renderer_registry import (
     RendererRegistry,
@@ -63,8 +67,8 @@ class PlanRenderer:
     def render(self, root: IcoNode) -> None:
         self._table = self._create_table()
 
-        tree_walker = create_flow_tree_walker(
-            include_agent_subflows=self.options.expand_subflows
+        tree_walker = create_plan_tree_walker(
+            include_subflows=self.options.expand_subflows
         )
         tree_walker.walk(
             root,
@@ -75,10 +79,7 @@ class PlanRenderer:
         self.console.rule(f"[bold blue]Flow plan: {root}", style="dim blue")
         self.console.print(self._table)
 
-    def _select_renderer(
-        self,
-        node: IcoNode,
-    ) -> RendererTypes:
+    def _select_renderer(self, node: IcoNode) -> RendererTypes:
         renderer = self._selected_renderers.get(type(node))
         if renderer is not None:
             return renderer
@@ -97,7 +98,7 @@ class PlanRenderer:
         self._selected_renderers[type(node)] = renderer
         return renderer
 
-    def render_node(self, node_info: FlowTraversalInfo) -> None:
+    def render_node(self, node_info: PlanTraversalInfo) -> None:
         node = node_info.node
 
         if node_info.current_order == "pre":
@@ -112,6 +113,7 @@ class PlanRenderer:
             # Custom rendering logic (for IcoEpoch, etc)
             if isinstance(renderer, CustomRenderer):
                 renderer.render(self, node)
+                node_info.visit_children = False
                 return
 
             if isinstance(renderer, RowRenderer):
@@ -138,7 +140,7 @@ class PlanRenderer:
                 self.push_group_indent(Text("│   ", style=DescribeStyle.group.value))
 
                 # Set context to close group on post-order visit
-                node_info.context = FlowTreeWalkerContext(group_opened=True)
+                node_info.context = PlanTreeWalkerContext(group_opened=True)
 
         elif (
             node_info.current_order == "post"

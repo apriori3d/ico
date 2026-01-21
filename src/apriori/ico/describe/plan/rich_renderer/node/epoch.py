@@ -15,7 +15,10 @@ from apriori.ico.core.source import source
 from apriori.ico.describe.plan.options import PlanRendererOptions
 from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from apriori.ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
-from apriori.ico.describe.plan.rich_renderer.render_target import PlanRenderTarget
+from apriori.ico.describe.plan.rich_renderer.render_target import (
+    PlanRenderTarget,
+    create_plan_tree_walker,
+)
 from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from apriori.ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
@@ -30,11 +33,8 @@ class IcoEpochRenderer(CustomRenderer):
         super().__init__(options=options)
         self._row_renderer = RowRenderer(options=options)
 
-        source_header = Text("╭── ") + Text(
-            "for each in ", style=DescribeStyle.keyword.value
-        )
         self._source_header_renderer = StreamGroupPartRenderer(
-            flow_column_prefix=source_header,
+            flow_column_prefix=Text("for each in ", style=DescribeStyle.keyword.value),
             options=replace(options, signature_format="Output"),
             show_name_column=False,
             show_type_column=False,
@@ -68,26 +68,44 @@ class IcoEpochRenderer(CustomRenderer):
 
         plan.render_row(self._row_renderer, epoch)
 
-        plan.render_row(self._source_header_renderer, epoch.source)
+        # Use tree walker to render nested epoch elements
+        tree_walker = create_plan_tree_walker(
+            include_subflows=self.options.expand_subflows
+        )
 
+        # Render epoch source part
+        plan.render_row(
+            self._source_header_renderer,
+            epoch.source,
+            indent=Text("╭── ", style=DescribeStyle.group.value),
+        )
+
+        # Render source flow
         plan.push_group_indent(Text("│   "))
-        plan.render_node(epoch.source)
+
+        tree_walker.walk(
+            epoch.source,
+            visit_fn=plan.render_node,
+            order="pre_post",  # Need post order to close groups
+        )
+
+        # Clear group indent
         plan.pop_group_indent()
 
+        # Render context operator part
         plan.render_row(self._context_header_renderer, epoch.context_operator)
 
+        # Render context operator flow
         plan.push_group_indent(Text("│   "))
-        plan.render_node(epoch.context_operator)
+
+        tree_walker.walk(
+            epoch.context_operator,
+            visit_fn=plan.render_node,
+            order="pre_post",  # Need post order to close groups
+        )
         plan.pop_group_indent()
 
         plan.render_row(self._footer_renderer, epoch)
-
-
-class IcoAsyncStreamNodeRender(RowRenderer):
-    def _render_node_args_info(self, node: IcoNode) -> Text:
-        assert isinstance(node, IcoAsyncStream)
-        astream = cast(IcoAsyncStream[Any, Any], node)
-        return Text(f"pool_size={len(astream.pool)}", style=DescribeStyle.meta.value)
 
 
 @source()
@@ -136,11 +154,11 @@ if __name__ == "__main__":
     │   next_index()
     │   fetch_item()
     │   ...
-    │─▸ update context in IcoContextPipeline():
+    │─▸ apply
     │   train_step()
     │   logging_step()
     │   save_checkpoint_step()
-    ╰─▸ return
+    ╰─▸ emit
 
     """
     pool = [MPAgent(create_worker_flow) for _ in range(4)]

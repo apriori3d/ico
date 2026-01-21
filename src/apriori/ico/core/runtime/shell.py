@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Sequence
 
-from apriori.ico.core.node import IcoNode
+from apriori.ico.core.node import IcoNode, create_flow_tree_walker
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import (
@@ -11,7 +11,6 @@ from apriori.ico.core.runtime.node import (
 )
 from apriori.ico.core.runtime.state import BaseStateModel
 from apriori.ico.core.runtime.toolbox import IcoToolBox
-from apriori.ico.core.tree_walker import create_flow_tree_walker
 
 
 class IcoShell(IcoRuntimeNode):
@@ -122,7 +121,7 @@ def _discover_and_connect_runtime_nodes(
 def _discover_runtime_subtrees(flow: IcoNode) -> list[IcoRuntimeNode]:
     """Discover all runtime hosts within the given flow."""
     roots = OrderedDict[IcoRuntimeNode, None]()
-    walker = create_flow_tree_walker(include_agent_subflows=False)
+    walker = create_flow_tree_walker(visit_subflows=False)
 
     for node in walker.traverse(flow):
         if not isinstance(node, IcoRuntimeNode):

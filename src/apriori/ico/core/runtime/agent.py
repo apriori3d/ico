@@ -172,9 +172,10 @@ class IcoAgent(
 
 class IcoAgentWorker(
     Generic[I, O],
-    IcoRuntimeNode[I, O],
+    IcoRuntimeNode,
     ABC,
 ):
+    flow: IcoOperator[I, O]
     channel: IcoChannel[O, I]
 
     def __init__(
@@ -189,12 +190,12 @@ class IcoAgentWorker(
     ) -> None:
         IcoRuntimeNode.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
-            flow_factory(),
-            name=name,
+            runtime_name=name,
             runtime_parent=runtime_parent,
             runtime_children=runtime_children,
             state_model=state_model or AgentStateModel(),
         )
+        self.flow = flow_factory()
         self.channel = channel
 
         # Connect to runtime port to enable command and event handling for remote runtime
@@ -241,7 +242,7 @@ class IcoAgentWorker(
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
                 self.state_model.fault()
-                self.bubble_event(IcoFaultEvent.create(e))
+                self.bubble_event(IcoFaultEvent.create(e), from_child=self)
                 continue
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:

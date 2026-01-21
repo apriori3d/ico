@@ -30,7 +30,7 @@ class IcoProcessRenderer(GroupRenderer):
                 flow_column_prefix=Text(
                     "iterate in ", style=DescribeStyle.keyword.value
                 ),
-                options=replace(options, signature_format="Input"),
+                options=options,
             ),
             footer_renderer=RowRenderer(
                 flow_column_prefix=Text("emit", style=DescribeStyle.keyword.value),

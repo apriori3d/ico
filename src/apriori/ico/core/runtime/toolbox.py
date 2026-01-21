@@ -4,8 +4,7 @@ from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.tree_walker import create_runtime_tree_walker
+from apriori.ico.core.runtime.node import IcoRuntimeNode, create_runtime_tree_walker
 from apriori.ico.core.tree_utils import TreePathIndex
 
 

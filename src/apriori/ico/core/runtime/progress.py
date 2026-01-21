@@ -30,9 +30,7 @@ class IcoProgress(Generic[I], IcoMonitor[I]):
         *,
         name: str | None = None,
     ) -> None:
-        IcoMonitor.__init__(  # pyright: ignore[reportUnknownMemberType]
-            self, name=name
-        )
+        IcoMonitor.__init__(self, name=name)  # pyright: ignore[reportUnknownMemberType]
         self.total = total
 
     def _before_call(self, item: I) -> None:

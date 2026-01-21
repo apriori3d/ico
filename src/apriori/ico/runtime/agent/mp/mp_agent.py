@@ -13,14 +13,15 @@ from apriori.ico.core.runtime.event import (
 from apriori.ico.runtime.agent.mp.mp_channel import (
     MPChannel,
 )
-from apriori.ico.tools.printer.node import IcoPrinter
+
+# from apriori.ico.tools.printer.node import IcoPrinter
 
 
 @final
 class MPAgent(Generic[I, O], IcoAgent[I, O]):
     _agent_process: SpawnProcess | None
     _mp_context: SpawnContext
-    _print: IcoPrinter
+    # _print: IcoPrinter
 
     def __init__(
         self,
@@ -28,19 +29,19 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
         *,
         name: str | None = None,
     ) -> None:
-        printer = IcoPrinter()
+        # printer = IcoPrinter()
 
         IcoAgent.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             channel=None,
             subflow_factory=subflow_factory,
             name=name,
-            runtime_children=[printer],
+            # runtime_children=[printer],
         )
 
         self._mp_context = get_context("spawn")
         self._agent_process = None
-        self._print = printer
+        # self._print = printer
 
     @property
     def is_alive(self) -> bool:
@@ -91,22 +92,22 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
                 print(f"Process Agent {self} worker joined.")
 
                 # Check if worker exited properly
-                if self._agent_process.exitcode is None:
-                    self._print("⚠️ Worker did not exit (possibly stuck)")
+                # if self._agent_process.exitcode is None:
+                #     self._print("⚠️ Worker did not exit (possibly stuck)")
 
-                elif self._agent_process.exitcode != 0:
-                    self._print(
-                        f"⚠️ Process Agent {self} worker exited with code {self._agent_process.exitcode}."
-                    )
+                # elif self._agent_process.exitcode != 0:
+                #     self._print(
+                #         f"⚠️ Process Agent {self} worker exited with code {self._agent_process.exitcode}."
+                #     )
         except Exception as e:
-            self._print(f"❌ Error while stopping agent {self}: {e}")
+            # self._print(f"❌ Error while stopping agent {self}: {e}")
             self.bubble_event(IcoFaultEvent.create(e))
 
         finally:
             if self._agent_process.is_alive():
-                self._print(
-                    f"⚠️ Process Agent {self} did not terminate worker gracefully."
-                )
+                # self._print(
+                #     f"⚠️ Process Agent {self} did not terminate worker gracefully."
+                # )
                 self._agent_process.terminate()
 
     def spawn_worker(self) -> SpawnProcess:

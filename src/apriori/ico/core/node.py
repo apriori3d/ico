@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from typing import (
+    Protocol,
+    TypeAlias,
+)
+
+from typing_extensions import runtime_checkable
+
+from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
 
 
 class IcoNode:
@@ -34,6 +42,49 @@ class IcoNode:
         from apriori.ico.describe.describer import describe
 
         describe(self)
+
+
+# ────────────────────────────────────────────────
+# Sub-flow factory protocol
+# ────────────────────────────────────────────────
+
+
+@runtime_checkable
+class HasSubflowFactory(Protocol):
+    subflow_factory: Callable[[], IcoNode]
+
+
+# ────────────────────────────────────────────────
+# Tree walker api
+# ────────────────────────────────────────────────
+
+
+FlowTreeWalker: TypeAlias = TreeWalker[IcoNode, None]
+FlowTraversalInfo: TypeAlias = TraversalInfo[IcoNode, None]
+
+
+def create_flow_tree_walker(
+    *,
+    visit_subflows: bool = True,
+) -> FlowTreeWalker:
+    """Get a tree walker for ICO runtime nodes."""
+    return FlowTreeWalker(
+        get_children_fn=lambda node: node.children,
+        get_lazy_subtree_fn=_create_node_subflow if visit_subflows else None,
+        subtree_policy="children_or_subtree",
+    )
+
+
+def _create_node_subflow(node: IcoNode) -> Sequence[IcoNode] | None:
+    if isinstance(node, HasSubflowFactory) and node.subflow_factory is not None:
+        return [node.subflow_factory()]
+
+    return None
+
+
+# ────────────────────────────────────────────────
+# Iteration api
+# ────────────────────────────────────────────────
 
 
 def iterate_nodes(

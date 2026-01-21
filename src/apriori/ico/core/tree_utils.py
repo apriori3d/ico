@@ -32,6 +32,7 @@ class TraversalInfo(Generic[T, C]):
     total_siblings: int
     current_order: TraversalOrder = "pre"
     context: C | None = None
+    visit_children: bool = True
 
     @property
     def is_last(self) -> bool:
@@ -48,28 +49,40 @@ class TraversalInfo(Generic[T, C]):
         return (self.node, self.path)
 
 
+LazySubtreeVisitingPolicy = Literal[
+    "children_only",
+    "subtree_only",
+    "children_or_subtree",
+    "subtree_or_children",
+    "both",
+]
+
+
 @final
 class TreeWalker(Generic[T, C]):
     __slots__ = (
         "get_children_fn",
         "get_lazy_subtree_fn",
         "initial_context",
+        "subtree_policy",
     )
 
     get_children_fn: Callable[[T], Sequence[T]]
     get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None
     initial_context: C | None
+    subtree_policy: LazySubtreeVisitingPolicy
 
     def __init__(
         self,
         get_children_fn: Callable[[T], Sequence[T]],
         get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None = None,
-        filter_fn: Callable[[T], bool] | None = None,
         initial_context: C | None = None,
+        subtree_policy: LazySubtreeVisitingPolicy = "both",
     ) -> None:
         self.get_children_fn = get_children_fn
         self.get_lazy_subtree_fn = get_lazy_subtree_fn
         self.initial_context = initial_context
+        self.subtree_policy = subtree_policy
 
     def walk(
         self,
@@ -89,6 +102,7 @@ class TreeWalker(Generic[T, C]):
     ) -> Iterator[TraversalInfo[T, C]]:
         if order in ["pre", "post", "pre_post"]:
             yield from self._traverse_dfs(root, order=order)
+            return
 
         raise ValueError(f"Unsupported traversal order: {order}")
 
@@ -123,22 +137,34 @@ class TreeWalker(Generic[T, C]):
                     node_info.current_order = "post"
 
             # Get children and push then to the stack in reverse order
-            children = self._get_all_children(node_info.node)
-            total = len(children)
-            stack += [
-                TraversalInfo(
-                    node=child,
-                    path=node_info.path.add_child(i),
-                    total_siblings=total,
-                    context=self.initial_context,
-                )
-                for i, child in enumerate(children[::-1])
-            ]
+            if node_info.visit_children:
+                children = self._get_all_children(node_info.node)
+                total = len(children)
+                stack += [
+                    TraversalInfo(
+                        node=child,
+                        path=node_info.path.add_child(i),
+                        total_siblings=total,
+                        context=self.initial_context,
+                    )
+                    for i, child in enumerate(children[::-1])
+                ]
 
     def _get_all_children(self, node: T) -> list[T]:
         children = list(self.get_children_fn(node))
-        children += self._get_lazy_subtree(node)
-        return children
+        subtree = list(self._get_lazy_subtree(node))
+
+        match self.subtree_policy:
+            case "both":
+                return children + subtree
+            case "children_only":
+                return children
+            case "subtree_only":
+                return subtree
+            case "children_or_subtree":
+                return children if len(children) > 0 else subtree
+            case "subtree_or_children":
+                return subtree if len(subtree) > 0 else children
 
     def _get_lazy_subtree(self, node: T) -> Sequence[T]:
         if self.get_lazy_subtree_fn is None:
