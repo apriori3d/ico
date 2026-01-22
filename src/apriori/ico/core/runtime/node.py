@@ -203,13 +203,14 @@ class IcoRuntimeNode(ABC):
 
 @runtime_checkable
 class HasSubTreeFactory(Protocol):
-    subtree_factory: Callable[[], IcoRuntimeNode]
+    def get_subtree_factory(self) -> Callable[[], IcoRuntimeNode]: ...
 
 
 # ────────────────────────────────────────────────
 # Tree walker api
 # ────────────────────────────────────────────────
 
+# ──────── Command broadcast walker ────────
 
 BroadcastTreeWalker: TypeAlias = TreeWalker[IcoRuntimeNode, IcoRuntimeCommand]
 BroadcastTraversalInfo: TypeAlias = TraversalInfo[IcoRuntimeNode, IcoRuntimeCommand]
@@ -224,22 +225,24 @@ def create_broadcast_walker(
     )
 
 
+# ──────── Runtime tree walker ────────
+
 RuntimeTreeWalker: TypeAlias = TreeWalker[IcoRuntimeNode, None]
 RuntimeTraversalInfo: TypeAlias = TraversalInfo[IcoRuntimeNode, None]
 
 
-def create_runtime_tree_walker(
-    *,
-    include_agent_worker: bool = True,
-) -> RuntimeTreeWalker:
+def create_runtime_walker(expand_subtree_factories: bool = True) -> RuntimeTreeWalker:
     """Get a tree walker for ICO runtime nodes."""
     return RuntimeTreeWalker(
         get_children_fn=lambda node: node.runtime_children,
-        get_lazy_subtree_fn=_create_worker_node if include_agent_worker else None,
+        get_lazy_subtree_fn=_create_node_subtree if expand_subtree_factories else None,
+        subtree_policy="children_and_subtree",  # To ensure worker subtrees are included
     )
 
 
-def _create_worker_node(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode] | None:
-    if isinstance(node, HasSubTreeFactory):
-        return [node.subtree_factory()]
-    return None
+def _create_node_subtree(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode] | None:
+    if not isinstance(node, HasSubTreeFactory):
+        return None
+
+    factory = node.get_subtree_factory()
+    return [factory()]

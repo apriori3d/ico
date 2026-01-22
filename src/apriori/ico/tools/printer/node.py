@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import overload
@@ -6,30 +8,26 @@ from typing_extensions import final
 
 from apriori.ico.core.operator import I, IcoOperator, O, wrap_operator
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
-from apriori.ico.core.runtime.tools.tool_node import IcoRegistrationEvent, IcoToolNode
-
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoPrinterRegistrationEvent(IcoRegistrationEvent):
-    pass
+from apriori.ico.core.tree_utils import TreePathIndex
 
 
 @final
 @dataclass(slots=True, frozen=True)
 class IcoPrintEvent(IcoRuntimeEvent):
-    node_id: int
     message: str
+
+    @staticmethod
+    def create(message: str) -> IcoPrintEvent:
+        return IcoPrintEvent(message=message, trace=TreePathIndex())
 
 
 @final
-class IcoPrinter(IcoToolNode):
+class IcoPrinter(IcoRuntimeNode):
     def __call__(self, message: str) -> None:
         self.state_model.running()
-        assert self.registered_id is not None
-
-        self.bubble_event(IcoPrintEvent(node_id=self.registered_id, message=message))
+        self.bubble_event(IcoPrintEvent.create(message=message))
         self.state_model.ready()
 
 

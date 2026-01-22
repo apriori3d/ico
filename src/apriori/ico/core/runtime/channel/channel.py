@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from queue import Empty
-from typing import Generic
+from typing import Generic, Protocol
 
 from apriori.ico.core.operator import I, O
 from apriori.ico.core.runtime.channel.messages import (
@@ -14,7 +14,6 @@ from apriori.ico.core.runtime.channel.messages import (
 )
 from apriori.ico.core.runtime.command import IcoDeactivateCommand, IcoRuntimeCommand
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
 class IcoSendEndpoint(Generic[I], ABC):
@@ -33,6 +32,11 @@ class IcoReceiveEndpoint(Generic[O], ABC):
     def close(self) -> None: ...
 
 
+class IcoChannelRuntimePort(Protocol):
+    def on_channel_command(self, command: IcoRuntimeCommand) -> None: ...
+    def on_channel_event(self, event: IcoRuntimeEvent) -> None: ...
+
+
 class IcoChannel(Generic[I, O], ABC):
     __slots__ = (
         "sender",
@@ -48,7 +52,7 @@ class IcoChannel(Generic[I, O], ABC):
 
     sender: IcoSendEndpoint[I]
     receiver: IcoReceiveEndpoint[O]
-    runtime_port: IcoRuntimeNode | None
+    runtime_port: IcoChannelRuntimePort | None
     ignore_receive_timeouts: bool
     timeout: int
     accept_commands: bool
@@ -61,7 +65,7 @@ class IcoChannel(Generic[I, O], ABC):
         sender: IcoSendEndpoint[I],
         receiver: IcoReceiveEndpoint[O],
         *,
-        runtime_port: IcoRuntimeNode | None = None,
+        runtime_port: IcoChannelRuntimePort | None = None,
         timeout: int = 5,
         ignore_receive_timeouts: bool = True,
         accept_commands: bool = True,
@@ -178,7 +182,7 @@ class IcoChannel(Generic[I, O], ABC):
             return  # Ignore command, wait for actual data item
 
         if self.runtime_port is not None:
-            self.runtime_port.broadcast_command(message.command)
+            self.runtime_port.on_channel_command(message.command)
 
         self._send(AcknowledgeMessage(self._message_id, message_id=message.id))
 
@@ -191,7 +195,7 @@ class IcoChannel(Generic[I, O], ABC):
         if self.runtime_port is None:
             return
 
-        self.runtime_port.bubble_event(message.event)
+        self.runtime_port.on_channel_event(message.event)
 
         self._send(AcknowledgeMessage(self._message_id, message.id))
 

@@ -40,6 +40,9 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
         )
 
         self._mp_context = get_context("spawn")
+        # Create channel to ensure subtree_factory can access channel
+        self.channel = self._create_channel()
+
         self._agent_process = None
         # self._print = printer
 
@@ -50,7 +53,7 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     # ─── Agent process management ───
 
-    def worker_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
+    def get_subtree_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
         assert self.channel is not None
 
         worker_channel = self.channel.invert()  # Invert channel for worker
@@ -66,15 +69,22 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
         return _create_worker
 
-    def _activate_worker(self) -> None:
-        self.channel = MPChannel[I, O](
+    def _create_channel(self) -> MPChannel[I, O]:
+        assert self._mp_context is not None
+        return MPChannel[I, O](
             mp_context=self._mp_context,
             runtime_port=self,
             accept_commands=False,
             accept_events=True,
             strict_accept=True,
         )
+
+    def _activate_worker(self) -> None:
+        # Recreate channel for agent process to ensure closed channels are not reused
+        self.channel = self._create_channel()
         self._agent_process = self.spawn_worker()
+
+        super()._activate_worker()
 
     def _deactivate_worker(self) -> None:
         assert self._agent_process is not None
@@ -110,10 +120,12 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
                 # )
                 self._agent_process.terminate()
 
+            super()._deactivate_worker()
+
     def spawn_worker(self) -> SpawnProcess:
         process = self._mp_context.Process(
             target=MPAgent[I, O]._start_worker_process,
-            args=(self.worker_factory(),),
+            args=(self.get_subtree_factory(),),
         )
         process.start()
         return process

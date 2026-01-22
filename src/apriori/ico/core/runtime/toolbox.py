@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode, create_runtime_tree_walker
+from apriori.ico.core.runtime.node import IcoRuntimeNode, create_runtime_walker
 from apriori.ico.core.tree_utils import TreePathIndex
 
 
@@ -38,9 +38,10 @@ class IcoToolBox(IcoRuntimeNode):
         if len(pending_tools) == 0:
             return
 
-        runtime_walker = create_runtime_tree_walker(include_agent_worker=True)
+        runtime_walker = create_runtime_walker()
 
         for node_info in runtime_walker.traverse(self.shell):
+            print("Registering node:", node_info.node, "at path:", node_info.node_path)
             for tool in pending_tools:
                 tool.register_node(*node_info.node_path)
 

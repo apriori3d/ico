@@ -20,6 +20,7 @@ from apriori.ico.core.runtime.state import (
     IcoRuntimeState,
     ReadyState,
 )
+from apriori.ico.core.runtime.utils import discover_and_connect_runtime_nodes
 
 
 @dataclass(slots=True, frozen=True)
@@ -72,6 +73,10 @@ class IcoAgent(
 ):
     channel: IcoChannel[I, O] | None
     subflow_factory: Callable[[], IcoOperator[I, O]]
+    subtree_factory: Callable[[], IcoRuntimeNode]
+
+    # Placeholder for worker in runtime tree (actual worker exists in separate process).
+    _worker_placeholder: IcoRuntimeNode
 
     def __init__(
         self,
@@ -86,6 +91,7 @@ class IcoAgent(
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
             self, fn=self._portal_fn, name=name
         )
+
         IcoRuntimeNode.__init__(
             self,
             runtime_name=name,
@@ -94,15 +100,25 @@ class IcoAgent(
         )
         self.channel = channel
         self.subflow_factory = subflow_factory
+        self._worker_placeholder = IcoRuntimeNode()
+
+    # ──────── Worker management ────────
+
+    def get_subflow_factory(self) -> Callable[[], IcoOperator[I, O]]:
+        return self.subflow_factory
 
     @abstractmethod
-    def worker_factory(self) -> Callable[[], IcoAgentWorker[I, O]]: ...
+    def get_subtree_factory(self) -> Callable[[], IcoAgentWorker[I, O]]: ...
 
-    @abstractmethod
-    def _activate_worker(self) -> None: ...
+    def _activate_worker(self) -> None:
+        assert self._worker_placeholder not in self._runtime_children
+        self._runtime_children.append(self._worker_placeholder)
 
-    @abstractmethod
-    def _deactivate_worker(self) -> None: ...
+    def _deactivate_worker(self) -> None:
+        assert self._worker_placeholder in self._runtime_children
+        self._runtime_children.remove(self._worker_placeholder)
+
+    # ──────── Data flow function ────────
 
     def _portal_fn(self, input: I) -> O:
         assert self.channel is not None
@@ -126,6 +142,17 @@ class IcoAgent(
         except Exception:
             self.state_model.fault()
             raise
+
+    # ──────── Channel message handling ────────
+
+    def on_channel_command(self, command: IcoRuntimeCommand) -> None:
+        raise Exception("Channel commands should not be sent to the agent runtime.")
+
+    def on_channel_event(self, event: IcoRuntimeEvent) -> None:
+        # Ensure events from the worker are bubbled correctly in the runtime tree
+        self.bubble_event(event, from_child=self._worker_placeholder)
+
+    # ─────── Runtime API ────────
 
     def on_command(self, command: IcoRuntimeCommand) -> None:
         if command.broadcast_order == "pre":
@@ -201,6 +228,8 @@ class IcoAgentWorker(
         # Connect to runtime port to enable command and event handling for remote runtime
         channel.runtime_port = self
 
+        discover_and_connect_runtime_nodes(self, self.flow)
+
     def run_loop(self) -> None:
         """
         Main execution loop of the process agent.
@@ -244,6 +273,18 @@ class IcoAgentWorker(
                 self.state_model.fault()
                 self.bubble_event(IcoFaultEvent.create(e), from_child=self)
                 continue
+
+    # ──────── Channel message handling ────────
+
+    def on_channel_command(self, command: IcoRuntimeCommand) -> None:
+        self.broadcast_command(command)
+
+    def on_channel_event(self, event: IcoRuntimeEvent) -> None:
+        raise Exception(
+            "Channel events should not be sent to the agent worker runtime."
+        )
+
+    # ─────── Runtime API ────────
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         # Send event to upstream runtime

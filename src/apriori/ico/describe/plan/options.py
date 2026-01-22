@@ -4,6 +4,7 @@ from typing import Literal, TypeAlias
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.chain import IcoChain
 from apriori.ico.core.context_pipeline import IcoContextPipeline
+from apriori.ico.core.epoch import IcoEpoch
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.process import IcoProcess
@@ -39,6 +40,7 @@ class PlanRendererOptions(RendererOptions):
     show_ico_operator: bool = False
     show_node_icons: bool = True
 
+    expand_subflows: bool = True
     expand_subflow_factories: bool = True
 
     flatten_node_type: set[type[IcoNode]] = field(
@@ -60,5 +62,6 @@ class PlanRendererOptions(RendererOptions):
             IcoSource: "📚",
             IcoSink: "🏁",
             IcoProgress: "⏳",
+            IcoEpoch: "🧠",
         }
     )

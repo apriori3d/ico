@@ -54,7 +54,7 @@ LazySubtreeVisitingPolicy = Literal[
     "subtree_only",
     "children_or_subtree",
     "subtree_or_children",
-    "both",
+    "children_and_subtree",
 ]
 
 
@@ -63,12 +63,14 @@ class TreeWalker(Generic[T, C]):
     __slots__ = (
         "get_children_fn",
         "get_lazy_subtree_fn",
+        "filter_fn",
         "initial_context",
         "subtree_policy",
     )
 
     get_children_fn: Callable[[T], Sequence[T]]
     get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None
+    filter_fn: Callable[[T], bool] | None
     initial_context: C | None
     subtree_policy: LazySubtreeVisitingPolicy
 
@@ -76,11 +78,13 @@ class TreeWalker(Generic[T, C]):
         self,
         get_children_fn: Callable[[T], Sequence[T]],
         get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None = None,
+        filter_fn: Callable[[T], bool] | None = None,
         initial_context: C | None = None,
-        subtree_policy: LazySubtreeVisitingPolicy = "both",
+        subtree_policy: LazySubtreeVisitingPolicy = "children_and_subtree",
     ) -> None:
         self.get_children_fn = get_children_fn
         self.get_lazy_subtree_fn = get_lazy_subtree_fn
+        self.filter_fn = filter_fn
         self.initial_context = initial_context
         self.subtree_policy = subtree_policy
 
@@ -113,30 +117,36 @@ class TreeWalker(Generic[T, C]):
 
         while len(stack) > 0:
             node_info = stack[-1]
+            skip_node = self.filter_fn and not self.filter_fn(node_info.node)
 
             if node_info.current_order == "post":
                 assert order in ["post", "pre_post"]
                 # This is second visit in post-order traversal - pop the node from the stack
-                yield stack.pop()
+                stack.pop()
+                if not skip_node:
+                    yield node_info
                 continue
 
             match order:
                 case "pre":
                     # This is the first visit of the node in pre-order traversal -
                     # pop the node from stack
-                    yield stack.pop()
+                    stack.pop()
+                    if not skip_node:
+                        yield node_info
 
                 case "pre_post":
                     # This is the first visit in pre_post-order traversal -
                     # yield node and mark for post-visit. Do not pop for post-visit yet.
-                    yield node_info
+                    if not skip_node:
+                        yield node_info
                     node_info.current_order = "post"
 
                 case "post":
                     # Mark for post-visit
                     node_info.current_order = "post"
 
-            # Get children and push then to the stack in reverse order
+            # Get children and push them to the stack in reverse order
             if node_info.visit_children:
                 children = self._get_all_children(node_info.node)
                 total = len(children)
@@ -155,7 +165,7 @@ class TreeWalker(Generic[T, C]):
         subtree = list(self._get_lazy_subtree(node))
 
         match self.subtree_policy:
-            case "both":
+            case "children_and_subtree":
                 return children + subtree
             case "children_only":
                 return children

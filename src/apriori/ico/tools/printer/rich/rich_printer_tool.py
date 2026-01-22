@@ -8,34 +8,23 @@ from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.tools.tool_node import (
-    IcoRegistrationEvent,
-    IcoTool,
-    IcoToolNode,
-)
+from apriori.ico.core.runtime.shell import IcoShell
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.tools.printer.node import (
     IcoPrinter,
-    IcoPrinterRegistrationEvent,
     IcoPrintEvent,
     use_printer,
 )
 
 
 @final
-class RichPrinterTool(IcoTool):
+class RichPrinterTool(IcoRuntimeNode):
     _console: Console
 
     def __init__(self, console: Console):
         IcoRuntimeNode.__init__(self)
         self._console = console
-
-    def get_registerable_node_types(self) -> set[type[IcoToolNode]]:
-        return {IcoPrinter}
-
-    def get_registration_event_types(self) -> set[type[IcoRegistrationEvent]]:
-        return {IcoPrinterRegistrationEvent}
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoPrintEvent):
@@ -80,13 +69,14 @@ if __name__ == "__main__":
     console = Console()
     printer_tool = RichPrinterTool(console)
 
-    runtime = flow.shell().add_tool(printer_tool)
-    # runtime.describe()
-    runtime.activate()  # .describe()
-    printer_tool.register_nodes()  # .describe()
+    shell = IcoShell(flow, tools=[printer_tool])
+    shell.describe()
 
-    # flow.describe(show_runtime_nodes=True)
+    # shell.activate()  # .describe()
+    # printer_tool.register_nodes()  # .describe()
 
-    runtime.run()
+    # # flow.describe(show_runtime_nodes=True)
 
-    runtime.deactivate()  # .describe()
+    # shell.run()
+
+    # shell.deactivate()  # .describe()

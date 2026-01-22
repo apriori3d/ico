@@ -2,8 +2,7 @@ from typing import Protocol
 
 from rich.text import Text
 
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.tree_walker import RuntimeTraversalInfo
+from apriori.ico.core.runtime.node import IcoRuntimeNode, RuntimeTraversalInfo
 from apriori.ico.describe.runtime.rich_renderer.row_renderer import RuntimeRowRenderer
 
 

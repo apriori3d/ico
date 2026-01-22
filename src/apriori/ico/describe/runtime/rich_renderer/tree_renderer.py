@@ -4,10 +4,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.tree_walker import (
+from apriori.ico.core.runtime.node import (
+    IcoRuntimeNode,
     RuntimeTraversalInfo,
-    create_runtime_tree_walker,
+    create_runtime_walker,
 )
 from apriori.ico.describe.rich_style import DescribeStyle
 from apriori.ico.describe.runtime.options import RuntimeRendererOptions
@@ -59,8 +59,8 @@ class RuntimeTreeRenderer:
     def render(self, root: IcoRuntimeNode) -> None:
         self._table = self._create_table()
 
-        tree_walker = create_runtime_tree_walker(
-            include_agent_worker=self.options.expand_subflows
+        tree_walker = create_runtime_walker(
+            expand_subtree_factories=self.options.expand_agents
         )
         tree_walker.walk(
             root,

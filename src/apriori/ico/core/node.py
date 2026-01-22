@@ -51,35 +51,7 @@ class IcoNode:
 
 @runtime_checkable
 class HasSubflowFactory(Protocol):
-    subflow_factory: Callable[[], IcoNode]
-
-
-# ────────────────────────────────────────────────
-# Tree walker api
-# ────────────────────────────────────────────────
-
-
-FlowTreeWalker: TypeAlias = TreeWalker[IcoNode, None]
-FlowTraversalInfo: TypeAlias = TraversalInfo[IcoNode, None]
-
-
-def create_flow_tree_walker(
-    *,
-    visit_subflows: bool = True,
-) -> FlowTreeWalker:
-    """Get a tree walker for ICO runtime nodes."""
-    return FlowTreeWalker(
-        get_children_fn=lambda node: node.children,
-        get_lazy_subtree_fn=_create_node_subflow if visit_subflows else None,
-        subtree_policy="children_or_subtree",
-    )
-
-
-def _create_node_subflow(node: IcoNode) -> Sequence[IcoNode] | None:
-    if isinstance(node, HasSubflowFactory) and node.subflow_factory is not None:
-        return [node.subflow_factory()]
-
-    return None
+    def get_subflow_factory(self) -> Callable[[], IcoNode] | None: ...
 
 
 # ────────────────────────────────────────────────
@@ -105,3 +77,28 @@ def iterate_parents(
 
     yield node.parent
     yield from iterate_parents(node.parent)
+
+
+# ────────────────────────────────────────────────
+# Tree walker api
+# ────────────────────────────────────────────────
+
+
+FlowTreeWalker: TypeAlias = TreeWalker[IcoNode, None]
+FlowTraversalInfo: TypeAlias = TraversalInfo[IcoNode, None]
+
+
+def create_flow_walker(*, visit_subflows: bool = True) -> FlowTreeWalker:
+    """Get a tree walker for ICO runtime nodes."""
+    return FlowTreeWalker(
+        get_children_fn=lambda node: node.children,
+        get_lazy_subtree_fn=_create_node_subflow if visit_subflows else None,
+        subtree_policy="children_or_subtree",
+    )
+
+
+def _create_node_subflow(node: IcoNode) -> Sequence[IcoNode] | None:
+    if isinstance(node, HasSubflowFactory) and node.get_subflow_factory is not None:
+        return [node.get_subflow_factory()]
+
+    return None

@@ -53,7 +53,12 @@ def create_plan_tree_walker(include_subflows: bool) -> PlanTreeWalker:
 
 
 def _create_node_subflow(node: IcoNode) -> Sequence[IcoNode] | None:
-    if isinstance(node, HasSubflowFactory) and node.subflow_factory is not None:
-        return [node.subflow_factory()]
+    if not isinstance(node, HasSubflowFactory):
+        return None
+
+    factory = node.get_subflow_factory()
+
+    if factory is not None:
+        return [factory()]
 
     return None

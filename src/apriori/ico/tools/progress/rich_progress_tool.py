@@ -16,6 +16,7 @@ from apriori.ico.core.runtime.progress import (
 )
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
+from apriori.ico.core.tree_utils import TreePathIndex
 from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
@@ -25,16 +26,29 @@ class RichProgressTool(IcoRuntimeNode):
     node_types: ClassVar[set[type[IcoRuntimeNode]]] = {IcoProgress}
 
     progress: Progress
-    _tasks: dict[int, TaskID]
+    _tasks: dict[TreePathIndex, TaskID]
 
     def __init__(self, progress: Progress):
-        IcoTool.__init__(self)
+        IcoRuntimeNode.__init__(self)
         self.progress = progress
         self._tasks = {}
 
+    def register_node(self, node: IcoRuntimeNode, path: TreePathIndex) -> None:
+        if isinstance(node, IcoProgress):
+            task_id = self.progress.add_task(
+                description=node.name or "Progress",
+                total=node.total,
+            )
+            self._tasks[path] = task_id
+
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoProgressEvent):
-            task_id = self._tasks[event.trace.reverse()]
+            path = event.trace.reverse()
+            if path not in self._tasks:
+                raise RuntimeError(
+                    f"Received progress event for unregistered progress node at path {path}"
+                )
+            task_id = self._tasks[path]
             task = self.progress.tasks[task_id]
 
             if task.finished:

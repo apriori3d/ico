@@ -8,11 +8,11 @@ from typing import Generic, final
 from apriori.ico.core.operator import I, O
 from apriori.ico.core.runtime.channel.channel import (
     IcoChannel,
+    IcoChannelRuntimePort,
     IcoReceiveEndpoint,
     IcoSendEndpoint,
 )
 from apriori.ico.core.runtime.channel.messages import DataMessage, RuntimeMessage
-from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
 @final
@@ -63,7 +63,7 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         send_endpoint: MPQueueSendEndpoint[I] | None = None,
         receive_endpoint: MPQueueReceiveEndpoint[O] | None = None,
         *,
-        runtime_port: IcoRuntimeNode | None = None,
+        runtime_port: IcoChannelRuntimePort | None = None,
         timeout: int = 5,
         ignore_receive_timeouts: bool = True,
         accept_commands: bool = True,
