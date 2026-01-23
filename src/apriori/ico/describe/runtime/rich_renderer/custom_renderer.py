@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.describe.runtime.options import RuntimeRendererOptions
 from apriori.ico.describe.runtime.rich_renderer.render_target import (
-    RuntimeTreeRenderTarget,
+    RuntimeRenderTarget,
 )
 
 
@@ -15,5 +15,5 @@ class RuntimeCustomRenderer(ABC):
 
     @abstractmethod
     def render(
-        self, runtime_tree: RuntimeTreeRenderTarget, node: IcoRuntimeNode
+        self, runtime_tree: RuntimeRenderTarget, node: IcoRuntimeNode
     ) -> None: ...

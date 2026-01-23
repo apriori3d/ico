@@ -23,9 +23,8 @@ def discover_and_connect_runtime_nodes(
 def _discover_runtime_subtrees(flow: IcoNode) -> list[IcoRuntimeNode]:
     """Discover all runtime hosts within the given flow."""
     roots = OrderedDict[IcoRuntimeNode, None]()
-    walker = create_flow_walker(visit_subflows=False)
 
-    for node_info in walker.traverse(flow):
+    for node_info in create_flow_walker().traverse(flow):
         if not isinstance(node_info.node, IcoRuntimeNode):
             continue
 

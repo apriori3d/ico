@@ -41,7 +41,8 @@ class IcoAsyncStream(
     )
 
     pool: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
-    subflow_factory: Callable[[], IcoOperator[I, O] | IcoAsyncOperator[I, O]] | None
+    pool_from_factory: bool
+
     ordered: bool
     has_factory: bool
     pool_size: int
@@ -86,11 +87,11 @@ class IcoAsyncStream(
                     "Pool_size must be specified when providing a flow factory."
                 )
             worker_pool = [pool() for _ in range(pool_size)]
-            self.subflow_factory = pool
+            self.pool_from_factory = True
         else:
             worker_pool = list(pool)
             pool_size = len(worker_pool)
-            self.subflow_factory = None
+            self.pool_from_factory = False
 
         super().__init__(fn=self._run_stream, name=name, children=worker_pool)
         self.pool = list(worker_pool)

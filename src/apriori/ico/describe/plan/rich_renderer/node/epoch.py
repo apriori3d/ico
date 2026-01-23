@@ -17,7 +17,7 @@ from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRender
 from apriori.ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
 from apriori.ico.describe.plan.rich_renderer.render_target import (
     PlanRenderTarget,
-    create_plan_tree_walker,
+    create_plan_walker,
 )
 from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from apriori.ico.describe.plan.rich_renderer.row_renderer import (
@@ -69,8 +69,8 @@ class IcoEpochRenderer(CustomRenderer):
         plan.render_row(self._row_renderer, epoch)
 
         # Use tree walker to render nested epoch elements
-        tree_walker = create_plan_tree_walker(
-            include_subflows=self.options.expand_subflows
+        tree_walker = create_plan_walker(
+            expand_remote_flows=self.options.show_remote_flows
         )
 
         # Render epoch source part

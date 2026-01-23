@@ -12,7 +12,7 @@ from apriori.ico.core.runtime.toolbox import IcoToolBox
 from apriori.ico.core.runtime.utils import discover_and_connect_runtime_nodes
 
 
-class IcoShell(IcoRuntimeNode):
+class IcoRuntime(IcoRuntimeNode):
     """
     Runtime contour that encapsulates a complete ICO flow.
 
@@ -87,18 +87,14 @@ class IcoShell(IcoRuntimeNode):
 
     # # ─── Execution ───
 
-    # def run(self) -> IcoRuntimeContour:
-    #     """Execute the entire runtime contour."""
-    #     try:
-    #         self.state_model.running()
-    #         self._contour_fn(None)
+    def run(self) -> IcoRuntime:
+        """Execute the entire runtime contour."""
+        try:
+            self.state_model.running()
+            self.closure(None)
+            self.state_model.ready()
+            return self
 
-    #         self.state_model.ready()
-    #         return self
-
-    #     except Exception as e:
-    #         self.state_model.fault()
-    #         raise e
-
-    # def _contour_fn(self, _: None) -> None:
-    #     self._closure(None)
+        except Exception as e:
+            self.state_model.fault()
+            raise e

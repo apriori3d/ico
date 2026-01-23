@@ -14,7 +14,12 @@ from apriori.ico.core.runtime.command import (
     IcoRuntimeCommand,
 )
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.state import BaseStateModel, IcoRuntimeState
+from apriori.ico.core.runtime.state import (
+    BaseStateModel,
+    IcoRuntimeState,
+    IcoStateEvent,
+    IcoStateRequestCommand,
+)
 from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
 
 # ────────────────────────────────────────────────
@@ -86,15 +91,21 @@ class IcoRuntimeNode(ABC):
         """
         self.state_model.update(command)
 
-    def _on_broadcast_visit(self, node_info: BroadcastTraversalInfo) -> None:
-        assert node_info.context is not None
-        self.on_command(node_info.context)
+        if isinstance(command, IcoStateRequestCommand):
+            # Respond with current state
+            self.bubble_event(
+                IcoStateEvent.create(state=self.state),
+            )
 
     def broadcast_command(self, command: IcoRuntimeCommand) -> None:
+        def visit_fn(node_info: BroadcastTraversalInfo) -> None:
+            assert node_info.context is not None
+            node_info.node.on_command(node_info.context)
+
         walker = create_broadcast_walker(command)
         walker.walk(
             self,
-            visit_fn=self._on_broadcast_visit,
+            visit_fn=visit_fn,
             order=command.broadcast_order,
         )
 
@@ -197,13 +208,20 @@ class IcoRuntimeNode(ABC):
 
 
 # ────────────────────────────────────────────────
-# Sub-tree factory protocol
+# Remote runtime factory protocol
 # ────────────────────────────────────────────────
 
 
+class IcoRemotePlaceholderNode(IcoRuntimeNode):
+    """Placeholder node representing a remote runtime node in the local runtime tree.
+    Need to be able to use correct tree path index in command and events."""
+
+    pass
+
+
 @runtime_checkable
-class HasSubTreeFactory(Protocol):
-    def get_subtree_factory(self) -> Callable[[], IcoRuntimeNode]: ...
+class HasRemoteRuntime(Protocol):
+    def get_remote_runtime_factory(self) -> Callable[[], IcoRuntimeNode]: ...
 
 
 # ────────────────────────────────────────────────
@@ -216,11 +234,16 @@ BroadcastTreeWalker: TypeAlias = TreeWalker[IcoRuntimeNode, IcoRuntimeCommand]
 BroadcastTraversalInfo: TypeAlias = TraversalInfo[IcoRuntimeNode, IcoRuntimeCommand]
 
 
-def create_broadcast_walker(
-    command: IcoRuntimeCommand,
-) -> BroadcastTreeWalker:
+def create_broadcast_walker(command: IcoRuntimeCommand) -> BroadcastTreeWalker:
+    def _get_children(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode]:
+        return [
+            c
+            for c in node.runtime_children
+            if not isinstance(c, IcoRemotePlaceholderNode)
+        ]
+
     return BroadcastTreeWalker(
-        get_children_fn=lambda node: node.runtime_children,
+        get_children_fn=_get_children,
         initial_context=command,
     )
 
@@ -231,18 +254,16 @@ RuntimeTreeWalker: TypeAlias = TreeWalker[IcoRuntimeNode, None]
 RuntimeTraversalInfo: TypeAlias = TraversalInfo[IcoRuntimeNode, None]
 
 
-def create_runtime_walker(expand_subtree_factories: bool = True) -> RuntimeTreeWalker:
+def create_runtime_walker(expand_remote_runtimes: bool = False) -> RuntimeTreeWalker:
     """Get a tree walker for ICO runtime nodes."""
-    return RuntimeTreeWalker(
-        get_children_fn=lambda node: node.runtime_children,
-        get_lazy_subtree_fn=_create_node_subtree if expand_subtree_factories else None,
-        subtree_policy="children_and_subtree",  # To ensure worker subtrees are included
-    )
 
+    def _get_children(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode]:
+        children = list(node.runtime_children)
 
-def _create_node_subtree(node: IcoRuntimeNode) -> Sequence[IcoRuntimeNode] | None:
-    if not isinstance(node, HasSubTreeFactory):
-        return None
+        if expand_remote_runtimes and isinstance(node, HasRemoteRuntime):
+            factory = node.get_remote_runtime_factory()
+            children.append(factory())
 
-    factory = node.get_subtree_factory()
-    return [factory()]
+        return children
+
+    return RuntimeTreeWalker(get_children_fn=_get_children)

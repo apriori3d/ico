@@ -8,7 +8,7 @@ from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.shell import IcoShell
+from apriori.ico.core.runtime.runtime import IcoRuntime
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.tools.printer.node import (
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     console = Console()
     printer_tool = RichPrinterTool(console)
 
-    shell = IcoShell(flow, tools=[printer_tool])
+    shell = IcoRuntime(flow, tools=[printer_tool])
     shell.describe()
 
     # shell.activate()  # .describe()

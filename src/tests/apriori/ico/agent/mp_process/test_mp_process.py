@@ -15,7 +15,7 @@ from apriori.ico.core.runtime.event import (
     IcoHearbeatEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.shell import IcoShell
+from apriori.ico.core.runtime.runtime import IcoRuntime
 from apriori.ico.runtime.agent.mp.mp_agent import (
     MPAgent,
 )
@@ -176,7 +176,7 @@ def test_agent_mp_process_end_to_end() -> None:
 
     flow = src | MPAgent(op_double) | dst
 
-    runtime = IcoShell(flow)
+    runtime = IcoRuntime(flow)
     runtime.activate().run().deactivate()
 
     assert collected == ["Received 14"]

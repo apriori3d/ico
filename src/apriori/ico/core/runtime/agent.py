@@ -14,7 +14,7 @@ from apriori.ico.core.runtime.command import (
 )
 from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
 from apriori.ico.core.runtime.state import (
     BaseStateModel,
     IcoRuntimeState,
@@ -72,7 +72,7 @@ class IcoAgent(
     ABC,
 ):
     channel: IcoChannel[I, O] | None
-    subflow_factory: Callable[[], IcoOperator[I, O]]
+    flow_factory: Callable[[], IcoOperator[I, O]]
     subtree_factory: Callable[[], IcoRuntimeNode]
 
     # Placeholder for worker in runtime tree (actual worker exists in separate process).
@@ -82,7 +82,7 @@ class IcoAgent(
         self,
         *,
         channel: IcoChannel[I, O] | None = None,
-        subflow_factory: Callable[[], IcoOperator[I, O]],
+        flow_factory: Callable[[], IcoOperator[I, O]],
         name: str | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
@@ -99,24 +99,23 @@ class IcoAgent(
             state_model=state_model or AgentStateModel(),
         )
         self.channel = channel
-        self.subflow_factory = subflow_factory
-        self._worker_placeholder = IcoRuntimeNode()
+        self.flow_factory = flow_factory
+        self._worker_placeholder = IcoRemotePlaceholderNode()
+        self._runtime_children.append(self._worker_placeholder)
 
     # ──────── Worker management ────────
 
-    def get_subflow_factory(self) -> Callable[[], IcoOperator[I, O]]:
-        return self.subflow_factory
+    def get_remote_flow_factory(self) -> Callable[[], IcoOperator[I, O]]:
+        return self.flow_factory
 
     @abstractmethod
-    def get_subtree_factory(self) -> Callable[[], IcoAgentWorker[I, O]]: ...
+    def get_remote_runtime_factory(self) -> Callable[[], IcoAgentWorker[I, O]]: ...
 
     def _activate_worker(self) -> None:
-        assert self._worker_placeholder not in self._runtime_children
-        self._runtime_children.append(self._worker_placeholder)
+        pass
 
     def _deactivate_worker(self) -> None:
-        assert self._worker_placeholder in self._runtime_children
-        self._runtime_children.remove(self._worker_placeholder)
+        pass
 
     # ──────── Data flow function ────────
 
@@ -155,35 +154,40 @@ class IcoAgent(
     # ─────── Runtime API ────────
 
     def on_command(self, command: IcoRuntimeCommand) -> None:
+        is_ready = self.state.is_ready()
         if command.broadcast_order == "pre":
             super().on_command(command)
 
         match command:
             case IcoActivateCommand():
                 assert command.broadcast_order == "pre"
-                # Spawn an agent in pre-order, before sending a command downstream
-                assert self.channel is None
-                self._activate_worker()
-                assert self.channel is not None
 
+                if not is_ready:
+                    # Spawn an agent in pre-order, before sending a command downstream
+                    # assert self.channel is None
+                    self._activate_worker()
+
+                assert self.channel is not None
                 self.channel.send_command(command)
 
             case IcoDeactivateCommand():
-                assert command.broadcast_order == "post"
-                assert self.channel is not None
+                if is_ready:
+                    assert command.broadcast_order == "post"
+                    assert self.channel is not None
 
-                self.channel.send_command(command)
+                    self.channel.send_command(command)
 
-                # Deactivate worker in post-order, to ensure proper shutdown
-                self._deactivate_worker()
+                    # Deactivate worker in post-order, to ensure proper shutdown
+                    self._deactivate_worker()
 
-                # Close channel queues
-                self.channel.close()
-                self.channel = None
+                    # Close channel queues
+                    self.channel.close()
+                    # self.channel = None
 
             case _:
-                assert self.channel is not None
-                self.channel.send_command(command)
+                if is_ready:
+                    assert self.channel is not None
+                    self.channel.send_command(command)
 
         if command.broadcast_order == "post":
             super().on_command(command)
@@ -220,7 +224,7 @@ class IcoAgentWorker(
             runtime_name=name,
             runtime_parent=runtime_parent,
             runtime_children=runtime_children,
-            state_model=state_model or AgentStateModel(),
+            state_model=state_model or AgentWorkerStateModel(),
         )
         self.flow = flow_factory()
         self.channel = channel

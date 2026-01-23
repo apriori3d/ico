@@ -3,7 +3,8 @@ from collections.abc import Iterable, Iterator
 from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.runtime.shell import IcoShell
+from apriori.ico.core.runtime.progress import IcoProgress
+from apriori.ico.core.runtime.runtime import IcoRuntime
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.describe.runtime.rich_renderer.tree_renderer import RuntimeTreeRenderer
@@ -46,6 +47,7 @@ def create_augment_flow() -> IcoOperator[Iterator[int], str]:
     augment = IcoPipeline(
         scale,
         shift,
+        IcoProgress[float](name="Augment Progress", total=9),
         name="Item Augment Pipeline",
     )
 
@@ -68,9 +70,10 @@ if __name__ == "__main__":
     """
 
     batcher = IcoBatcher[int](batch_size=3)
+    agents = [MPAgent(create_augment_flow) for _ in range(2)]
     workers_pool = IcoAsyncStream(
-        lambda: MPAgent(create_augment_flow),
-        pool_size=2,
+        agents,
+        # pool_size=2,
         name="Workers pool",
     )
 
@@ -103,9 +106,18 @@ if __name__ == "__main__":
     full_flow = data_stream | train_stream | save_result
     full_flow.name = "Example flow"
 
-    runtime = IcoShell(full_flow, name="full_flow_runtime")
-    # runtime.activate()
+    renderer = RuntimeTreeRenderer()
+
+    runtime = IcoRuntime(full_flow, name="full_flow_runtime")
+    runtime.activate()
+    renderer.render(runtime)
+
+    agents[1].deactivate()
+    renderer.render(runtime)
 
     # ──── 6. Visualize ────
-    renderer = RuntimeTreeRenderer()
+
+    runtime.deactivate()
     renderer.render(runtime)
+
+    print("Done")

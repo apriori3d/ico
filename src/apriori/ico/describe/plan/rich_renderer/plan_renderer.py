@@ -19,7 +19,7 @@ from apriori.ico.describe.plan.rich_renderer.group_renderer import (
 from apriori.ico.describe.plan.rich_renderer.render_target import (
     PlanTraversalInfo,
     PlanTreeWalkerContext,
-    create_plan_tree_walker,
+    create_plan_walker,
 )
 from apriori.ico.describe.plan.rich_renderer.renderer_registry import (
     RendererRegistry,
@@ -67,8 +67,8 @@ class PlanRenderer:
     def render(self, root: IcoNode) -> None:
         self._table = self._create_table()
 
-        tree_walker = create_plan_tree_walker(
-            include_subflows=self.options.expand_subflows
+        tree_walker = create_plan_walker(
+            expand_remote_flows=self.options.show_remote_flows
         )
         tree_walker.walk(
             root,
@@ -128,7 +128,7 @@ class PlanRenderer:
             if renderer.node_renderer is not None:
                 self.render_row(renderer.node_renderer, node)
 
-            if self.options.expand_subflows:
+            if self.options.show_remote_flows:
                 # Render header
                 self.render_row(
                     renderer.header_renderer,

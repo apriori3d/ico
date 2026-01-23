@@ -49,44 +49,23 @@ class TraversalInfo(Generic[T, C]):
         return (self.node, self.path)
 
 
-LazySubtreeVisitingPolicy = Literal[
-    "children_only",
-    "subtree_only",
-    "children_or_subtree",
-    "subtree_or_children",
-    "children_and_subtree",
-]
-
-
 @final
 class TreeWalker(Generic[T, C]):
     __slots__ = (
         "get_children_fn",
-        "get_lazy_subtree_fn",
-        "filter_fn",
         "initial_context",
-        "subtree_policy",
     )
 
     get_children_fn: Callable[[T], Sequence[T]]
-    get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None
-    filter_fn: Callable[[T], bool] | None
     initial_context: C | None
-    subtree_policy: LazySubtreeVisitingPolicy
 
     def __init__(
         self,
         get_children_fn: Callable[[T], Sequence[T]],
-        get_lazy_subtree_fn: Callable[[T], Sequence[T] | None] | None = None,
-        filter_fn: Callable[[T], bool] | None = None,
         initial_context: C | None = None,
-        subtree_policy: LazySubtreeVisitingPolicy = "children_and_subtree",
     ) -> None:
         self.get_children_fn = get_children_fn
-        self.get_lazy_subtree_fn = get_lazy_subtree_fn
-        self.filter_fn = filter_fn
         self.initial_context = initial_context
-        self.subtree_policy = subtree_policy
 
     def walk(
         self,
@@ -113,33 +92,34 @@ class TreeWalker(Generic[T, C]):
     def _traverse_dfs(
         self, root: T, order: TraversalOrder
     ) -> Iterator[TraversalInfo[T, C]]:
-        stack = [TraversalInfo[T, C](root, TreePathIndex(), 0)]
+        stack = [
+            TraversalInfo[T, C](
+                node=root,
+                path=TreePathIndex(),
+                total_siblings=0,
+                context=self.initial_context,
+            )
+        ]
 
         while len(stack) > 0:
             node_info = stack[-1]
-            skip_node = self.filter_fn and not self.filter_fn(node_info.node)
 
             if node_info.current_order == "post":
                 assert order in ["post", "pre_post"]
                 # This is second visit in post-order traversal - pop the node from the stack
-                stack.pop()
-                if not skip_node:
-                    yield node_info
+                yield stack.pop()
                 continue
 
             match order:
                 case "pre":
                     # This is the first visit of the node in pre-order traversal -
                     # pop the node from stack
-                    stack.pop()
-                    if not skip_node:
-                        yield node_info
+                    yield stack.pop()
 
                 case "pre_post":
                     # This is the first visit in pre_post-order traversal -
                     # yield node and mark for post-visit. Do not pop for post-visit yet.
-                    if not skip_node:
-                        yield node_info
+                    yield node_info
                     node_info.current_order = "post"
 
                 case "post":
@@ -148,7 +128,7 @@ class TreeWalker(Generic[T, C]):
 
             # Get children and push them to the stack in reverse order
             if node_info.visit_children:
-                children = self._get_all_children(node_info.node)
+                children = list(self.get_children_fn(node_info.node))
                 total = len(children)
                 stack += [
                     TraversalInfo(
@@ -157,26 +137,5 @@ class TreeWalker(Generic[T, C]):
                         total_siblings=total,
                         context=self.initial_context,
                     )
-                    for i, child in enumerate(children[::-1])
+                    for i, child in reversed(list(enumerate(children)))
                 ]
-
-    def _get_all_children(self, node: T) -> list[T]:
-        children = list(self.get_children_fn(node))
-        subtree = list(self._get_lazy_subtree(node))
-
-        match self.subtree_policy:
-            case "children_and_subtree":
-                return children + subtree
-            case "children_only":
-                return children
-            case "subtree_only":
-                return subtree
-            case "children_or_subtree":
-                return children if len(children) > 0 else subtree
-            case "subtree_or_children":
-                return subtree if len(subtree) > 0 else children
-
-    def _get_lazy_subtree(self, node: T) -> Sequence[T]:
-        if self.get_lazy_subtree_fn is None:
-            return []
-        return self.get_lazy_subtree_fn(node) or []

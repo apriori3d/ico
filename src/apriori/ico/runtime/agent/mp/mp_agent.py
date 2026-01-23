@@ -7,6 +7,7 @@ from typing import Generic, final
 
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
+from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.event import (
     IcoFaultEvent,
 )
@@ -25,7 +26,7 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     def __init__(
         self,
-        subflow_factory: Callable[[], IcoOperator[I, O]],
+        flow_factory: Callable[[], IcoOperator[I, O]],
         *,
         name: str | None = None,
     ) -> None:
@@ -34,7 +35,7 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
         IcoAgent.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             channel=None,
-            subflow_factory=subflow_factory,
+            flow_factory=flow_factory,
             name=name,
             # runtime_children=[printer],
         )
@@ -53,21 +54,19 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     # ─── Agent process management ───
 
-    def get_subtree_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
+    def get_remote_runtime_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
         assert self.channel is not None
 
         worker_channel = self.channel.invert()  # Invert channel for worker
-        flow_factory = self.subflow_factory
+        flow_factory = self.flow_factory
         name = self.name
 
-        def _create_worker():
-            return IcoAgentWorker[I, O](
-                channel=worker_channel,
-                flow_factory=flow_factory,
-                name=name,
-            )
-
-        return _create_worker
+        # Return a pickleable factory that preserves generic typing
+        return _WorkerFactory[I, O](
+            worker_channel=worker_channel,
+            flow_factory=flow_factory,
+            name=name,
+        )
 
     def _create_channel(self) -> MPChannel[I, O]:
         assert self._mp_context is not None
@@ -99,7 +98,7 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
                 self._agent_process.join(timeout=5)
 
                 # Note: Queues will be closed by the channels themselves after command propagation downstream
-                print(f"Process Agent {self} worker joined.")
+                # self._print(f"Process Agent {self} worker joined.")
 
                 # Check if worker exited properly
                 # if self._agent_process.exitcode is None:
@@ -123,9 +122,10 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
             super()._deactivate_worker()
 
     def spawn_worker(self) -> SpawnProcess:
+        worker_factory = self.get_remote_runtime_factory()
         process = self._mp_context.Process(
             target=MPAgent[I, O]._start_worker_process,
-            args=(self.get_subtree_factory(),),
+            args=(worker_factory,),
         )
         process.start()
         return process
@@ -137,3 +137,25 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
         worker = worker_factory()
         # Run agent to start receiving and processing commands and items
         worker.run_loop()
+
+
+@final
+class _WorkerFactory(Generic[I, O]):
+    """Pickleable factory for creating MPAgentWorker instances."""
+
+    def __init__(
+        self,
+        worker_channel: IcoChannel[O, I],
+        flow_factory: Callable[[], IcoOperator[I, O]],
+        name: str | None,
+    ) -> None:
+        self.worker_channel = worker_channel
+        self.flow_factory = flow_factory
+        self.name = name
+
+    def __call__(self) -> IcoAgentWorker[I, O]:
+        return IcoAgentWorker[I, O](
+            channel=self.worker_channel,
+            flow_factory=self.flow_factory,
+            name=self.name,
+        )

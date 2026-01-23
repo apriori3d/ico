@@ -45,13 +45,13 @@ class IcoNode:
 
 
 # ────────────────────────────────────────────────
-# Sub-flow factory protocol
+# Remote flow protocol
 # ────────────────────────────────────────────────
 
 
 @runtime_checkable
-class HasSubflowFactory(Protocol):
-    def get_subflow_factory(self) -> Callable[[], IcoNode] | None: ...
+class HasRemoteFlow(Protocol):
+    def get_remote_flow_factory(self) -> Callable[[], IcoNode]: ...
 
 
 # ────────────────────────────────────────────────
@@ -88,17 +88,16 @@ FlowTreeWalker: TypeAlias = TreeWalker[IcoNode, None]
 FlowTraversalInfo: TypeAlias = TraversalInfo[IcoNode, None]
 
 
-def create_flow_walker(*, visit_subflows: bool = True) -> FlowTreeWalker:
+def create_flow_walker(expand_remote_flows: bool = False) -> FlowTreeWalker:
     """Get a tree walker for ICO runtime nodes."""
-    return FlowTreeWalker(
-        get_children_fn=lambda node: node.children,
-        get_lazy_subtree_fn=_create_node_subflow if visit_subflows else None,
-        subtree_policy="children_or_subtree",
-    )
 
+    def _get_children(node: IcoNode) -> Sequence[IcoNode]:
+        children = list(node.children)
 
-def _create_node_subflow(node: IcoNode) -> Sequence[IcoNode] | None:
-    if isinstance(node, HasSubflowFactory) and node.get_subflow_factory is not None:
-        return [node.get_subflow_factory()]
+        if expand_remote_flows and isinstance(node, HasRemoteFlow):
+            factory = node.get_remote_flow_factory()
+            children.append(factory())
 
-    return None
+        return children
+
+    return FlowTreeWalker(get_children_fn=_get_children)

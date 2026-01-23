@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, final
 
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
     IcoRuntimeCommand,
 )
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.tree_utils import TreePathIndex
 
 
 @dataclass(slots=True, frozen=True)
@@ -85,3 +89,26 @@ class BaseStateModel:
 
     def fault(self) -> None:
         self.state = FaultState()
+
+
+# ────────────────────────────────────────────────
+# State collection API
+# ────────────────────────────────────────────────
+
+
+@final
+@dataclass(slots=True, frozen=True)
+class IcoStateRequestCommand(IcoRuntimeCommand):
+    @staticmethod
+    def create() -> IcoStateRequestCommand:
+        return IcoStateRequestCommand()
+
+
+@final
+@dataclass(slots=True, frozen=True)
+class IcoStateEvent(IcoRuntimeEvent):
+    state: IcoRuntimeState
+
+    @staticmethod
+    def create(state: IcoRuntimeState) -> IcoStateEvent:
+        return IcoStateEvent(state=state, trace=TreePathIndex())

@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import ClassVar, Literal, final
 
-from apriori.ico.core.tree_utils import TreePathIndex
-
 
 class IcoRuntimeCommandType(Enum):
     activate = auto()
@@ -36,7 +34,6 @@ class IcoRuntimeCommand:
     """
 
     broadcast_order: ClassVar[CommandBroadcastOrder] = "pre"
-    path: TreePathIndex
 
 
 @final
@@ -44,7 +41,7 @@ class IcoRuntimeCommand:
 class IcoActivateCommand(IcoRuntimeCommand):
     @staticmethod
     def create() -> IcoActivateCommand:
-        return IcoActivateCommand(path=TreePathIndex())
+        return IcoActivateCommand()
 
 
 @final
@@ -52,7 +49,7 @@ class IcoActivateCommand(IcoRuntimeCommand):
 class IcoRunCommand(IcoRuntimeCommand):
     @staticmethod
     def create() -> IcoActivateCommand:
-        return IcoActivateCommand(path=TreePathIndex())
+        return IcoActivateCommand()
 
 
 @final
@@ -62,4 +59,4 @@ class IcoDeactivateCommand(IcoRuntimeCommand):
 
     @staticmethod
     def create() -> IcoDeactivateCommand:
-        return IcoDeactivateCommand(path=TreePathIndex())
+        return IcoDeactivateCommand()

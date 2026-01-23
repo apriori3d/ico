@@ -4,15 +4,24 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
     RuntimeTraversalInfo,
-    create_runtime_walker,
 )
+from apriori.ico.core.runtime.state import (
+    IcoRuntimeState,
+    IcoStateEvent,
+    IcoStateRequestCommand,
+)
+from apriori.ico.core.tree_utils import TreePathIndex
 from apriori.ico.describe.rich_style import DescribeStyle
 from apriori.ico.describe.runtime.options import RuntimeRendererOptions
 from apriori.ico.describe.runtime.rich_renderer.custom_renderer import (
     RuntimeCustomRenderer,
+)
+from apriori.ico.describe.runtime.rich_renderer.render_target import (
+    create_runtime_renderer_walker,
 )
 from apriori.ico.describe.runtime.rich_renderer.renderer_registry import (
     RendererRegistry,
@@ -25,7 +34,7 @@ from apriori.ico.describe.utils import import_all_renderers
 RendererTypes: TypeAlias = RuntimeRowRenderer | RuntimeCustomRenderer
 
 
-class RuntimeTreeRenderer:
+class RuntimeTreeRenderer(IcoRuntimeNode):
     options: RuntimeRendererOptions
     console: Console
 
@@ -33,12 +42,15 @@ class RuntimeTreeRenderer:
     _group_indents: list[Text]
     _default_renderer: RuntimeRowRenderer
     _selected_renderers: dict[type[IcoRuntimeNode], RendererTypes]
+    _node_states: dict[TreePathIndex, IcoRuntimeState]
 
     def __init__(
         self,
         options: RuntimeRendererOptions | None = None,
         console: Console | None = None,
     ) -> None:
+        super().__init__()
+
         self.options = options or RuntimeRendererOptions()
         self.console = console or Console()
 
@@ -46,6 +58,7 @@ class RuntimeTreeRenderer:
         self._table = None
         self._group_indents = []
         self._selected_renderers = {}
+        self._node_states = {}
 
         for path in self.options.renderers_paths:
             import_all_renderers(path)
@@ -56,11 +69,25 @@ class RuntimeTreeRenderer:
             table.add_column(column, no_wrap=True)
         return table
 
+    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+        super().on_event(event)
+
+        if isinstance(event, IcoStateEvent) and len(event.trace.path_index) > 0:
+            runtime_index = TreePathIndex(
+                path_index=event.trace.reverse().path_index[1:]
+            )
+            self._node_states[runtime_index] = event.state
+
     def render(self, root: IcoRuntimeNode) -> None:
+        # Collect states via event API
+        self._node_states = {}
+        self.add_runtime_children(root)
+        self.broadcast_command(IcoStateRequestCommand.create())
+
         self._table = self._create_table()
 
-        tree_walker = create_runtime_walker(
-            expand_subtree_factories=self.options.expand_agents
+        tree_walker = create_runtime_renderer_walker(
+            expand_remote_runtimes=self.options.expand_agents
         )
         tree_walker.walk(
             root,
@@ -70,6 +97,8 @@ class RuntimeTreeRenderer:
 
         self.console.rule(f"[bold blue]Runtime tree: {root}", style="dim blue")
         self.console.print(self._table)
+
+        self.remove_runtime_child(root)
 
     def _select_renderer(
         self,
@@ -92,6 +121,8 @@ class RuntimeTreeRenderer:
 
     def render_node(self, node_info: RuntimeTraversalInfo) -> None:
         node = node_info.node
+        if node_info.path in self._node_states:
+            node.state_model.state = self._node_states[node_info.path]
 
         if node_info.current_order == "pre":
             renderer = self._select_renderer(node)

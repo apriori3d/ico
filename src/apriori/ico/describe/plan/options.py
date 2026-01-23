@@ -35,13 +35,12 @@ class PlanRendererOptions(RendererOptions):
     callable_format: CallableFormat = "__name__"
     signature_format: SignatureFormat = "Full"
 
-    dim_ico_nodes: bool = False
     query_iterable_size: bool = True
+    show_remote_flows: bool = True
+
+    dim_ico_nodes: bool = False
     show_ico_operator: bool = False
     show_node_icons: bool = True
-
-    expand_subflows: bool = True
-    expand_subflow_factories: bool = True
 
     flatten_node_type: set[type[IcoNode]] = field(
         default_factory=lambda: {

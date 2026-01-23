@@ -173,7 +173,7 @@ def infer_by_node_type(obj: object) -> IcoSignature | None:
 
         case MPAgent():
             process = cast(MPAgent[Any, Any], obj)
-            return infer_from_flow_factory(process.subflow_factory)
+            return infer_from_flow_factory(process.flow_factory)
 
         case IcoBatcher():
             # Generic parameter for batcher dosn't include Iterators

@@ -24,7 +24,9 @@ class IcoAsyncStreamRenderer(GroupRenderer):
         super().__init__(
             options=options,
             header_renderer=IcoAsyncStreamHeaderRender(
-                flow_column_prefix=Text("parallel ", style=DescribeStyle.keyword.value),
+                flow_column_prefix=Text(
+                    "parallel in ", style=DescribeStyle.keyword.value
+                ),
                 options=options,
             ),
             footer_renderer=StreamGroupPartRenderer(
