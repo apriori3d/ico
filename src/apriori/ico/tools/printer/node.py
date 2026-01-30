@@ -32,28 +32,6 @@ class IcoPrinter(IcoRuntimeNode):
 
 
 # ─────────────────────────────────────────────
-# Decorator
-# ─────────────────────────────────────────────
-
-
-def use_printer(
-    printer: IcoPrinter,
-) -> Callable[[IcoOperator[I, O]], IcoOperator[I, O]]:
-    def decorator(operator: IcoOperator[I, O]) -> IcoOperator[I, O]:
-        if isinstance(operator, IcoRuntimeWrapper):
-            operator.runtime_children.append(printer)
-            return operator
-
-        return IcoRuntimeWrapper[I, O](
-            operator,
-            runtime_children=[printer],
-            name=operator.name,
-        )
-
-    return decorator
-
-
-# ─────────────────────────────────────────────
 # Operator Wrapping Utility
 # ─────────────────────────────────────────────
 

@@ -98,3 +98,10 @@ class IcoRuntime(IcoRuntimeNode):
         except Exception as e:
             self.state_model.fault()
             raise e
+
+    def __str__(self):
+        return (
+            f"IcoRuntime(name={self.runtime_name}"
+            f", state={self.state_model.state}"
+            f", tools={len(self._toolbox.runtime_children) if self._toolbox else 0})"
+        )

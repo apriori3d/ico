@@ -5,7 +5,9 @@ from typing import Protocol, TypeAlias
 
 from rich.text import Text
 
-from apriori.ico.core.runtime.agent import IcoRemotePlaceholderNode
+from apriori.ico.core.runtime.agent import (
+    IcoRemotePlaceholderNode,
+)
 from apriori.ico.core.runtime.node import (
     HasRemoteRuntime,
     IcoRuntimeNode,
@@ -46,7 +48,8 @@ def create_runtime_renderer_walker(
 
         if expand_remote_runtimes and isinstance(node, HasRemoteRuntime):
             factory = node.get_remote_runtime_factory()
-            children.append(factory())
+            remote_runtime = factory()
+            children.append(remote_runtime)
 
         return [c for c in children if not isinstance(c, IcoRemotePlaceholderNode)]
 

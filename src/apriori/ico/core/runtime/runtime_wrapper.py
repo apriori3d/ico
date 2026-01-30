@@ -1,7 +1,8 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Generic
 
 from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
@@ -39,3 +40,28 @@ class IcoRuntimeWrapper(
 
     def _wrapper_fn(self, item: I) -> O:
         return self.operator(item)
+
+    def on_command(self, command: IcoRuntimeCommand):
+        return super().on_command(command)
+
+
+# ─────────────────────────────────────────────
+# Decorator
+# ─────────────────────────────────────────────
+
+
+def use_runtime(
+    *nodes: IcoRuntimeNode,
+) -> Callable[[IcoOperator[I, O]], IcoOperator[I, O]]:
+    def decorator(operator: IcoOperator[I, O]) -> IcoOperator[I, O]:
+        if isinstance(operator, IcoRuntimeNode):
+            operator.runtime_children.extend(nodes)
+            return operator
+
+        return IcoRuntimeWrapper[I, O](
+            operator,
+            runtime_children=nodes,
+            name=operator.name,
+        )
+
+    return decorator

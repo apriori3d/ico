@@ -4,6 +4,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from apriori.ico.core.runtime.agent import IcoAgentWorker
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
@@ -140,6 +141,8 @@ class RuntimeTreeRenderer(IcoRuntimeNode):
                     style=DescribeStyle.tree.value,
                 )
 
+            if isinstance(node_info.node, IcoAgentWorker):
+                print("!")
             self.render_row(renderer, node, indent=branch)
 
             # Open subtree group for children.

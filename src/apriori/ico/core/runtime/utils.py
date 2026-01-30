@@ -23,10 +23,13 @@ def discover_and_connect_runtime_nodes(
 def _discover_runtime_subtrees(flow: IcoNode) -> list[IcoRuntimeNode]:
     """Discover all runtime hosts within the given flow."""
     roots = OrderedDict[IcoRuntimeNode, None]()
+    runtime_nodes = set[IcoRuntimeNode]()
 
     for node_info in create_flow_walker().traverse(flow):
         if not isinstance(node_info.node, IcoRuntimeNode):
             continue
+
+        runtime_nodes.add(node_info.node)
 
         if node_info.node.runtime_parent is None:
             roots[node_info.node] = None
@@ -36,4 +39,14 @@ def _discover_runtime_subtrees(flow: IcoNode) -> list[IcoRuntimeNode]:
         if len(all_parents) > 0:
             roots[all_parents[-1]] = None
 
-    return list(roots.keys())
+    root_nodes = list(roots.keys())
+
+    # Check for external connections - it is possible if flow factory returns existing runtime nodes
+    external_runtimes = [r for r in root_nodes if r not in runtime_nodes]
+    if len(external_runtimes) > 0:
+        raise RuntimeError(
+            "Some runtime nodes already connected to external runtimes: "
+            + ", ".join(str(r) for r in external_runtimes)
+            + ". Possibly the flow factory returned existing runtime nodes."
+        )
+    return root_nodes

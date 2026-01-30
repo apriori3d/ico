@@ -56,7 +56,8 @@ def create_plan_walker(expand_remote_flows: bool) -> PlanTreeWalker:
 
         if expand_remote_flows and isinstance(node, HasRemoteFlow):
             factory = node.get_remote_flow_factory()
-            children.append(factory())
+            flow = factory()
+            children.append(flow)
 
         return children
 
