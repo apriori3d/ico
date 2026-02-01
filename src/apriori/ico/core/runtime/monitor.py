@@ -17,7 +17,7 @@ class IcoMonitor(
     def __call__(self, item: I) -> I:
         self._before_call(item)
 
-        result = super.__call__(item)
+        result = super().__call__(item)
 
         self._after_call(item)
         return result

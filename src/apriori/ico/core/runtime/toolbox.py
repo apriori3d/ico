@@ -17,9 +17,9 @@ class IcoToolRegistrationProtocol(Protocol):
 class IcoToolBox(IcoRuntimeNode):
     """Container for multiple runtime tools."""
 
-    __slots__ = ("shell", "tools")
+    __slots__ = ("runtime", "tools")
 
-    shell: IcoRuntimeNode
+    runtime: IcoRuntimeNode
     tools: list[IcoTool]
 
     def __init__(
@@ -28,7 +28,7 @@ class IcoToolBox(IcoRuntimeNode):
         tools: Sequence[IcoTool] | None = None,
     ) -> None:
         super().__init__()
-        self.shell = runtime
+        self.runtime = runtime
         self.tools = []
         if tools is not None:
             self.add_tool(*tools)
@@ -39,9 +39,9 @@ class IcoToolBox(IcoRuntimeNode):
 
         for tool in tools:
             if isinstance(tool, IcoToolRegistrationProtocol):
-                runtime_walker = create_runtime_walker()
+                runtime_walker = create_runtime_walker(expand_remote_runtimes=True)
 
-                for node_info in runtime_walker.traverse(self.shell):
+                for node_info in runtime_walker.traverse(self.runtime):
                     tool.register_node(*node_info.node_path)
 
     def remove_tool(self, *tools: IcoTool) -> None:

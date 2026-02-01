@@ -37,7 +37,7 @@ class RichProgressTool(IcoTool):
     def register_node(self, node: IcoRuntimeNode, path: TreePathIndex) -> None:
         if isinstance(node, IcoProgress):
             task_id = self.progress.add_task(
-                description=node.name or "Progress",
+                description=node.name or f"Progress {len(self._tasks)}",
                 total=node.total,
             )
             self._tasks[path] = task_id

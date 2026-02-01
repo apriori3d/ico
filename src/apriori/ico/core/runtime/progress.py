@@ -35,4 +35,4 @@ class IcoProgress(Generic[I], IcoMonitor[I]):
 
     def _before_call(self, item: I) -> None:
         super()._before_call(item)
-        self.bubble_event(IcoProgressEvent.create(advance=1), from_child=self)
+        self.bubble_event(IcoProgressEvent.create(advance=1))

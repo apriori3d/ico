@@ -74,10 +74,10 @@ class IcoRuntime(IcoRuntimeNode):
             state_model=state_model,
         )
         self.closure = closure
+        discover_and_connect_runtime_nodes(self, closure)
+
         self.toolbox = IcoToolBox(runtime=self, tools=tools)
         self.add_runtime_children(self.toolbox)
-
-        discover_and_connect_runtime_nodes(self, closure)
 
     # ────── Tools management ──────
 
@@ -104,10 +104,3 @@ class IcoRuntime(IcoRuntimeNode):
         except Exception as e:
             self.state_model.fault()
             raise e
-
-    def __str__(self):
-        return (
-            f"IcoRuntime(name={self.runtime_name}"
-            f", state={self.state_model.state}"
-            f", tools={len(self.toolbox.runtime_children) if self.toolbox else 0})"
-        )

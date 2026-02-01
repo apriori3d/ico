@@ -214,6 +214,12 @@ class IcoRuntimeNode(ABC):
         yield self.runtime_parent
         yield from self.runtime_parent.iterate_parents()
 
+    def __str__(self):
+        return (
+            f"{self.__class__}(name={self.runtime_name}"
+            f", state={self.state_model.state})"
+        )
+
 
 # ────────────────────────────────────────────────
 # Remote runtime factory protocol
@@ -270,8 +276,21 @@ def create_runtime_walker(expand_remote_runtimes: bool = False) -> RuntimeTreeWa
 
         if expand_remote_runtimes and isinstance(node, HasRemoteRuntime):
             factory = node.get_remote_runtime_factory()
-            children.append(factory())
+            placeholder_index = get_placeholder_index(children)
+            children[placeholder_index] = factory()
 
         return children
 
     return RuntimeTreeWalker(get_children_fn=_get_children)
+
+
+def get_placeholder_index(children: list[IcoRuntimeNode]):
+    placeholder_indices = [
+        i for i, c in enumerate(children) if isinstance(c, IcoRemotePlaceholderNode)
+    ]
+    if len(placeholder_indices) == 0:
+        raise RuntimeError("No remote placeholder found among runtime children.")
+    if len(placeholder_indices) > 1:
+        raise RuntimeError("Multiple remote placeholders found among runtime children.")
+
+    return placeholder_indices[0]
