@@ -8,8 +8,13 @@ from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
 )
 from apriori.ico.core.runtime.state import BaseStateModel
+from apriori.ico.core.runtime.tool import IcoTool
 from apriori.ico.core.runtime.toolbox import IcoToolBox
 from apriori.ico.core.runtime.utils import discover_and_connect_runtime_nodes
+
+
+class OnForwardEventProtocol:
+    def on_forward_event(self, event: IcoRuntimeEvent) -> None: ...
 
 
 class IcoRuntime(IcoRuntimeNode):
@@ -48,7 +53,8 @@ class IcoRuntime(IcoRuntimeNode):
     """
 
     closure: IcoOperator[None, None]
-    _toolbox: IcoToolBox | None
+    toolbox: IcoToolBox
+    event_listeners: list[OnForwardEventProtocol] = []
 
     def __init__(
         self,
@@ -58,7 +64,7 @@ class IcoRuntime(IcoRuntimeNode):
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
-        tools: Sequence[IcoRuntimeNode] | None = None,
+        tools: Sequence[IcoTool] | None = None,
     ) -> None:
         IcoRuntimeNode.__init__(
             self,
@@ -68,22 +74,22 @@ class IcoRuntime(IcoRuntimeNode):
             state_model=state_model,
         )
         self.closure = closure
+        self.toolbox = IcoToolBox(runtime=self, tools=tools)
+        self.add_runtime_children(self.toolbox)
 
         discover_and_connect_runtime_nodes(self, closure)
-
-        if tools is not None:
-            self._toolbox = IcoToolBox(shell=self, tools=tools)
-            self.add_runtime_children(self._toolbox)
-            self._toolbox.register_tools()
-        else:
-            self._toolbox = None
 
     # ────── Tools management ──────
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         super().on_event(event)
 
-        return self._toolbox.on_event(event) if self._toolbox else event
+        self.toolbox.on_forward_event(event)
+
+        for listener in self.event_listeners:
+            listener.on_forward_event(event)
+
+        return event
 
     # # ─── Execution ───
 
@@ -103,5 +109,5 @@ class IcoRuntime(IcoRuntimeNode):
         return (
             f"IcoRuntime(name={self.runtime_name}"
             f", state={self.state_model.state}"
-            f", tools={len(self._toolbox.runtime_children) if self._toolbox else 0})"
+            f", tools={len(self.toolbox.runtime_children) if self.toolbox else 0})"
         )

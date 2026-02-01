@@ -19,6 +19,10 @@ class TreePathIndex:
     def __str__(self) -> str:
         return ".".join(map(str, self.path_index))
 
+    @staticmethod
+    def create(*path_index: int) -> TreePathIndex:
+        return TreePathIndex(path_index=tuple(path_index))
+
 
 T = TypeVar("T")
 C = TypeVar("C")

@@ -5,6 +5,7 @@ from typing import Protocol, runtime_checkable
 
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode, create_runtime_walker
+from apriori.ico.core.runtime.tool import IcoTool
 from apriori.ico.core.tree_utils import TreePathIndex
 
 
@@ -19,38 +20,36 @@ class IcoToolBox(IcoRuntimeNode):
     __slots__ = ("shell", "tools")
 
     shell: IcoRuntimeNode
-    tools: list[IcoRuntimeNode]
+    tools: list[IcoTool]
 
     def __init__(
         self,
-        shell: IcoRuntimeNode,
-        tools: Sequence[IcoRuntimeNode] | None = None,
+        runtime: IcoRuntimeNode,
+        tools: Sequence[IcoTool] | None = None,
     ) -> None:
         super().__init__()
-        self.shell = shell
-        self.tools = list(tools) if tools is not None else []
-        self.add_runtime_children(*self.tools)
+        self.shell = runtime
+        self.tools = []
+        if tools is not None:
+            self.add_tool(*tools)
 
-    def register_tools(self) -> None:
-        pending_tools = [
-            tool for tool in self.tools if isinstance(tool, IcoToolRegistrationProtocol)
-        ]
-        if len(pending_tools) == 0:
-            return
+    def add_tool(self, *tools: IcoTool) -> None:
+        self.tools.extend(tools)
+        self.add_runtime_children(*tools)
 
-        runtime_walker = create_runtime_walker()
+        for tool in tools:
+            if isinstance(tool, IcoToolRegistrationProtocol):
+                runtime_walker = create_runtime_walker()
 
-        for node_info in runtime_walker.traverse(self.shell):
-            print("Registering node:", node_info.node, "at path:", node_info.node_path)
-            for tool in pending_tools:
-                tool.register_node(*node_info.node_path)
+                for node_info in runtime_walker.traverse(self.shell):
+                    tool.register_node(*node_info.node_path)
 
-    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        super().on_event(event)
+    def remove_tool(self, *tools: IcoTool) -> None:
+        for tool in tools:
+            self.tools.remove(tool)
+        self.remove_runtime_child(*tools)
 
+    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         # Forward event to tools
         for tool in self.tools:
-            if not tool.on_event(event):
-                return None
-
-        return event
+            tool.on_forward_event(event)

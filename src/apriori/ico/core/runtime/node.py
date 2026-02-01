@@ -126,7 +126,7 @@ class IcoRuntimeNode(ABC):
         self,
         event: IcoRuntimeEvent,
         from_child: IcoRuntimeNode | None = None,
-    ) -> IcoRuntimeEvent | None:
+    ) -> None:
         """
         Propagate a runtime event upward until a contour or agent host is reached.
         """
@@ -148,16 +148,24 @@ class IcoRuntimeNode(ABC):
     def add_runtime_children(self, *children: IcoRuntimeNode) -> Self:
         """Connect to a runtime host for command propagation."""
         for child in children:
+            if child.runtime_parent is not None:
+                raise ValueError(
+                    f"Child node {child} already has a runtime parent "
+                    f"{child.runtime_parent}"
+                )
             if child not in self._runtime_children:
                 self._runtime_children.append(child)
             child._runtime_parent = self
         return self
 
-    def remove_runtime_child(self, child: IcoRuntimeNode) -> Self:
+    def remove_runtime_child(self, *children: IcoRuntimeNode) -> Self:
         """Disconnect from a runtime host."""
-        if child in self._runtime_children:
-            self._runtime_children.remove(child)
-        child._runtime_parent = None
+        for child in children:
+            if child.runtime_parent is not self:
+                raise ValueError(f"Child node {child} is not a runtime child of {self}")
+            if child in self._runtime_children:
+                self._runtime_children.remove(child)
+            child._runtime_parent = None
         return self
 
     # ────────────────────────────────────────────────

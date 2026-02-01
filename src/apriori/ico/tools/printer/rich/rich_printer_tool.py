@@ -7,9 +7,9 @@ from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.runtime_wrapper import use_runtime
+from apriori.ico.core.runtime.runtime_wrapper import with_runtime
+from apriori.ico.core.runtime.tool import IcoTool
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
@@ -20,33 +20,33 @@ from apriori.ico.tools.printer.node import (
 
 
 @final
-class RichPrinterTool(IcoRuntimeNode):
+class RichPrinterTool(IcoTool):
     _console: Console
 
     def __init__(self, console: Console):
-        IcoRuntimeNode.__init__(self)
+        super().__init__()
         self._console = console
 
-    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+    def on_forward_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoPrintEvent):
             self._console.print(event.message)
             return None  # Stop propagation after handling log event
 
-        return super().on_event(event)
+        return super().on_forward_event(event)
 
 
 def create_agent_flow() -> IcoOperator[int, int]:
     # Create fresh instances to avoid sharing runtime connections with main flow
     printer = IcoPrinter()
 
-    @use_runtime(printer)
+    @with_runtime(printer)
     @operator()
     def agent_double(x: int) -> int:
         res = x * 2
         printer(f"Doubling {x} to get {res}")
         return res
 
-    @use_runtime(printer)
+    @with_runtime(printer)
     @operator()
     def agent_shift(x: int) -> int:
         res = x + 1
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     def numbers() -> Iterator[int]:
         yield from range(3)
 
-    @use_runtime(printer)
+    @with_runtime(printer)
     @sink()
     def print_result(x: int) -> None:
         printer(f"Sink received: {x}")

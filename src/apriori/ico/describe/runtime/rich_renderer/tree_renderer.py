@@ -1,4 +1,4 @@
-from typing import TypeAlias
+from typing import TypeAlias, cast, overload
 
 from rich.console import Console
 from rich.table import Table
@@ -10,11 +10,13 @@ from apriori.ico.core.runtime.node import (
     IcoRuntimeNode,
     RuntimeTraversalInfo,
 )
+from apriori.ico.core.runtime.runtime import IcoRuntime, OnForwardEventProtocol
 from apriori.ico.core.runtime.state import (
     IcoRuntimeState,
     IcoStateEvent,
     IcoStateRequestCommand,
 )
+from apriori.ico.core.runtime.tool import IcoTool
 from apriori.ico.core.tree_utils import TreePathIndex
 from apriori.ico.describe.rich_style import DescribeStyle
 from apriori.ico.describe.runtime.options import RuntimeRendererOptions
@@ -35,7 +37,7 @@ from apriori.ico.describe.utils import import_all_renderers
 RendererTypes: TypeAlias = RuntimeRowRenderer | RuntimeCustomRenderer
 
 
-class RuntimeTreeRenderer(IcoRuntimeNode):
+class RuntimeTreeRenderer(IcoTool):
     options: RuntimeRendererOptions
     console: Console
 
@@ -70,20 +72,32 @@ class RuntimeTreeRenderer(IcoRuntimeNode):
             table.add_column(column, no_wrap=True)
         return table
 
-    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        super().on_event(event)
+    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
+        super().on_forward_event(event)
 
-        if isinstance(event, IcoStateEvent) and len(event.trace.path_index) > 0:
-            runtime_index = TreePathIndex(
-                path_index=event.trace.reverse().path_index[1:]
-            )
+        if isinstance(event, IcoStateEvent):
+            runtime_index = event.trace.reverse()
             self._node_states[runtime_index] = event.state
 
-    def render(self, root: IcoRuntimeNode) -> None:
-        # Collect states via event API
-        self._node_states = {}
-        self.add_runtime_children(root)
-        self.broadcast_command(IcoStateRequestCommand.create())
+    @overload
+    def render(self, node: IcoRuntime, collect_state: bool = True) -> None: ...
+
+    @overload
+    def render(self, node: IcoRuntimeNode, collect_state: bool = True) -> None: ...
+
+    def render(
+        self, node: IcoRuntimeNode | IcoRuntime, collect_state: bool = True
+    ) -> None:
+        # Use tool api to collect state from all nodes
+        if collect_state:
+            assert isinstance(node, IcoRuntime)
+            self_forward_event: OnForwardEventProtocol = cast(
+                OnForwardEventProtocol, self
+            )
+            node.event_listeners.append(self_forward_event)
+            self._node_states = {}
+            node.broadcast_command(IcoStateRequestCommand.create())
+            node.event_listeners.remove(self_forward_event)
 
         self._table = self._create_table()
 
@@ -91,15 +105,13 @@ class RuntimeTreeRenderer(IcoRuntimeNode):
             expand_remote_runtimes=self.options.expand_agents
         )
         tree_walker.walk(
-            root,
+            node,
             visit_fn=self.render_node,
             order="pre_post",  # Need post order to close subtree groups
         )
 
-        self.console.rule(f"[bold blue]Runtime tree: {root}", style="dim blue")
+        self.console.rule(f"[bold blue]Runtime tree: {node}", style="dim blue")
         self.console.print(self._table)
-
-        self.remove_runtime_child(root)
 
     def _select_renderer(
         self,

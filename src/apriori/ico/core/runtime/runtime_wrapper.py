@@ -50,18 +50,26 @@ class IcoRuntimeWrapper(
 # ─────────────────────────────────────────────
 
 
-def use_runtime(
+def with_runtime(
     *nodes: IcoRuntimeNode,
 ) -> Callable[[IcoOperator[I, O]], IcoOperator[I, O]]:
     def decorator(operator: IcoOperator[I, O]) -> IcoOperator[I, O]:
-        if isinstance(operator, IcoRuntimeNode):
-            operator.runtime_children.extend(nodes)
-            return operator
-
-        return IcoRuntimeWrapper[I, O](
-            operator,
-            runtime_children=nodes,
-            name=operator.name,
-        )
+        return with_runtime_fn(operator, *nodes)
 
     return decorator
+
+
+def with_runtime_fn(
+    operator: IcoOperator[I, O],
+    *nodes: IcoRuntimeNode,
+) -> IcoOperator[I, O]:
+    unbind_nodes = [n for n in nodes if n.runtime_parent is None]
+    if len(unbind_nodes) == 0:
+        return operator
+
+    if isinstance(operator, IcoRuntimeNode):
+        # Attach only unbind nodes to runtime tree.
+        operator.add_runtime_children(*unbind_nodes)
+        return operator
+
+    return IcoRuntimeWrapper[I, O](operator, runtime_children=unbind_nodes)

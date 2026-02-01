@@ -1,6 +1,6 @@
 import time
 from collections.abc import Iterator
-from typing import ClassVar, final
+from typing import final
 
 from rich.progress import Progress, TaskID
 
@@ -14,6 +14,8 @@ from apriori.ico.core.runtime.progress import (
     IcoProgress,
     IcoProgressEvent,
 )
+from apriori.ico.core.runtime.runtime import IcoRuntime
+from apriori.ico.core.runtime.tool import IcoTool
 from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.core.tree_utils import TreePathIndex
@@ -21,15 +23,14 @@ from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @final
-class RichProgressTool(IcoRuntimeNode):
+class RichProgressTool(IcoTool):
     __slots__ = ("progress", "_tasks")
-    node_types: ClassVar[set[type[IcoRuntimeNode]]] = {IcoProgress}
 
     progress: Progress
     _tasks: dict[TreePathIndex, TaskID]
 
     def __init__(self, progress: Progress):
-        IcoRuntimeNode.__init__(self)
+        super().__init__()
         self.progress = progress
         self._tasks = {}
 
@@ -41,7 +42,9 @@ class RichProgressTool(IcoRuntimeNode):
             )
             self._tasks[path] = task_id
 
-    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
+        super().on_forward_event(event)
+
         if isinstance(event, IcoProgressEvent):
             path = event.trace.reverse()
             if path not in self._tasks:
@@ -58,8 +61,6 @@ class RichProgressTool(IcoRuntimeNode):
 
             # # Stop propagation after handling log event
             return None
-
-        return super().on_event(event)
 
 
 class WorkerFlow:
@@ -120,14 +121,11 @@ if __name__ == "__main__":
 
         progress_tool = RichProgressTool(progress)
 
-        shell = flow.shell().add_tool(progress_tool)
-        shell.activate()
-        describe(shell, console=console)
+        runtime = IcoRuntime(flow, tools=[progress_tool])
+        runtime.activate()
+        describe(runtime, console=console)
 
-        # progress_tool.discover()
-        # describe(flow, console=console)
+        runtime.run()
 
-        # runtime.run()
-
-        # runtime.deactivate()
-        # describe(flow, console=console)
+        runtime.deactivate()
+        describe(flow, console=console)
