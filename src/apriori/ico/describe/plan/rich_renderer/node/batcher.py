@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from rich.text import Text
 
+from apriori.ico.core.batcher import IcoBatcher
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.source import source
 from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
@@ -12,7 +13,6 @@ from apriori.ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
 from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.utils.data.batcher import IcoBatcher
 
 
 @register_renderer(IcoBatcher)

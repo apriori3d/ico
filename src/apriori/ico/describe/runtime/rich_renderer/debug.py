@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Iterator
 
 from apriori.ico.core.async_stream import IcoAsyncStream
+from apriori.ico.core.batcher import IcoBatcher
 from apriori.ico.core.operator import IcoOperator, operator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.runtime.progress import IcoProgress
@@ -9,7 +10,6 @@ from apriori.ico.core.sink import sink
 from apriori.ico.core.source import source
 from apriori.ico.describe.runtime.rich_renderer.tree_renderer import RuntimeTreeRenderer
 from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
-from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ──── 1. Define a batched data source ────
 data = [0.5, 1.0, 1.5, 2.0, 0.8, 0.2, 1.0, 1.2, 0.9]

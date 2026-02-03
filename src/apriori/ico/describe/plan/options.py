@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 from apriori.ico.core.async_stream import IcoAsyncStream
+from apriori.ico.core.batcher import IcoBatcher
 from apriori.ico.core.chain import IcoChain
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
@@ -16,7 +17,6 @@ from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
 from apriori.ico.describe.options import RendererOptions
-from apriori.ico.utils.data.batcher import IcoBatcher
 
 PlanRendererColumn: TypeAlias = Literal["Flow", "Signature", "Name"]
 CallableFormat: TypeAlias = Literal["__name__", "str()"]

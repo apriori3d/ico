@@ -4,10 +4,10 @@ from typing import TypeAlias, final
 import torch
 from torch import Tensor
 
+from apriori.ico.core.batcher import IcoBatcher
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.pipeline import IcoPipeline
 from apriori.ico.core.source import IcoSource
-from apriori.ico.utils.data.batcher import IcoBatcher
 from examples.visual.cifar.augment import (
     AdjustBrightness,
     AdjustContrast,

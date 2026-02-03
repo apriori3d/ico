@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 
+from apriori.ico.core.batcher import IcoBatcher
 from apriori.ico.core.context_operator import IcoContextOperator
 from apriori.ico.core.context_pipeline import IcoContextPipeline
 from apriori.ico.core.epoch import IcoEpoch
@@ -9,7 +10,6 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
-from apriori.ico.utils.data.batcher import IcoBatcher
 
 # ─── Operator ───
 
