@@ -11,6 +11,8 @@ from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.event import (
     IcoFaultEvent,
 )
+from apriori.ico.core.signature import IcoSignature
+from apriori.ico.core.signature_utils import infer_from_flow_factory
 from apriori.ico.runtime.agent.mp.mp_channel import (
     MPChannel,
 )
@@ -137,6 +139,21 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
         worker = worker_factory()
         # Run agent to start receiving and processing commands and items
         worker.run_loop()
+
+    # ────── Signature API ──────
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        if signature.infered:
+            signature = infer_from_flow_factory(self.flow_factory)
+
+        return IcoSignature(
+            i=signature.c,
+            c=None,
+            o=signature.c,
+        )
 
 
 @final

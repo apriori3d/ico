@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, Generic
+from typing import Any, ClassVar, Generic
 
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.channel.channel import IcoChannel
@@ -21,6 +21,8 @@ from apriori.ico.core.runtime.state import (
     ReadyState,
 )
 from apriori.ico.core.runtime.utils import discover_and_connect_runtime_nodes
+from apriori.ico.core.signature import IcoSignature
+from apriori.ico.core.signature_utils import infer_from_flow_factory
 
 
 @dataclass(slots=True, frozen=True)
@@ -199,6 +201,17 @@ class IcoAgent(
                 f"Agent event fault received: {event.info['message']}"
             )
         return super().on_event(event)
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        if not signature.infered:
+            signature = infer_from_flow_factory(self.flow_factory)
+
+            if signature is None:
+                signature = IcoSignature(i=Any, c=None, o=Any, infered=False)
+        return signature
 
 
 class IcoAgentWorker(

@@ -8,6 +8,7 @@ from apriori.ico.core.context_operator import (
     wrap_context_operator,
 )
 from apriori.ico.core.operator import IcoOperator, wrap_operator
+from apriori.ico.core.signature import IcoSignature
 
 
 class IcoEpoch(
@@ -39,3 +40,16 @@ class IcoEpoch(
         for item in self.source(None):
             context = self.context_operator(item, context)
         return context
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        if not signature.infered:
+            signature = self.context_operator.signature
+
+        return IcoSignature(
+            i=Iterator[signature.i],
+            c=signature.c,
+            o=signature.c,
+        )

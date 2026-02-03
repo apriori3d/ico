@@ -9,6 +9,7 @@ from apriori.ico.core.operator import (
     O,
     wrap_operator,
 )
+from apriori.ico.core.signature import IcoSignature
 
 
 @final
@@ -50,3 +51,17 @@ class IcoStream(
     def _stream_fn(self, items: Iterator[I]) -> Iterator[O]:
         for item in items:
             yield self.body(item)
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        # If signature is undefined, infer from body operator
+        if not signature.infered:
+            signature = self.body.signature
+
+        return IcoSignature(
+            i=Iterator[signature.i],
+            c=None,
+            o=Iterator[signature.o],
+        )

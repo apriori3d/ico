@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
+from apriori.ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
@@ -109,14 +110,32 @@ class IcoOperator(Generic[I, O], IcoNode):
         return IcoStream(self)
 
     # ────────────────────────────────────────────────
-    # Runtime interface
+    # Signature interface
     # ────────────────────────────────────────────────
 
-    # def shell(self) -> IcoShell[I, O]:
-    #     """Create a runtime contour for this operator."""
-    #     from apriori.ico.core.runtime.shell import IcoShell
+    @property
+    def signature(self) -> IcoSignature:
+        """Infer ICO signature of this operator."""
+        from apriori.ico.core.signature_utils import (
+            get_generic_args,
+            infer_from_callable,
+        )
 
-    #     return IcoShell(self)
+        # 1. Infer from generic type parameters if available
+        args = get_generic_args(self)
+        if args is not None:
+            if len(args) == 1:
+                return IcoSignature(i=args[0], c=None, o=args[0])
+            if len(args) == 2:
+                return IcoSignature(i=args[0], c=None, o=args[1])
+
+        # 2. Infer from callable signature
+        signature = infer_from_callable(self.fn)
+        if signature is not None:
+            return signature
+
+        # 3. Fallback to Any types
+        return IcoSignature(i=Any, c=None, o=Any, infered=False)
 
 
 # ─────────────────────────────────────────────

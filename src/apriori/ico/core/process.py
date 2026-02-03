@@ -8,6 +8,7 @@ from apriori.ico.core.operator import (
     IcoOperator,
     wrap_operator,
 )
+from apriori.ico.core.signature import IcoSignature
 
 
 @final
@@ -39,7 +40,7 @@ class IcoProcess(
     __slots__ = ("num_iterations", "body")
 
     num_iterations: int
-    body: Callable[[C], C]
+    body: IcoOperator[C, C]
 
     def __init__(
         self,
@@ -48,7 +49,7 @@ class IcoProcess(
         num_iterations: int,
         name: str | None = None,
     ):
-        body_fn = body
+        # body_fn = body
         body = wrap_operator(body)
 
         super().__init__(
@@ -56,10 +57,17 @@ class IcoProcess(
             name=name or "process",
             children=[body],
         )
-        self.body = body_fn
+        self.body = body
         self.num_iterations = num_iterations
 
     def _process_fn(self, context: C) -> C:
         for _ in range(self.num_iterations):
             context = self.body(context)
         return context
+
+    @property
+    def signature(self) -> IcoSignature:
+        """Infer ICO signature of this operator."""
+        signature = super().signature
+
+        return signature if signature.infered else self.body.signature

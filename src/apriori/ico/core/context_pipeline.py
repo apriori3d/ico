@@ -14,6 +14,7 @@ from apriori.ico.core.operator import (
     O,
     wrap_operator,
 )
+from apriori.ico.core.signature import IcoSignature
 
 
 @final
@@ -55,3 +56,9 @@ class IcoContextPipeline(
 
     def __len__(self) -> int:
         return len(self.body)
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        return signature if signature.infered else self.apply.signature

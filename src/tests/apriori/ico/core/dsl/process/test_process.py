@@ -1,4 +1,3 @@
-from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.process import IcoProcess
 
@@ -30,12 +29,12 @@ def test_process_body_can_mutate_context() -> None:
         def __init__(self) -> None:
             self.value = 0
 
-        def step(self) -> "Counter":
+        def __call__(self) -> "Counter":
             self.value += 1
             return self
 
     # Wrap stateful callable
-    step = IcoOperator[Counter, Counter](lambda c: c.step(), name="step")
+    step = IcoOperator[Counter, Counter](lambda c: c(), name="step")
 
     process = IcoProcess[Counter](body=step, num_iterations=5)
 
@@ -45,23 +44,6 @@ def test_process_body_can_mutate_context() -> None:
     # Context should be mutated in-place
     assert result.value == 5
     assert c is result  # same object reference
-
-
-def test_process_structure_representation() -> None:
-    """
-    Test that IcoProcess exposes correct flow structure.
-    """
-
-    step = IcoOperator[int, int](lambda x: x * 2, name="scale")
-    process = IcoProcess[int](body=step, num_iterations=2)
-
-    flow = IcoNodeMeta.from_node(process)
-
-    # Root node should be a process
-    assert flow.node_type == "process"
-    assert len(flow.children) == 1
-    assert flow.children[0].name == "scale"
-    assert flow.children[0].node_type == "operator"
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from typing import Generic, TypeVar, final, overload
 
 from apriori.ico.core.async_operator import IcoAsyncOperator
 from apriori.ico.core.operator import I, IcoOperator, O
+from apriori.ico.core.signature import IcoSignature
 
 
 @final
@@ -102,6 +103,24 @@ class IcoAsyncStream(
         self._has_job = False
         self._next_index = 0
         self._ordering_buffer: dict[int, O | Exception] = {}
+
+    # ─── Signature API ───
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        # If signature is undefined, infer from body operator
+        if not signature.infered:
+            signature = self.pool[0].signature
+
+        return IcoSignature(
+            i=Iterator[signature.i],
+            c=None,
+            o=Iterator[signature.o],
+        )
+
+    # ─── Async iterator state management ───
 
     def _reset_iterator_state(self) -> None:
         """Reset per-iteration state (important when stream reused across runs)."""

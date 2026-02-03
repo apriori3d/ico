@@ -4,6 +4,7 @@ from typing import Generic
 from apriori.ico.core.operator import I, IcoOperator, O
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.signature import IcoSignature
 
 
 class IcoRuntimeWrapper(
@@ -43,6 +44,12 @@ class IcoRuntimeWrapper(
 
     def on_command(self, command: IcoRuntimeCommand):
         return super().on_command(command)
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        return signature if signature.infered else self.operator.signature
 
 
 # ─────────────────────────────────────────────

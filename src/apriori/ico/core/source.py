@@ -1,10 +1,11 @@
 from collections.abc import Callable, Iterable, Iterator
-from typing import Generic, final
+from typing import Any, Generic, final
 
 from apriori.ico.core.operator import (
     IcoOperator,
     O,
 )
+from apriori.ico.core.signature import IcoSignature
 
 
 @final
@@ -41,6 +42,46 @@ class IcoSource(
 
     def _iterator_fn(self, _: None) -> Iterator[O]:
         yield from self.provider()
+
+    @property
+    def signature(self) -> IcoSignature:
+        from types import GenericAlias
+        from typing import get_args
+
+        from apriori.ico.core.signature_utils import (
+            infer_from_callable,
+        )
+
+        signature = super().signature
+        if signature.infered:
+            return IcoSignature(
+                i=None,
+                c=None,
+                o=Iterator[signature.o],
+            )
+
+        # Infer from provider callable
+        provider_signature = infer_from_callable(self.provider)
+
+        # Provider returns an Iterable[T], we need to convert it to Iterator[T]
+        # to match IcoSource signature
+        if provider_signature is not None and isinstance(
+            provider_signature.o, GenericAlias
+        ):
+            o_args = get_args(provider_signature.o)
+
+            return IcoSignature(
+                i=type(None),
+                c=type(None),
+                o=Iterator[o_args],
+            )
+
+        return IcoSignature(
+            i=None,
+            c=None,
+            o=Iterator[Any],
+            infered=False,
+        )
 
 
 # ─────────────────────────────────────────────

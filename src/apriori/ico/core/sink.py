@@ -1,10 +1,11 @@
 from collections.abc import Callable, Iterator
-from typing import Generic
+from typing import Any, Generic
 
 from apriori.ico.core.operator import (
     I,
     IcoOperator,
 )
+from apriori.ico.core.signature import IcoSignature
 
 
 class IcoSink(
@@ -29,6 +30,38 @@ class IcoSink(
     def _sink_fn(self, items: Iterator[I]) -> None:
         for item in items:
             self.consumer(item)
+
+    @property
+    def signature(self) -> IcoSignature:
+        from apriori.ico.core.signature_utils import (
+            infer_from_callable,
+        )
+
+        signature = super().signature
+
+        if signature.infered:
+            return IcoSignature(
+                i=Iterator[signature.i],
+                c=None,
+                o=None,
+            )
+
+        # Infer from consumer callable
+        consumer_signature = infer_from_callable(self.consumer)
+
+        if consumer_signature is not None:
+            return IcoSignature(
+                i=Iterator[consumer_signature.i],
+                c=None,
+                o=None,
+            )
+
+        return IcoSignature(
+            i=Iterator[Any],
+            c=None,
+            o=None,
+            infered=False,
+        )
 
 
 # ─────────────────────────────────────────────

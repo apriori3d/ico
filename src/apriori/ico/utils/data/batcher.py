@@ -2,6 +2,8 @@ from collections.abc import Iterator
 from typing import Generic
 
 from apriori.ico.core.operator import I, IcoOperator
+from apriori.ico.core.signature import IcoSignature
+from apriori.ico.core.signature_utils import wrap_iterator_or_none
 
 
 class IcoBatcher(
@@ -35,3 +37,13 @@ class IcoBatcher(
 
         if len(batch) > 0 and not self.drop_last:
             yield iter(batch)
+
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
+
+        return IcoSignature(
+            i=wrap_iterator_or_none(signature.i),
+            c=None,
+            o=wrap_iterator_or_none(wrap_iterator_or_none(signature.i)),
+        )

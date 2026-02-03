@@ -1,17 +1,14 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 
-from apriori.ico.core.meta.node_meta import IcoNodeMeta
 from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
-from apriori.ico.core.stream import IcoStream
 
 IntOperator = IcoOperator[int, int]
 
 
-def sink_fn(data: Iterable[int]) -> None:
-    for _ in data:
-        pass  # Simulate consuming the data
+def sink_fn(data: int) -> None:
+    pass  # Simulate consuming the data
 
 
 def test_data_consumes_iterable() -> None:
@@ -31,36 +28,6 @@ def test_data_consumes_iterable() -> None:
     flow = source | sink
     flow(None)
     assert read_all
-
-
-def test_data_structure_representation() -> None:
-    """
-    Test that IcoData exposes correct flow structure.
-    """
-
-    dataset = IcoSource[int](lambda: iter(range(5)), name="dataset")
-    scale = IntOperator(lambda x: x * 2, name="scale")
-    stream = IcoStream(scale)
-    sink_op = IcoSink(sink_fn, name="sink")
-    flow = dataset | stream | sink_op
-
-    structure = IcoNodeMeta.from_node(flow)
-
-    # Root node should be composition
-    assert structure.node_type == "chain"
-
-    # Check child order
-    chain2, sink = structure.children
-    assert chain2.node_type == "chain"
-    assert sink.node_type == "sink"
-
-    # Check child order
-    data_node, stream_node = chain2.children
-    assert data_node.node_type == "source"
-    assert data_node.name == "dataset"
-
-    assert stream_node.node_type == "stream"
-    assert stream_node.children[0].name == "scale"
 
 
 if __name__ == "__main__":

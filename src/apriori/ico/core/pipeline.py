@@ -8,6 +8,7 @@ from apriori.ico.core.operator import (
     IcoOperator,
     wrap_operator,
 )
+from apriori.ico.core.signature import IcoSignature
 
 
 @final
@@ -28,6 +29,7 @@ class IcoPipeline(
             raise ValueError("Pipeline body must contain at least one operator.")
 
         body_ops = [wrap_operator(step) for step in body]
+
         super().__init__(
             fn=self._run_streamline,
             name=name or "streamline",
@@ -43,3 +45,10 @@ class IcoPipeline(
 
     def __len__(self) -> int:
         return len(self.body)
+
+    @property
+    def signature(self) -> IcoSignature:
+        """Infer ICO signature of this operator."""
+        signature = super().signature
+
+        return signature if signature.infered else self.body[0].signature
