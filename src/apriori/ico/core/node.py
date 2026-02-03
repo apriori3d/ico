@@ -8,6 +8,7 @@ from typing import (
 
 from typing_extensions import runtime_checkable
 
+from apriori.ico.core.signature import IcoSignature
 from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
 
 
@@ -33,6 +34,10 @@ class IcoNode:
 
     def __str__(self) -> str:
         return type(self).__name__
+
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=None, c=None, o=None, infered=False)
 
     # ────────────────────────────────────────────────
     # Describe util interface

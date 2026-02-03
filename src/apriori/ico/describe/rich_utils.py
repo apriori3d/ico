@@ -1,14 +1,12 @@
 from __future__ import annotations
 
+from types import FunctionType
+
 from rich.text import Text
 
 from apriori.ico.describe.options import RendererOptions
 from apriori.ico.describe.plan.options import PlanRendererOptions
 from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.inspect.utils import (
-    extract_class_display_name,
-    extract_fn_display_name,
-)
 
 
 def render_node_class(
@@ -45,3 +43,24 @@ def render_callable(obj: object, options: PlanRendererOptions) -> Text:
         return Text(f"{name}()", style=DescribeStyle.class_.value)
 
     return Text("Unknown", style=DescribeStyle.dimmed.value)
+
+
+# ──────────── Helpers  ────────────
+
+
+def extract_fn_display_name(fn: object) -> str | None:
+    cls = getattr(fn, "__class__", None)
+
+    if cls is FunctionType:
+        return getattr(fn, "__name__", None)
+
+    return None
+
+
+def extract_class_display_name(obj: object) -> str | None:
+    cls = getattr(obj, "__class__", None)
+
+    if cls is None:
+        return None
+
+    return getattr(cls, "__name__", None)

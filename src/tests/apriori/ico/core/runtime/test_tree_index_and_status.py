@@ -35,7 +35,7 @@ class StateCollectorTool(IcoTool):
         )
         self.collected_events: list[tuple[TreePathIndex, IcoRuntimeState]] = []
 
-    def on_forward_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
+    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         """Collect state events with their paths."""
         from apriori.ico.core.runtime.state import IcoStateEvent
 
@@ -44,7 +44,7 @@ class StateCollectorTool(IcoTool):
             self.collected_states[tree_path] = event.state
             self.collected_events.append((tree_path, event.state))
 
-        return super().on_forward_event(event)
+        super().on_forward_event(event)
 
     def reset(self):
         """Reset collected data."""
@@ -150,5 +150,8 @@ def test_flow_with_mp_agent() -> None:
 
 
 if __name__ == "__main__":
-    test_flow_with_runtime()
-    test_flow_with_mp_agent()
+    import sys
+
+    import pytest
+
+    sys.exit(pytest.main([__file__]))

@@ -3,7 +3,6 @@ from typing import Generic
 
 from apriori.ico.core.operator import I, IcoOperator
 from apriori.ico.core.signature import IcoSignature
-from apriori.ico.core.signature_utils import wrap_iterator_or_none
 
 
 class IcoBatcher(
@@ -43,7 +42,7 @@ class IcoBatcher(
         signature = super().signature
 
         return IcoSignature(
-            i=wrap_iterator_or_none(signature.i),
+            i=Iterator[signature.i],
             c=None,
-            o=wrap_iterator_or_none(wrap_iterator_or_none(signature.i)),
+            o=Iterator[Iterator[signature.i]],
         )

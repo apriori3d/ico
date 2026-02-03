@@ -156,6 +156,9 @@ def format_ico_type(tp: object) -> str:
     if origin is Iterator:
         return f"Iterator[{format_ico_type(args[0])}]"
 
+    if origin is list:
+        return f"list[{format_ico_type(args[0])}]"
+
     if isinstance(tp, type):
         return tp.__name__
 

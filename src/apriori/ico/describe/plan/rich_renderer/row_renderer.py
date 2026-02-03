@@ -8,6 +8,7 @@ from rich.text import Text
 from apriori.ico.core.context_operator import IcoContextOperator
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.operator import IcoOperator
+from apriori.ico.core.signature_utils import format_ico_type
 from apriori.ico.describe.plan.options import (
     PlanRendererColumn,
     PlanRendererOptions,
@@ -18,7 +19,6 @@ from apriori.ico.describe.rich_utils import (
     render_node_class,
 )
 from apriori.ico.describe.utils import match_icon
-from apriori.ico.inspect.signature import format_ico_type, infer_signature
 
 
 class RowRenderer:
@@ -101,9 +101,7 @@ class RowRenderer:
         if not self.show_signature_column:
             return Text("")
 
-        signature = infer_signature(node)
-        if signature.has_context:
-            print("!")
+        signature = node.signature
         i = format_ico_type(signature.i) if signature.has_input else None
         c = format_ico_type(signature.c) if signature.has_context else None
         o = format_ico_type(signature.o) if signature.has_output else None

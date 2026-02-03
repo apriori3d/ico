@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     @sink()
     def save_result(item: str) -> None:
-        pass
+        print("Saved result:", item)
 
     # ──── 5. Combine all into the full flow ────
     full_flow = data_stream | train_stream | save_result
@@ -111,6 +111,8 @@ if __name__ == "__main__":
     runtime = IcoRuntime(full_flow, name="full_flow_runtime")
     runtime.activate()
     renderer.render(runtime)
+
+    runtime.run()
 
     agents[1].deactivate()
     renderer.render(runtime)

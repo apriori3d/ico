@@ -66,18 +66,18 @@ class IcoRuntime(IcoRuntimeNode):
         state_model: BaseStateModel | None = None,
         tools: Sequence[IcoTool] | None = None,
     ) -> None:
+        toolbox = IcoToolBox(runtime=self, tools=tools)
+
         IcoRuntimeNode.__init__(
             self,
             runtime_name=name,
             runtime_parent=runtime_parent,
-            runtime_children=runtime_children,
+            runtime_children=[toolbox] + list(runtime_children or []),
             state_model=state_model,
         )
         self.closure = closure
+        self.toolbox = toolbox
         discover_and_connect_runtime_nodes(self, closure)
-
-        self.toolbox = IcoToolBox(runtime=self, tools=tools)
-        self.add_runtime_children(self.toolbox)
 
     # ────── Tools management ──────
 
