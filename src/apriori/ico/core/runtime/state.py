@@ -54,12 +54,19 @@ class BaseStateModel:
         IcoDeactivateCommand: IdleState,
     }
 
-    __slots__ = ("state",)
+    __slots__ = ("_state",)
 
-    state: IcoRuntimeState
+    _state: IcoRuntimeState
 
     def __init__(self) -> None:
-        self.state = IdleState()
+        self._state = IdleState()
+
+    @property
+    def state(self) -> IcoRuntimeState:
+        return self._state
+
+    def update_state(self, new_state: IcoRuntimeState) -> None:
+        self._state = new_state
 
     def update(self, command: IcoRuntimeCommand) -> None:
         new_state: IcoRuntimeState | None = None
@@ -69,26 +76,26 @@ class BaseStateModel:
                 new_state = state_cls()
 
         if new_state:
-            self.state = new_state
+            self.update_state(new_state)
 
     def idle(self) -> None:
-        self.state = IdleState()
+        self.update_state(IdleState())
 
     def ready(self) -> None:
         if not self.state.is_ready():
             raise RuntimeError("Cannot transition to Ready state from non-Ready state.")
 
-        self.state = ReadyState()
+        self.update_state(ReadyState())
 
     def running(self) -> None:
         if not self.state.is_ready():
             raise RuntimeError(
                 "Cannot transition to Running state from non-Ready state."
             )
-        self.state = RunningState()
+        self.update_state(RunningState())
 
     def fault(self) -> None:
-        self.state = FaultState()
+        self.update_state(FaultState())
 
 
 # ────────────────────────────────────────────────

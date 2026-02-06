@@ -12,7 +12,7 @@ from apriori.ico.core.runtime.channel.channel import IcoChannel
 from apriori.ico.core.runtime.command import IcoRuntimeCommand
 from apriori.ico.core.runtime.event import (
     IcoFaultEvent,
-    IcoHearbeatEvent,
+    IcoHeartbeatEvent,
     IcoRuntimeEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
@@ -47,7 +47,7 @@ def recording_agent(
                 channel.close()
                 return
 
-            hearbeat = IcoHearbeatEvent()
+            hearbeat = IcoHeartbeatEvent()
             recording_node.on_event(hearbeat)
             channel.send_event(hearbeat)
 

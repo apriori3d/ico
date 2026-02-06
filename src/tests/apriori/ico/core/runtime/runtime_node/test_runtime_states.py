@@ -1,10 +1,15 @@
 import pytest
 
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.node import IcoRuntimeStateOld
+from apriori.ico.core.runtime.state import (
+    FaultState,
+    IdleState,
+    ReadyState,
+    RunningState,
+)
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
-from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingContour
+from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntime
 
 # ──── Test: normal execution ────
 
@@ -15,22 +20,20 @@ def clousure_fn(x: None) -> None:
 
 def test_state_transitions_success() -> None:
     clousure = IcoOperator(clousure_fn, name="no_op")
-    recording_runtime = RecordingContour(clousure)
+    recording_runtime = RecordingRuntime(clousure)
 
     # Initially idle
-    assert recording_runtime.state is IcoRuntimeStateOld.inactive
+    assert isinstance(recording_runtime.state, IdleState)
 
     # Call operator
-    recording_runtime.activate().run().pause().resume().deactivate()
+    recording_runtime.activate().run().deactivate()
 
     assert recording_runtime.recorded_states == [
-        IcoRuntimeStateOld.inactive,
-        IcoRuntimeStateOld.ready,
-        IcoRuntimeStateOld.running,
-        IcoRuntimeStateOld.ready,
-        IcoRuntimeStateOld.paused,
-        IcoRuntimeStateOld.ready,
-        IcoRuntimeStateOld.inactive,
+        IdleState,
+        ReadyState,
+        RunningState,
+        ReadyState,
+        IdleState,
     ]
 
 
@@ -43,11 +46,11 @@ def test_execution_state_transitions_failure() -> None:
 
     faulty_op = IcoOperator(faulty_fn, name="faulty_op")
     source = IcoSource[int](lambda: iter([1, 2, 3]), name="data")
-    sink = IcoSink[int](lambda items: None if list(items) else None, name="sink")
+    sink = IcoSink[int](lambda item: None, name="sink")
 
     flow = source | faulty_op.stream() | sink
 
-    runtime = RecordingContour(flow)
+    runtime = RecordingRuntime(flow)
 
     with pytest.raises(RuntimeError):
         runtime.activate().run()
@@ -55,11 +58,11 @@ def test_execution_state_transitions_failure() -> None:
     runtime.deactivate()
 
     assert runtime.recorded_states == [
-        IcoRuntimeStateOld.inactive,
-        IcoRuntimeStateOld.ready,
-        IcoRuntimeStateOld.running,
-        IcoRuntimeStateOld.fault,
-        IcoRuntimeStateOld.inactive,
+        IdleState,
+        ReadyState,
+        RunningState,
+        FaultState,
+        IdleState,
     ]
 
 

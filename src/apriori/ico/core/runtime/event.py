@@ -16,10 +16,10 @@ class IcoRuntimeEvent:
 
 @final
 @dataclass(slots=True, frozen=True)
-class IcoHearbeatEvent(IcoRuntimeEvent):
+class IcoHeartbeatEvent(IcoRuntimeEvent):
     @staticmethod
-    def create() -> IcoHearbeatEvent:
-        return IcoHearbeatEvent(trace=TreePathIndex())
+    def create() -> IcoHeartbeatEvent:
+        return IcoHeartbeatEvent(trace=TreePathIndex())
 
 
 @final

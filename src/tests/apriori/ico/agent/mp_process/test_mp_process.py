@@ -12,7 +12,7 @@ from apriori.ico.core.runtime.command import (
     IcoResumeCommand,
 )
 from apriori.ico.core.runtime.event import (
-    IcoHearbeatEvent,
+    IcoHeartbeatEvent,
 )
 from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.runtime import IcoRuntime
@@ -148,12 +148,12 @@ def test_agent_event_propagation() -> None:
     # flow = host.channel.send | host.channel.receive
 
     # Agent echoes heartbeat event manually
-    mp_process.bubble_event(IcoHearbeatEvent())
+    mp_process.bubble_event(IcoHeartbeatEvent())
 
     # produce/consume one item to flush internal queues
     # flow(123)
 
-    assert [IcoHearbeatEvent] == main_runtime.recorded_events
+    assert [IcoHeartbeatEvent] == main_runtime.recorded_events
 
     main_runtime.deactivate()
 

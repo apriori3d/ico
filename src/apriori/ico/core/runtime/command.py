@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import ClassVar, Literal, final
 
-
-class IcoRuntimeCommandType(Enum):
-    activate = auto()
-    run = auto()
-    reset = auto()
-    deactivate = auto()
-    pause = auto()
-    resume = auto()
-    stop = auto()
+# class IcoRuntimeCommandType(Enum):
+#     activate = auto()
+#     run = auto()
+#     reset = auto()
+#     deactivate = auto()
+#     pause = auto()
+#     resume = auto()
+#     stop = auto()
 
 
 CommandBroadcastOrder = Literal["pre", "post"]

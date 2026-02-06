@@ -18,7 +18,7 @@ def drain_all(xs: Iterator[I]) -> None:
 # ─── Basic Flow Construction ───
 
 
-def test_runtime_contour_executes_source_to_sink() -> None:
+def test_runtime_run_source_to_sink() -> None:
     """Contour should execute full Source → Operator → Sink chain."""
     # Source: () → Iterable[int]
     source = IcoSource[int](lambda: iter(range(3)), name="dataset")
@@ -28,17 +28,17 @@ def test_runtime_contour_executes_source_to_sink() -> None:
 
     output: list[int] = []
 
-    def capture_output(xs: Iterator[int]) -> None:
+    def capture_output(x: int) -> None:
         nonlocal output
-        output += list(xs)
+        output.append(x)
 
     # Sink: Iterable[int] → None (prints result)
     sink = IcoSink[int](capture_output, name="capture")
 
-    # Compose flow and wrap in contour
+    # Compose flow and wrap in runtime
     flow = source | op.stream() | sink
-    contour = IcoRuntime(flow)
-    contour.activate().run().deactivate()
+    runtime = IcoRuntime(flow)
+    runtime.activate().run().deactivate()
 
     # Capture printed output
     assert output == [0, 2, 4]

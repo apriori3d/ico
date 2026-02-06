@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from apriori.ico.core.runtime.command import IcoRuntimeCommandType
+from apriori.ico.core.runtime.command import IcoActivateCommand
 from apriori.ico.core.runtime.event import (
-    IcoHearbeatEvent,
-    IcoRuntimeEventType,
+    IcoHeartbeatEvent,
 )
-from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode
+from apriori.ico.core.runtime.state import IdleState, ReadyState
+from tests.apriori.ico.core.runtime.runtime_node.test_utils import (
+    RecordingRuntimeNode,
+)
 
 
 def test_runtime_command_and_event_propagation() -> None:
@@ -17,18 +19,21 @@ def test_runtime_command_and_event_propagation() -> None:
     # --- Test: Broadcast command from root ---
     root.activate()
 
-    assert root.recorded_commands == [IcoRuntimeCommandType.activate]
-    assert mid.recorded_commands == [IcoRuntimeCommandType.activate]
-    assert leaf.recorded_commands == [IcoRuntimeCommandType.activate]
+    assert root.recorded_commands == [IcoActivateCommand]
+    assert mid.recorded_commands == [IcoActivateCommand]
+    assert leaf.recorded_commands == [IcoActivateCommand]
+
+    assert root.recorded_states == [IdleState, ReadyState]
+    assert mid.recorded_states == [IdleState, ReadyState]
+    assert leaf.recorded_states == [IdleState, ReadyState]
 
     # --- Test: Bubble event from leaf ---
-    heartbeat = IcoHearbeatEvent()
-    leaf.bubble_event(heartbeat)
+    leaf.bubble_event(IcoHeartbeatEvent.create())
 
     # leaf handles event, mid handles, root handles
-    assert leaf.recorded_events == [IcoRuntimeEventType.heartbeat]
-    assert mid.recorded_events == [IcoRuntimeEventType.heartbeat]
-    assert root.recorded_events == [IcoRuntimeEventType.heartbeat]
+    assert leaf.recorded_events == [IcoHeartbeatEvent]
+    assert mid.recorded_events == [IcoHeartbeatEvent]
+    assert root.recorded_events == [IcoHeartbeatEvent]
 
 
 if __name__ == "__main__":
