@@ -13,7 +13,8 @@ from apriori.ico.core.runtime.channel.messages import (
     RuntimeMessage,
 )
 from apriori.ico.core.runtime.command import IcoDeactivateCommand, IcoRuntimeCommand
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
+from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 
 
 class IcoSendEndpoint(Generic[I], ABC):
@@ -89,25 +90,32 @@ class IcoChannel(Generic[I, O], ABC):
     # Send + Acknowledge logic
     # ────────────────────────────────
 
-    def send(self, payload: I) -> None:
+    def send(self, payload: I, wait_for_ack: bool = True) -> None:
         """Send a payload and wait for acknowledgment."""
         message = DataMessage(self._message_id, payload)
         self._send(message)
-        self._wait_for_ack(message.id)
 
-    def send_command(self, payload: IcoRuntimeCommand) -> None:
+        if wait_for_ack:
+            self._wait_for_ack(message.id)
+
+    def send_command(
+        self, payload: IcoRuntimeCommand, wait_for_ack: bool = True
+    ) -> None:
         """Send a payload and wait for acknowledgment."""
         message = CommandMessage(self._message_id, payload)
         self._send(message)
 
         # Runtime command may be updated by peer runtime
-        self._wait_for_ack(message.id)
+        if wait_for_ack:
+            self._wait_for_ack(message.id)
 
-    def send_event(self, payload: IcoRuntimeEvent) -> None:
+    def send_event(self, payload: IcoRuntimeEvent, wait_for_ack: bool = True) -> None:
         """Send a payload and wait for acknowledgment."""
         message = EventMessage(self._message_id, payload)
         self._send(message)
-        self._wait_for_ack(message.id)
+
+        if wait_for_ack:
+            self._wait_for_ack(message.id)
 
     def _send(self, message: DataMessage[I] | RuntimeMessage) -> None:
         self._message_id += 1
@@ -187,6 +195,12 @@ class IcoChannel(Generic[I, O], ABC):
         self._send(AcknowledgeMessage(self._message_id, message_id=message.id))
 
     def _handle_input_event(self, message: EventMessage) -> None:
+        if isinstance(message.event, IcoFaultEvent):
+            self._send(AcknowledgeMessage(self._message_id, message.id))
+            raise IcoRuntimeError(
+                f"Remote agent raise an exception: {message.event.info}"
+            )
+
         if not self.accept_events:
             if self.strict_accept:
                 raise RuntimeError("Runtime events are not accepted.")
@@ -196,7 +210,6 @@ class IcoChannel(Generic[I, O], ABC):
             return
 
         self.runtime_port.on_channel_event(message.event)
-
         self._send(AcknowledgeMessage(self._message_id, message.id))
 
     def close(self) -> None:

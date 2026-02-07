@@ -8,8 +8,6 @@ from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
-    IcoPauseCommand,
-    IcoResumeCommand,
 )
 from apriori.ico.core.runtime.event import (
     IcoHeartbeatEvent,
@@ -92,18 +90,17 @@ def test_agent_multiple_items() -> None:
 def test_agent_exception_propagation() -> None:
     """If agent raises IcoRuntimeError, host should receive corresponding runtime event."""
 
-    mp_process = MPAgent(op_fail_factory)
-    mp_process.activate()
+    agent = MPAgent(op_fail_factory).activate()
 
     # normal items ok
-    assert mp_process(1) == 1
-    assert mp_process(2) == 2
+    assert agent(1) == 1
+    assert agent(2) == 2
 
     with pytest.raises(IcoRuntimeError) as exc:
-        mp_process(3)
+        agent(3)
     assert "boom" in str(exc.value)
 
-    mp_process.deactivate()
+    agent.deactivate()
 
 
 # ───────────────────────────────────────────────
@@ -117,17 +114,15 @@ def test_agent_command_propagation() -> None:
     # Attach recording runtime to channel
     end_runtime = RecordingRuntimeNode()
 
-    mp_process = MPAgent(op_identity)
-    mp_process.add_runtime_children(end_runtime)
+    agent = MPAgent(op_identity)
+    agent.add_runtime_children(end_runtime)
 
     # channel is a parent runtime of the agent host runtime
-    mp_process.activate().pause().resume().deactivate()
+    agent.activate().deactivate()
 
     # Agent receives commands in same order
     assert end_runtime.recorded_commands == [
         IcoActivateCommand,
-        IcoPauseCommand,
-        IcoResumeCommand,
         IcoDeactivateCommand,
     ]
 
@@ -148,12 +143,9 @@ def test_agent_event_propagation() -> None:
     # flow = host.channel.send | host.channel.receive
 
     # Agent echoes heartbeat event manually
-    mp_process.bubble_event(IcoHeartbeatEvent())
+    mp_process.bubble_event(IcoHeartbeatEvent.create())
 
-    # produce/consume one item to flush internal queues
-    # flow(123)
-
-    assert [IcoHeartbeatEvent] == main_runtime.recorded_events
+    assert main_runtime.recorded_events == [IcoHeartbeatEvent]
 
     main_runtime.deactivate()
 

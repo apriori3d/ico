@@ -135,7 +135,7 @@ class RuntimeTreeRenderer(IcoTool):
     def render_node(self, node_info: RuntimeTraversalInfo) -> None:
         node = node_info.node
         if node_info.path in self._node_states:
-            node.state_model.state = self._node_states[node_info.path]
+            node.state_model.update_state(self._node_states[node_info.path])
 
         if node_info.current_order == "pre":
             renderer = self._select_renderer(node)

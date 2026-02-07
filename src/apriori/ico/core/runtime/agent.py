@@ -13,7 +13,6 @@ from apriori.ico.core.runtime.command import (
     IcoRuntimeCommand,
 )
 from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
-from apriori.ico.core.runtime.exceptions import IcoRuntimeError
 from apriori.ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
 from apriori.ico.core.runtime.state import (
     BaseStateModel,
@@ -44,27 +43,27 @@ class AgentStateModel(BaseStateModel):
     """State model for runtime agents."""
 
     def waiting(self) -> None:
-        if not self.state.is_ready():
+        if not self.state.is_ready:
             raise RuntimeError(
                 "Cannot transition to Waiting state from non-Ready state."
             )
-        self.state = WaitingState()
+        self.update_state(WaitingState())
 
     def sending(self) -> None:
-        if not self.state.is_ready():
+        if not self.state.is_ready:
             raise RuntimeError(
                 "Cannot transition to Sending state from non-Ready state."
             )
-        self.state = SendingState()
+        self.update_state(SendingState())
 
 
 class AgentWorkerStateModel(AgentStateModel):
     """State model for runtime agent workers."""
 
     def pending(self) -> None:
-        if self.state.is_ready():
+        if self.state.is_ready:
             raise RuntimeError("Cannot transition to Pending state from Ready state.")
-        self.state = PendingState()
+        self.update_state(PendingState())
 
 
 class IcoAgent(
@@ -156,7 +155,7 @@ class IcoAgent(
     # ─────── Runtime API ────────
 
     def on_command(self, command: IcoRuntimeCommand) -> None:
-        is_ready = self.state.is_ready()
+        is_ready = self.state.is_ready
         if command.broadcast_order == "pre":
             super().on_command(command)
 
@@ -173,7 +172,7 @@ class IcoAgent(
                 self.channel.send_command(command)
 
             case IcoDeactivateCommand():
-                if is_ready:
+                if self.state.is_ready or self.state.is_fault:
                     assert command.broadcast_order == "post"
                     assert self.channel is not None
 
@@ -193,14 +192,6 @@ class IcoAgent(
 
         if command.broadcast_order == "post":
             super().on_command(command)
-
-    def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        if isinstance(event, IcoFaultEvent):
-            # Raise exception received from agent process
-            raise IcoRuntimeError(
-                f"Agent event fault received: {event.info['message']}"
-            )
-        return super().on_event(event)
 
     @property
     def signature(self) -> IcoSignature:
@@ -288,7 +279,7 @@ class IcoAgentWorker(
             except Exception as e:
                 # Report runtime errors downstream to output channel and terminate
                 self.state_model.fault()
-                self.bubble_event(IcoFaultEvent.create(e), from_child=self)
+                self.bubble_event(IcoFaultEvent.create(e))
                 continue
 
     # ──────── Channel message handling ────────

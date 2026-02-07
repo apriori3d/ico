@@ -16,8 +16,13 @@ from apriori.ico.core.tree_utils import TreePathIndex
 class IcoRuntimeState:
     name: ClassVar[str] = "base_state"
 
+    @property
     def is_ready(self) -> bool:
         return isinstance(self, ReadyState)
+
+    @property
+    def is_fault(self) -> bool:
+        return isinstance(self, FaultState)
 
     def __str__(self) -> str:
         return type(self).name
@@ -82,13 +87,13 @@ class BaseStateModel:
         self.update_state(IdleState())
 
     def ready(self) -> None:
-        if not self.state.is_ready():
+        if not self.state.is_ready:
             raise RuntimeError("Cannot transition to Ready state from non-Ready state.")
 
         self.update_state(ReadyState())
 
     def running(self) -> None:
-        if not self.state.is_ready():
+        if not self.state.is_ready:
             raise RuntimeError(
                 "Cannot transition to Running state from non-Ready state."
             )
