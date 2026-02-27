@@ -76,7 +76,7 @@ class PlanRenderer:
             order="pre_post",  # Need post order to close groups
         )
 
-        self.console.rule(f"[bold blue]Flow plan: {root}", style="dim blue")
+        self.console.rule(f"[bold blue]Flow plan: {root.name}", style="dim blue")
         self.console.print(self._table)
 
     def _select_renderer(self, node: IcoNode) -> RendererTypes:
