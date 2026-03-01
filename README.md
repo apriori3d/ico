@@ -39,6 +39,17 @@ fib_process.describe()
 
 <img src="docs/images/fib_describe.jpg" width="800" alt="Fibonacci process visualization">
 
+### 🎯 **Declarative Elegance**
+```python
+# Complex workflows become simple
+ml_pipeline = (
+    load_train_data
+    | augment_pipeline
+    | train_epoch
+    | save_checkpoint
+)
+```
+
 
 ### 🛡️ **Type Safety Everywhere**
 ```python
@@ -56,6 +67,7 @@ pipeline = square | to_str
 # This fails at type-check time ❌
 bad_pipeline = to_str | square
 ```
+
 
 ### ⚡ **Distributed by Design**
 ```python
@@ -80,27 +92,6 @@ pipeline = source | progress | processing | train
 <img src="docs/images/progress.jpg" width="600" alt="Fibonacci process visualization">
 
 
-### 🎯 **Declarative Pipeline Composition**
-```python
-# Complex workflows become simple
-ml_pipeline = (
-    load_train_indices # Load indices for train split
-    | batcher # Group into batches
-    | augment_pipeline # Fetch items and augment (possible to distribute)
-    | train_epoch
-    | save_checkpoint
-)
-```
-
-
-## 🚀 Getting Started
-
-### 📖 Examples
-- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) — Complete data processing pipeline without PyTorch DataLoader
-- **Basic Introduction**: Linear regression example (coming soon)
-- **Runtime Monitoring**: Progress tracking with Rich tools (coming soon)
-- **Distributed Processing**: Multi-processing data pipeline (coming soon)
-
 ## 📚 Use Cases
 
 **Perfect for:**
@@ -119,6 +110,16 @@ ml_pipeline = (
 | Distribution | ✅ Built-in multiprocessing | ❌ Manual setup |
 | Composability | ✅ Pipe syntax `\|` | ❌ Complex APIs |
 | Monitoring | ✅ Real-time state tracking | ❌ Limited introspection |
+
+## 🚀 Getting Started
+
+### 📖 Examples
+- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) — Complete data processing pipeline without PyTorch DataLoader
+- **Basic Introduction**: Linear regression example (coming soon)
+- **Runtime Monitoring**: Progress tracking with Rich tools (coming soon)
+- **Distributed Processing**: Multi-processing data pipeline (coming soon)
+
+
 
 ## 🤝 Contributing
 
