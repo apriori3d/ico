@@ -51,7 +51,7 @@ ml_pipeline = (
 
 ### 🛡️ **Type Safety Everywhere**
 ```python
-# Automatic type inference and validation
+# Static type checking with mypy, Pylance, and other type checkers
 def square(x: float) -> float:
     return x * x
 
@@ -103,7 +103,7 @@ pipeline = source | progress | processing | train
 
 | Feature | ICO | Others |
 |---------|-----|--------|
-| Type Safety | ✅ Full static typing | ❌ Runtime errors |
+| Type Safety | ✅ Static type checking (mypy/Pylance) | ❌ Runtime errors |
 | Visualization | ✅ Rich console integration | ❌ External tools needed |
 | Distribution | ✅ Built-in multiprocessing | ❌ Manual setup |
 | Composability | ✅ Pipe syntax `\|` | ❌ Complex APIs |
@@ -134,7 +134,7 @@ We welcome contributions! Contribution guidelines coming soon.
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 ---
 
