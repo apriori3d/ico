@@ -17,14 +17,25 @@ RuntimeRendererColumn: TypeAlias = Literal["Tree", "State", "Name"]
 
 @dataclass(slots=True)
 class RuntimeRendererOptions(RendererOptions):
+    """
+    Configuration options for runtime tree rendering.
+
+    Extends base RendererOptions with runtime-specific settings including
+    column layout, agent expansion, and predefined node icons.
+    """
+
     columns: list[RuntimeRendererColumn] = field(
         default_factory=lambda: ["Tree", "State", "Name"]
     )
+    """Display columns: Tree structure, Runtime state, Node names"""
+
     renderers_paths: list[str] = field(
         default_factory=lambda: ["apriori.ico.describe.runtime.rich_renderer.node"]
     )
+    """Paths to runtime renderer modules"""
 
     expand_agents: bool = True
+    """Show internal agent/worker hierarchies"""
 
     node_icons: dict[type[IcoNode | IcoRuntimeNode], str] = field(
         default_factory=lambda: OrderedDict(
@@ -40,3 +51,4 @@ class RuntimeRendererOptions(RendererOptions):
             }
         )
     )
+    """Emoji icons for runtime node visualization"""

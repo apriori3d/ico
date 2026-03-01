@@ -23,6 +23,8 @@ from apriori.ico.describe.rich_style import DescribeStyle
 
 @register_renderer(IcoProcess)
 class IcoProcessRenderer(GroupRenderer):
+    """Specialized group renderer for IcoProcess nodes with pipeline display."""
+
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,

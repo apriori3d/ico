@@ -16,6 +16,8 @@ from apriori.ico.describe.rich_style import DescribeStyle
 
 @register_renderer(IcoStream)
 class IcoStreamRenderer(GroupRenderer):
+    """Specialized group renderer for IcoStream nodes with flow visualization."""
+
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,

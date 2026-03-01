@@ -18,10 +18,18 @@ from apriori.ico.describe.utils import match_icon
 
 
 class RuntimeRowRenderer:
+    """
+    Renders runtime nodes as table rows with Tree, State, Name columns.
+
+    Provides runtime-specific formatting including state indicators,
+    colored status display, and runtime node icons.
+    """
+
     options: RuntimeRendererOptions
     _column_renderer: dict[RuntimeRendererColumn, Callable[[IcoRuntimeNode], Text]]
 
     def __init__(self, options: RuntimeRendererOptions) -> None:
+        """Initialize runtime row renderer with options."""
         self.options = options
         self._column_renderer: dict[
             RuntimeRendererColumn, Callable[[IcoRuntimeNode], Text]
@@ -32,9 +40,11 @@ class RuntimeRowRenderer:
         }
 
     def render(self, node: IcoRuntimeNode, column: RuntimeRendererColumn) -> Text:
+        """Render specific column for runtime node."""
         return self._column_renderer[column](node)
 
     def render_tree_column(self, node: IcoRuntimeNode) -> Text:
+        """Render Tree column with node class and icon."""
         text = render_node_class(node, options=self.options)
 
         if self.options.show_node_icons:

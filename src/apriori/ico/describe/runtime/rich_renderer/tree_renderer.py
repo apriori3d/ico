@@ -38,6 +38,13 @@ RendererTypes: TypeAlias = RuntimeRowRenderer | RuntimeCustomRenderer
 
 
 class RuntimeTreeRenderer(IcoTool):
+    """
+    Runtime tree visualization tool using Rich console rendering.
+
+    Provides real-time runtime state display with configurable columns,
+    state monitoring, and event-driven updates during execution.
+    """
+
     options: RuntimeRendererOptions
     console: Console
 

@@ -25,22 +25,43 @@ SignatureFormat: TypeAlias = Literal["Full", "Input", "Output"]
 
 @dataclass(slots=True)
 class PlanRendererOptions(RendererOptions):
+    """
+    Configuration options for computation flow plan rendering.
+
+    Extends base RendererOptions with plan-specific settings like
+    column layout, signature display format, and node flattening rules.
+    """
+
     columns: list[PlanRendererColumn] = field(
         default_factory=lambda: ["Flow", "Signature", "Name"]
     )
+    """Display columns: Flow tree, Type signatures, Node names"""
+
     renderers_paths: list[str] = field(
         default_factory=lambda: ["apriori.ico.describe.plan.rich_renderer.node"]
     )
+    """Paths to renderer modules for auto-import"""
 
     callable_format: CallableFormat = "__name__"
+    """Function display format: '__name__' or 'str()'"""
+
     signature_format: SignatureFormat = "Full"
+    """Type signature display: 'Full', 'Input', or 'Output'"""
 
     query_iterable_size: bool = True
+    """Show collection sizes when available"""
+
     show_remote_flows: bool = True
+    """Display flows inside distributed agents"""
 
     dim_ico_nodes: bool = False
+    """Dim ICO framework nodes to focus on user code"""
+
     show_ico_operator: bool = False
+    """Show IcoOperator wrapper details"""
+
     show_node_icons: bool = True
+    """Display emoji icons for node types"""
 
     flatten_node_type: set[type[IcoNode]] = field(
         default_factory=lambda: {
@@ -50,6 +71,7 @@ class PlanRendererOptions(RendererOptions):
             IcoRuntimeWrapper,
         }
     )
+    """Node types to flatten/unwrap for cleaner display"""
 
     node_icons: dict[type[IcoNode | IcoRuntimeNode], str] = field(
         default_factory=lambda: {
@@ -64,3 +86,4 @@ class PlanRendererOptions(RendererOptions):
             IcoEpoch: "🧠",
         }
     )
+    """Emoji icons for visual node type identification"""

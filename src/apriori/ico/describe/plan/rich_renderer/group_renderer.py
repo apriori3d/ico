@@ -8,6 +8,13 @@ from apriori.ico.describe.rich_style import DescribeStyle
 
 
 class GroupRenderer:
+    """
+    Renders subflows as expandable groups with entry/exit rows.
+
+    Provides visual hierarchy using indentation and branch symbols
+    for nodes containing child flows.
+    """
+
     node_renderer: RowRenderer | None
     header_renderer: RowRenderer
     footer_renderer: RowRenderer
@@ -19,6 +26,7 @@ class GroupRenderer:
         header_renderer: RowRenderer | None = None,
         footer_renderer: RowRenderer | None = None,
     ) -> None:
+        """Initialize group renderer with configurable row renderers."""
         self.node_renderer = node_renderer
 
         self.header_renderer = header_renderer or RowRenderer(

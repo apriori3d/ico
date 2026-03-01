@@ -16,6 +16,7 @@ state_styles = [
 
 
 def get_state_color(state: IcoRuntimeState) -> str:
+    """Get Rich console color for runtime state visualization."""
     for state_type, color in state_styles:
         if isinstance(state, state_type):  # type: ignore
             return color

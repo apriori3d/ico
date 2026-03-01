@@ -20,6 +20,8 @@ from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 @register_renderer(IcoAsyncStream)
 class IcoAsyncStreamRenderer(GroupRenderer):
+    """Specialized group renderer for IcoAsyncStream nodes with parallel visualization."""
+
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,

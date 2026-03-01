@@ -19,7 +19,10 @@ from apriori.ico.describe.rich_utils import (
 
 @register_renderer(IcoSource)
 class IcoSourceRender(RowRenderer):
+    """Specialized renderer for IcoSource nodes with data size information."""
+
     def _render_node_args_info(self, node: IcoNode) -> Text:
+        """Render source provider info with optional size details."""
         assert isinstance(node, IcoSource)
         source = cast(IcoSource[Any], node)
 

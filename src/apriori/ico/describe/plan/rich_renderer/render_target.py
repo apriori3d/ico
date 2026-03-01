@@ -16,18 +16,28 @@ from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 
 
 class PlanRenderTarget(Protocol):
-    def render_node(self, node_info: PlanTraversalInfo) -> None: ...
+    """Protocol defining plan renderer interface for node traversal."""
+
+    def render_node(self, node_info: PlanTraversalInfo) -> None:
+        """Render individual node during tree traversal."""
+        ...
 
     def render_row(
         self,
         row_renderer: RowRenderer,
         node: IcoNode,
         indent: Text | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Render table row with optional indentation."""
+        ...
 
-    def push_group_indent(self, indent: Text) -> None: ...
+    def push_group_indent(self, indent: Text) -> None:
+        """Add group indentation level."""
+        ...
 
-    def pop_group_indent(self) -> None: ...
+    def pop_group_indent(self) -> None:
+        """Remove group indentation level."""
+        ...
 
 
 # ────────────────────────────────────────────────
@@ -37,6 +47,8 @@ class PlanRenderTarget(Protocol):
 
 @dataclass(slots=True)
 class PlanTreeWalkerContext:
+    """Context data for plan tree traversal state."""
+
     group_opened: bool = False
 
 
@@ -45,7 +57,7 @@ PlanTraversalInfo: TypeAlias = TraversalInfo[IcoNode, PlanTreeWalkerContext]
 
 
 def create_plan_walker(expand_remote_flows: bool) -> PlanTreeWalker:
-    """Get a tree walker for ICO runtime nodes."""
+    """Create tree walker for ICO plan nodes with remote flow expansion."""
 
     def _get_children(node: IcoNode) -> Sequence[IcoNode]:
         # Flatten async stream pool to a single flow

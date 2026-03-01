@@ -15,6 +15,8 @@ from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 @register_renderer(MPAgent)
 class MPProcessRenderer(GroupRenderer):
+    """Specialized group renderer for MPAgent nodes with worker process display."""
+
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
             options=options,

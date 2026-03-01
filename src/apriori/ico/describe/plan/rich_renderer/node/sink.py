@@ -15,7 +15,10 @@ from apriori.ico.describe.rich_utils import render_callable
 
 @register_renderer(IcoSink)
 class IcoSinkRender(RowRenderer):
+    """Specialized renderer for IcoSink nodes showing consumer function."""
+
     def _render_node_args_info(self, node: IcoNode) -> Text:
+        """Render sink consumer function information."""
         assert isinstance(node, IcoSink)
         sink = cast(IcoSink[Any], node)
 

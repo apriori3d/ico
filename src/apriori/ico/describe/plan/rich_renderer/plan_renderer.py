@@ -32,6 +32,13 @@ RendererTypes: TypeAlias = RowRenderer | GroupRenderer | CustomRenderer
 
 
 class PlanRenderer:
+    """
+    Main plan rendering engine using Rich console for ICO flow visualization.
+
+    Renders ICO node trees as formatted tables with configurable columns,
+    automatic renderer selection, and subflow grouping support.
+    """
+
     options: PlanRendererOptions
     console: Console
 
@@ -46,6 +53,7 @@ class PlanRenderer:
         options: PlanRendererOptions | None = None,
         console: Console | None = None,
     ) -> None:
+        """Initialize plan renderer with options and console."""
         self.options = options or PlanRendererOptions()
         self.console = console or Console()
 
@@ -59,12 +67,14 @@ class PlanRenderer:
             import_all_renderers(path)
 
     def _create_table(self) -> Table:
+        """Create Rich table with configured columns."""
         table = Table(show_lines=False, show_edge=False, box=None)
         for column in self.options.columns:
             table.add_column(column, no_wrap=True)
         return table
 
     def render(self, root: IcoNode) -> None:
+        """Render complete ICO node tree to console."""
         self._table = self._create_table()
 
         tree_walker = create_plan_walker(
@@ -80,6 +90,7 @@ class PlanRenderer:
         self.console.print(self._table)
 
     def _select_renderer(self, node: IcoNode) -> RendererTypes:
+        """Select appropriate renderer for node type via registry lookup."""
         renderer = self._selected_renderers.get(type(node))
         if renderer is not None:
             return renderer
@@ -99,6 +110,7 @@ class PlanRenderer:
         return renderer
 
     def render_node(self, node_info: PlanTraversalInfo) -> None:
+        """Render individual node using pre/post order traversal logic."""
         node = node_info.node
 
         if node_info.current_order == "pre":
@@ -160,9 +172,11 @@ class PlanRenderer:
             )
 
     def push_group_indent(self, indent: Text) -> None:
+        """Add indentation level for nested groups."""
         self._group_indents.append(indent)
 
     def pop_group_indent(self) -> None:
+        """Remove last indentation level when exiting group."""
         self._group_indents.pop()
 
     def render_row(
@@ -171,6 +185,7 @@ class PlanRenderer:
         node: IcoNode,
         indent: Text | None = None,
     ) -> None:
+        """Render single table row with proper indentation."""
         assert self._table is not None
 
         columns = [row_renderer.render(node, column) for column in self.options.columns]
@@ -182,6 +197,7 @@ class PlanRenderer:
         self._table.add_row(*columns)
 
     def _gather_indentation(self, indent: Text | None = None) -> Text | None:
+        """Combine all group indentations into single Text object."""
         all_indents = self._group_indents.copy()
 
         if indent is not None:

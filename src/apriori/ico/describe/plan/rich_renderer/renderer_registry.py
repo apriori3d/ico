@@ -12,7 +12,7 @@ RendererRegistry: dict[type[IcoNode], RendererMetaTypes] = {}
 def register_renderer(
     node_type: type[IcoNode],
 ) -> Callable[[RendererMetaTypes], RendererMetaTypes]:
-    """Decorator to register a renderer class for a specific node type."""
+    """Decorator to register renderer class for specific node type."""
 
     def decorator(renderer_cls: RendererMetaTypes) -> RendererMetaTypes:
         RendererRegistry[node_type] = renderer_cls

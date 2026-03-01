@@ -18,16 +18,24 @@ from apriori.ico.describe.runtime.rich_renderer.row_renderer import RuntimeRowRe
 
 
 class RuntimeRenderTarget(Protocol):
-    def render_node(self, node_info: RuntimeRendererTraversalInfo) -> None: ...
+    """Protocol defining runtime renderer interface for tree traversal."""
+
+    def render_node(self, node_info: RuntimeRendererTraversalInfo) -> None:
+        """Render individual runtime node during tree traversal."""
+        ...
 
     def render_row(
         self,
         row_renderer: RuntimeRowRenderer,
         node: IcoRuntimeNode,
         indent: Text | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Render runtime table row with optional indentation."""
+        ...
 
-    def push_group_indent(self, indent: Text) -> None: ...
+    def push_group_indent(self, indent: Text) -> None:
+        """Add group indentation level for runtime display."""
+        ...
 
     def pop_group_indent(self) -> None: ...
 

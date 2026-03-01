@@ -17,7 +17,10 @@ from apriori.ico.describe.rich_style import DescribeStyle
 
 @register_renderer(IcoBatcher)
 class IcoBatcherRender(RowRenderer):
+    """Specialized renderer for IcoBatcher nodes showing batch size."""
+
     def _render_node_args_info(self, node: IcoNode) -> Text:
+        """Render batcher configuration with batch size info."""
         assert isinstance(node, IcoBatcher)
         batcher = cast(IcoBatcher[Any], node)
         return Text(f"batch_size={batcher.batch_size}", style=DescribeStyle.meta.value)

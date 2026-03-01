@@ -29,6 +29,13 @@ from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 @register_renderer(IcoEpoch)
 class IcoEpochRenderer(CustomRenderer):
+    """
+    Custom renderer for IcoEpoch nodes with iteration structure display.
+
+    Renders epochs as expandable groups showing source iteration,
+    item processing pipelines, and result aggregation.
+    """
+
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(options=options)
         self._row_renderer = RowRenderer(options=options)

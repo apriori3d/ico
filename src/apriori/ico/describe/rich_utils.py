@@ -14,6 +14,7 @@ def render_node_class(
     options: RendererOptions,
     args_info: Text | None = None,
 ) -> Text:
+    """Render node class name with Rich styling and optional args."""
     display_name = Text(f"{type(node).__name__}(", style=DescribeStyle.class_.value)
 
     if options.dim_ico_nodes:
@@ -31,6 +32,7 @@ def render_node_class(
 
 
 def render_callable(obj: object, options: PlanRendererOptions) -> Text:
+    """Render callable object with appropriate Rich styling."""
     name = extract_fn_display_name(obj)  # type: ignore
     if name:
         return Text(name, style=DescribeStyle.fn.value)

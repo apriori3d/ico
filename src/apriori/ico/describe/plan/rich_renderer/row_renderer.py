@@ -22,6 +22,13 @@ from apriori.ico.describe.utils import match_icon
 
 
 class RowRenderer:
+    """
+    Renders individual nodes as table rows with configurable columns.
+
+    Supports Flow, Signature, Name columns with customizable formatting,
+    prefix/postfix text, and column visibility controls.
+    """
+
     options: PlanRendererOptions
     show_name_column: bool
     show_signature_column: bool
@@ -43,6 +50,7 @@ class RowRenderer:
         flow_column_postfix: Text | None = None,
         flow_includes_node_info: bool = True,
     ) -> None:
+        """Initialize row renderer with column visibility and formatting options."""
         self.options = options
         self.show_name_column = show_name_column
         self.show_signature_column = show_signature_column
@@ -59,9 +67,11 @@ class RowRenderer:
         }
 
     def render(self, node: IcoNode, column: PlanRendererColumn) -> Text:
+        """Render specific column for node using registered column renderers."""
         return self._column_renderer[column](node)
 
     def render_flow_column(self, node: IcoNode) -> Text:
+        """Render Flow column: icons, class name, and arguments."""
         args_info = self._render_node_args_info(node)
         text = self.flow_column_prefix or Text("")
 
@@ -91,6 +101,7 @@ class RowRenderer:
         return text
 
     def render_name_column(self, node: IcoNode) -> Text:
+        """Render Name column with node name text."""
         return (
             Text(node.name or "", style=DescribeStyle.text.value)
             if self.show_name_column
@@ -98,6 +109,7 @@ class RowRenderer:
         )
 
     def render_signature_column(self, node: IcoNode) -> Text:
+        """Render Signature column with type information and arrows."""
         if not self.show_signature_column:
             return Text("")
 
