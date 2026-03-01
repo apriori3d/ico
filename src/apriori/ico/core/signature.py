@@ -13,8 +13,31 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class IcoSignature:
     """
-    A representation of the ICO form of an operator in DSL.
-    Possible types are type[Any] or typing generics."""
+    A representation of the ICO type signature for operators in the DSL.
+
+    Captures the input, context, and output types of an ICO operator to enable
+    type inference, validation, and visualization. Supports both concrete types
+    and typing generics.
+
+    ICO signature format:
+        I → O (simple transformation)
+        I, C → O (transformation with context)
+
+    Example:
+        >>> # Simple int to string conversion
+        >>> sig = IcoSignature(i=int, c=None, o=str)
+        >>> print(sig.format())  # "int → str"
+
+        >>> # Transformation with context
+        >>> sig = IcoSignature(i=str, c=dict, o=int)
+        >>> print(sig.format())  # "str, dict → int"
+
+    Attributes:
+        i: Input type of the operator (can be Any or typing generic).
+        c: Optional context type for stateful operations.
+        o: Output type of the operator (can be Any or typing generic).
+        infered: Whether this signature was successfully inferred from code.
+    """
 
     i: object
     c: object | None
@@ -22,6 +45,17 @@ class IcoSignature:
     infered: bool = True
 
     def format(self) -> str:
+        """Format the signature as a human-readable type flow string.
+
+        Returns:
+            A string representation showing the type flow:
+            - "I → O" for simple transformations
+            - "I, C → O" for transformations with context
+
+        Example:
+            >>> sig = IcoSignature(i=int, c=str, o=float)
+            >>> print(sig.format())  # "int, str → float"
+        """
         from apriori.ico.core.signature_utils import format_ico_type
 
         if self.c is None or self.c is type(None):
@@ -30,16 +64,48 @@ class IcoSignature:
 
     @property
     def name(self) -> str:
+        """Get the formatted name of this signature.
+
+        Returns:
+            The same string as format() - a human-readable type flow.
+
+        Note:
+            This property provides convenient access to the formatted signature.
+        """
         return self.format()
 
     @property
     def has_input(self) -> bool:
+        """Check if this signature has a defined input type.
+
+        Returns:
+            True if input type is specified and not None, False otherwise.
+
+        Note:
+            Used for validation and signature analysis.
+        """
         return self.i is not None and self.i is not type(None)
 
     @property
     def has_context(self) -> bool:
+        """Check if this signature has a defined context type.
+
+        Returns:
+            True if context type is specified and not None, False otherwise.
+
+        Note:
+            Context is optional - operators can work with or without it.
+        """
         return self.c is not None and self.c is not type(None)
 
     @property
     def has_output(self) -> bool:
+        """Check if this signature has a defined output type.
+
+        Returns:
+            True if output type is specified and not None, False otherwise.
+
+        Note:
+            Used for validation and ensuring proper type flow in compositions.
+        """
         return self.o is not None and self.o is not type(None)

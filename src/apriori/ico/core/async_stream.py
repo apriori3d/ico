@@ -12,24 +12,76 @@ class IcoAsyncStream(
     Generic[I, O],
     IcoOperator[Iterator[I], Iterator[O]],
 ):
-    """
-    Asynchronous stream operator.
+    """Asynchronous stream processor with concurrent worker pool.
 
-    ICO form:
+    IcoAsyncStream enables concurrent processing of stream items using a pool of
+    workers (operators). Items are distributed among workers for parallel execution,
+    with results streamed back as soon as they're produced. Workers can be async
+    operators for I/O-bound tasks or multiprocessing agents (MPAgent) for CPU-intensive
+    computations. This provides significant performance improvements across different
+    workload types.
+
+    Generic Parameters:
+        I: Input item type - the type of individual items in the input stream.
+        O: Output item type - the type of individual items produced by workers.
+
+    ICO signature:
         Iterator[I] → Iterator[O]
 
-    Executes multiple operators concurrently on incoming items.
-    Each operator acts as an independent worker consuming items
-    from a shared async queue. Results are streamed back as soon
-    as they are produced.
+    Example:
+        >>> import asyncio
+        >>> from apriori.ico.core.async_operator import IcoAsyncOperator
+
+        >>> # Create async workers
+        >>> async def slow_process(x: int) -> int:
+        ...     await asyncio.sleep(0.1)  # Simulate I/O work
+        ...     return x * 2
+
+        >>> # Pool of 3 workers for concurrent processing
+        >>> workers = [IcoAsyncOperator(slow_process) for _ in range(3)]
+        >>> stream_processor = IcoAsyncStream(workers, name="concurrent_doubler")
+
+        >>> # Process numbers concurrently
+        >>> numbers = iter([1, 2, 3, 4, 5, 6])
+        >>> results = list(stream_processor(numbers))
+        >>> # Results may be out of order: [4, 2, 6, 8, 10, 12]
+
+        >>> # Ordered processing (preserves input order)
+        >>> ordered_stream = IcoAsyncStream(workers, ordered=True)
+        >>> ordered_results = list(ordered_stream(iter([1, 2, 3])))
+        >>> # Results in order: [2, 4, 6]
+
+        >>> # Factory-based worker creation with MPAgent for CPU-bound work
+        >>> from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+        >>> def make_worker() -> IcoAsyncOperator[int, int]:
+        ...     return IcoAsyncOperator(slow_process)
+
+        >>> def make_mp_worker() -> MPAgent[int, int]:
+        ...     # MPAgent provides true multiprocessing for CPU-intensive operations
+        ...     return MPAgent(lambda: IcoOperator(lambda x: x ** 2))
+
+        >>> dynamic_stream = IcoAsyncStream(make_worker, pool_size=4)
+        >>> # Creates 4 workers dynamically when needed
 
     Flow schema:
         input_stream(I) → producer → in_queue → workers → out_queue → yield(O)
 
     Key properties:
     • Fully asynchronous execution, converted back to sync iterator.
-    • No external timeout or blocking assumptions.
+    • Configurable worker pool size for optimal concurrency.
+    • Optional result ordering to preserve input sequence.
     • Graceful shutdown and fast-exit for empty input streams.
+    • No external timeout or blocking assumptions.
+
+    Attributes:
+        pool: List of worker operators (sync, async, or multiprocessing agents).
+        ordered: Whether to preserve input order in results.
+        pool_size: Number of workers in the pool.
+
+    Note:
+        Best suited for I/O-bound tasks where concurrency provides significant
+        performance gains. For CPU-bound tasks, consider using MPAgent workers
+        for true multiprocessing or other process-based parallelism approaches.
     """
 
     __slots__ = (
@@ -82,6 +134,25 @@ class IcoAsyncStream(
         ordered: bool = False,
         name: str | None = None,
     ) -> None:
+        """Initialize async stream with worker pool or factory.
+
+        Args:
+            pool: Either a sequence of pre-created operators/agents or a factory function
+                 that creates new workers. Supports IcoOperator, IcoAsyncOperator, and
+                 MPAgent types. Factory enables dynamic worker creation.
+            pool_size: Required when pool is a factory. Number of workers to create.
+                      Ignored when pool is a sequence (uses sequence length).
+            ordered: If True, results are yielded in the same order as input items.
+                    If False, results are yielded as soon as workers complete.
+            name: Optional name for this stream (useful for debugging/visualization).
+
+        Raises:
+            ValueError: If pool is a factory but pool_size is not specified.
+
+        Note:
+            Factory-based pools allow for fresh worker instances, which can be
+            useful for stateful operators, memory management, or process isolation.
+        """
         if callable(pool):
             if pool_size is None:
                 raise ValueError(
@@ -108,6 +179,19 @@ class IcoAsyncStream(
 
     @property
     def signature(self) -> IcoSignature:
+        """Infer the ICO type signature for this async stream.
+
+        Derives the stream signature from the first worker's signature, wrapping
+        the input and output types in Iterator containers to reflect stream processing.
+
+        Returns:
+            IcoSignature with Iterator[I] input and Iterator[O] output types,
+            derived from the worker operators' signatures.
+
+        Note:
+            All workers in the pool should have compatible signatures. The first
+            worker's signature is used as the template for the entire stream.
+        """
         signature = super().signature
 
         # If signature is undefined, infer from body operator
@@ -123,7 +207,14 @@ class IcoAsyncStream(
     # ─── Async iterator state management ───
 
     def _reset_iterator_state(self) -> None:
-        """Reset per-iteration state (important when stream reused across runs)."""
+        """Reset per-iteration state for stream reuse.
+
+        Clears internal state variables that track iteration progress and ordering.
+        This is important when the same stream instance is used multiple times.
+
+        Note:
+            Called automatically before each stream execution to ensure clean state.
+        """
         self._has_job = False
         self._next_index = 0
         self._ordering_buffer.clear()
@@ -131,20 +222,41 @@ class IcoAsyncStream(
     # ─── Synchronous entrypoint ───
 
     def _run_stream(self, input_stream: Iterator[I]) -> Iterator[O]:
-        """Run the async stream inside a synchronous context."""
+        """Run the async stream inside a synchronous context.
+
+        Args:
+            input_stream: Iterator of input items to be processed concurrently.
+
+        Yields:
+            O: Processed results from the worker pool, either in order or as completed.
+
+        Note:
+            This is the synchronous entrypoint that bridges to the async implementation.
+            It converts the async iterator to sync using async_to_sync_iter utility.
+        """
         yield from async_to_sync_iter(self._run_stream_async(input_stream))
 
     # ─── Asynchronous execution ───
 
     async def _run_stream_async(self, input_stream: Iterator[I]) -> AsyncIterator[O]:
-        """
-        Internal async loop driving producer, workers, and output emission.
+        """Internal async implementation driving producer, workers, and output emission.
 
-        The lifecycle:
-            1. Producer fills in_queue with items.
-            2. Workers consume in_queue, push results to out_queue.
-            3. Main loop yields items from out_queue as they appear.
-            4. All workers receive termination signals (None).
+        Coordinates the complete async processing lifecycle:
+        1. Producer fills input queue with items from input_stream
+        2. Worker pool consumes from input queue and processes items concurrently
+        3. Results are collected in output queue and yielded as they become available
+        4. Graceful shutdown ensures all workers complete and resources are cleaned up
+
+        Args:
+            input_stream: Iterator of input items to be processed.
+
+        Yields:
+            O: Processed results, either in input order (if ordered=True) or
+               as soon as workers complete (if ordered=False).
+
+        Note:
+            Handles empty input streams with fast-exit optimization and ensures
+            proper resource cleanup even if processing is interrupted.
         """
         self._reset_iterator_state()
 

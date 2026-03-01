@@ -26,20 +26,19 @@ O2 = TypeVar("O2")
 
 class IcoOperator(Generic[I, O], IcoNode):
     """
-    An atomic transformation unit following the ICO convention.
+    A fundamental building block and base class for synchronous operations in the ICO framework.
 
-    ICO form:
+    Generic Parameters:
+        I: Input type - the type of data this operator accepts.
+        O: Output type - the type of data this operator produces.
+
+    ICO signature:
         I → O
         fn: I → O
 
     An `IcoOperator` wraps a callable and provides:
     • chainable transformations via `|` or `chain()`
-    • lazy mapping over iterables with `.map()`
-    • structured graph representation for flow inspection
-
-    Operators are the fundamental building blocks of ICO pipelines.
-    They can represent stateless or stateful transformations,
-    depending on the behavior of the wrapped callable.
+    • wrapping into an `Iterable` with `.stream()`
 
     Example:
         >>> from apriori.ico import IcoOperator
@@ -53,18 +52,15 @@ class IcoOperator(Generic[I, O], IcoNode):
         >>> print(pipeline("21.0"))
         '42.0'
 
-        # Lazy map over iterable
-        >>> mapped = scale.map()
-        >>> print(list(mapped([1, 2, 3])))
+        # Lazy stream over iterable
+        >>> stream = scale.stream()
+        >>> for i in stream([1, 2, 3]):
+                print(i)
         [2, 4, 6]
 
-        # Inspect flow
-        >>> flow = pipeline.describe_flow()
-        >>> print(flow.name)
-        to_float | scale | to_string
     """
 
-    # Note: do not use __slots__ here to allow dynamic inference of ICO-form attributes
+    # Note:  __slots__ is not used here to allow dynamic inference of ICO-signature attributes
 
     fn: Callable[[I], O]
 
@@ -76,6 +72,17 @@ class IcoOperator(Generic[I, O], IcoNode):
         parent: IcoNode | None = None,
         children: Sequence[IcoNode] | None = None,
     ):
+        """Initialize an IcoOperator with a callable function.
+
+        Args:
+            fn: The callable function to wrap. Should accept type I and return type O.
+            name: Optional human-readable identifier for this operator.
+            parent: Optional parent node to establish hierarchy.
+            children: Optional sequence of child nodes to connect.
+
+        Note:
+            The operator inherits tree structure functionality from IcoNode.
+        """
         IcoNode.__init__(
             self,
             name=name,
@@ -85,6 +92,14 @@ class IcoOperator(Generic[I, O], IcoNode):
         self.fn = fn
 
     def __call__(self, item: I) -> O:
+        """Execute the wrapped function with the given input.
+
+        Args:
+            item: The input value of type I.
+
+        Returns:
+            The output value of type O after applying the wrapped function.
+        """
         return self.fn(item)
 
     # ────────────────────────────────────────────────
@@ -98,12 +113,23 @@ class IcoOperator(Generic[I, O], IcoNode):
         return chain(self, other)
 
     def __or__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-        """Pipe composition: a | b == a.chain(b)."""
+        """Pipe composition operator: a | b == a.chain(b).
+
+        Args:
+            other: The operator to chain with this one.
+
+        Returns:
+            A new operator that applies this operator followed by the other.
+        """
         return self.chain(other)
 
     def stream(self) -> IcoOperator[Iterator[I], Iterator[O]]:
-        """Apply this operator elementwise over an iterable (lazy generator):
-        Iterable[I] → Iterable[O]
+        """Apply this operator element-wise over an iterable (lazy generator).
+
+        Transforms: Iterable[I] → Iterable[O]
+
+        Returns:
+            An IcoStream that applies this operator to each element of an iterable.
         """
         from apriori.ico.core.stream import IcoStream
 
@@ -115,7 +141,16 @@ class IcoOperator(Generic[I, O], IcoNode):
 
     @property
     def signature(self) -> IcoSignature:
-        """Infer ICO signature of this operator."""
+        """Infer the ICO type signature of this operator.
+
+        Attempts to determine input and output types through:
+        1. Generic type parameters if available
+        2. Callable signature inspection
+        3. Fallback to Any types
+
+        Returns:
+            IcoSignature containing input, context, and output type information.
+        """
         from apriori.ico.core.signature_utils import (
             get_generic_args,
             infer_from_callable,
@@ -144,6 +179,17 @@ class IcoOperator(Generic[I, O], IcoNode):
 
 
 def operator() -> Callable[[Callable[[I], O]], IcoOperator[I, O]]:
+    """Decorator to wrap a function as an IcoOperator.
+
+    Returns:
+        A decorator function that converts a callable into an IcoOperator.
+
+    Example:
+        >>> @operator()
+        >>> def double(x: int) -> int:
+        ...     return x * 2
+    """
+
     def decorator(fn: Callable[[I], O]) -> IcoOperator[I, O]:
         return wrap_operator(fn)
 
@@ -160,8 +206,19 @@ def wrap_operator(fn: Callable[[I], O]) -> IcoOperator[I, O]: ...
 
 def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]:
     """
-    Wrap raw callable into IcoOperator only when necessary.
-    Ensures type inference for both mypy and pyright.
+    Wrap a raw callable into an IcoOperator only when necessary.
+
+    If the input is already an IcoOperator, returns it unchanged.
+    Otherwise, wraps the callable in a new IcoOperator.
+
+    Args:
+        fn: A callable or existing IcoOperator to wrap.
+
+    Returns:
+        An IcoOperator wrapping the given callable.
+
+    Note:
+        Ensures proper type inference for both mypy and pyright.
     """
     if isinstance(fn, IcoOperator):
         # Suppress runtime type checker warning,
