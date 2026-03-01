@@ -112,10 +112,9 @@ pipeline = source | progress | processing | train
 ## 🚀 Getting Started
 
 ### 📖 Examples
-- **Basic Introduction**: [Linear Regression with ICO](src/examples/linear_regression.ipynb) — Type-safe gradient descent training using
-- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) — Complete data processing pipeline without PyTorch DataLoader
-IcoEpoch
-- **Runtime Monitoring**: Progress tracking with Rich tools (coming soon)
+- **Basic Introduction**: [Linear Regression with ICO](src/examples/linear_regression.ipynb)
+- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) (with PyTorch DataLoader replacement)
+- **Runtime Monitoring**: Runtime Monitoring with ICO Tools (comming soon)
 - **Distributed Processing**: Multi-processing data pipeline (coming soon)
 
 
