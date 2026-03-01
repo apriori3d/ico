@@ -10,6 +10,7 @@ from apriori.ico.core.process import IcoProcess
 from apriori.ico.core.sink import IcoSink
 from apriori.ico.core.source import IcoSource
 from apriori.ico.core.stream import IcoStream
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 # ─── Operator ───
 
@@ -248,6 +249,53 @@ def test_infer_form_epoch_from_type_hints_with_source() -> None:
     source = IcoSource(source_fn)
     epoch = IcoEpoch(source, context_fn)
     assert epoch.signature.name == "Iterator[int], str → str"
+
+
+# ─── MPAgent ───
+
+
+def test_infer_form_mp_agent_from_generics() -> None:
+    """Test MPAgent signature inference from explicit Generic parameters."""
+
+    def create_worker_flow() -> IcoOperator[str, int]:
+        return IcoOperator[str, int](lambda x: len(x))
+
+    agent = MPAgent[str, int](flow_factory=create_worker_flow)
+    signature = agent.signature
+
+    # MPAgent should have signature: str → int (input → output)
+    # Context (c) should be None for agents
+    assert signature.name == "str → int"
+
+
+def test_infer_form_mp_agent_with_type_hints() -> None:
+    """Test MPAgent signature inference from factory function type hints."""
+
+    def computation(x: int) -> float:
+        return float(x * 2)
+
+    def create_worker_flow() -> IcoOperator[int, float]:
+        return IcoOperator(computation)
+
+    agent = MPAgent(flow_factory=create_worker_flow)
+    signature = agent.signature
+    assert signature.name == "int → float"
+
+
+def test_infer_form_mp_agent_complex_computation() -> None:
+    """Test MPAgent signature with complex computation flow."""
+
+    def string_processor(text: str) -> list[str]:
+        return text.split()
+
+    def create_complex_flow() -> IcoOperator[str, list[str]]:
+        return IcoOperator(string_processor)
+
+    agent = MPAgent[str, list[str]](flow_factory=create_complex_flow)
+    signature = agent.signature
+
+    # Test complex type handling
+    assert signature.name == "str → list[str]"  # Should be "str → list[str]?"
 
 
 if __name__ == "__main__":
