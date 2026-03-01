@@ -209,10 +209,14 @@ class IcoRuntime(IcoRuntimeNode):
             state_model=state_model,
         )
         self.closure = closure
-        self.toolbox = IcoToolBox(runtime=self, tools=tools)
-        self.add_runtime_children(self.toolbox)
+
+        # Tools in toolbox might need to use `IcoToolRegistrationProtocol` to register for runtime events,
+        # so we need to discover and connect runtime nodes before creating the toolbox and adding tools to it.
 
         discover_and_connect_runtime_nodes(self, closure)
+
+        self.toolbox = IcoToolBox(runtime=self, tools=tools)
+        self.add_runtime_children(self.toolbox)
 
     # ────────────────────────────────────────────────
     # Event coordination and distribution

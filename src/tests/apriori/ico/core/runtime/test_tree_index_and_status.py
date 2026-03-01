@@ -13,7 +13,7 @@ from apriori.ico.core.operator import IcoOperator
 from apriori.ico.core.runtime.event import IcoRuntimeEvent
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.runtime_wrapper import with_runtime_fn
+from apriori.ico.core.runtime.runtime_wrapper import wrap_runtime_fn
 from apriori.ico.core.runtime.state import (
     IcoRuntimeState,
     IcoStateRequestCommand,
@@ -73,9 +73,9 @@ def test_flow_with_runtime() -> None:
 
     flow = (
         IcoIdentity[Any]()
-        | with_runtime_fn(IcoIdentity[Any](), shared_runtime_node1)
+        | wrap_runtime_fn(IcoIdentity[Any](), shared_runtime_node1)
         | IcoIdentity[Any]()
-        | with_runtime_fn(IcoIdentity[Any](), shared_runtime_node1)
+        | wrap_runtime_fn(IcoIdentity[Any](), shared_runtime_node1)
     )
 
     runtime = IcoRuntime(flow)
@@ -93,17 +93,17 @@ def test_flow_with_runtime() -> None:
     expected_states = {
         TreePathIndex(): IdleState(),
         TreePathIndex.create(0): IdleState(),
-        TreePathIndex.create(0, 0): IdleState(),
+        TreePathIndex.create(0, 0): ReadyState(),
+        TreePathIndex.create(0, 0, 0): IdleState(),
+        TreePathIndex.create(0, 0, 1): ReadyState(),
         TreePathIndex.create(1): IdleState(),
-        TreePathIndex.create(1, 0): ReadyState(),
-        TreePathIndex.create(1, 0, 0): IdleState(),
-        TreePathIndex.create(1, 0, 1): ReadyState(),
+        TreePathIndex.create(1, 0): IdleState(),
     }
     assert collector.collected_states == expected_states
 
 
 def _agent_flow_factory() -> IcoOperator[Any, Any]:
-    return with_runtime_fn(
+    return wrap_runtime_fn(
         IcoIdentity[Any](),
         IcoRuntimeNode(runtime_name="worker_runtime_node"),
     )
@@ -118,7 +118,7 @@ def test_flow_with_mp_agent() -> None:
     shared_runtime_node = IcoRuntimeNode(runtime_name="shared_runtime_node")
     flow = (
         IcoIdentity[Any]()
-        | with_runtime_fn(IcoIdentity[Any](), shared_runtime_node)
+        | wrap_runtime_fn(IcoIdentity[Any](), shared_runtime_node)
         | MPAgent(_agent_flow_factory)
     )
     runtime = IcoRuntime(flow)
@@ -138,11 +138,11 @@ def test_flow_with_mp_agent() -> None:
         TreePathIndex.create(0): ReadyState(),
         TreePathIndex.create(0, 0): IdleState(),
         TreePathIndex.create(1): ReadyState(),
-        TreePathIndex.create(1, 0): IdleState(),
+        TreePathIndex.create(1, 0): ReadyState(),
+        TreePathIndex.create(1, 0, 0): ReadyState(),
+        TreePathIndex.create(1, 0, 0, 0): ReadyState(),
         TreePathIndex.create(2): ReadyState(),
-        TreePathIndex.create(2, 0): ReadyState(),
-        TreePathIndex.create(2, 0, 0): ReadyState(),
-        TreePathIndex.create(2, 0, 0, 0): ReadyState(),
+        TreePathIndex.create(2, 0): IdleState(),
     }
     assert collector.collected_states == expected_states
 

@@ -5,11 +5,11 @@ from typing import Literal, TypeAlias
 from apriori.ico.core.node import IcoNode
 from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
 from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.printer import IcoPrinter
 from apriori.ico.core.runtime.progress import IcoProgress
 from apriori.ico.core.runtime.runtime import IcoRuntime
 from apriori.ico.describe.options import RendererOptions
-from apriori.ico.tools.printer.node import IcoPrinter
-from apriori.ico.tools.printer.rich.rich_printer_tool import RichPrinterTool
+from apriori.ico.tools.printer.rich_printer_tool import RichPrinterTool
 from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
 
 RuntimeRendererColumn: TypeAlias = Literal["Tree", "State", "Name"]
