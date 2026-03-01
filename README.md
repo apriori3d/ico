@@ -9,7 +9,7 @@
 
 </div>
 
-ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe, and fully-transparent framework for ML engineers and researchers.
+ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe and fully-transparent framework for ML engineers and researchers.
 
 ## 🚀 Quick Demo
 
