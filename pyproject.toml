@@ -1,3 +1,50 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "apriori.ico"
+version = "0.1.0"
+description = "ICO formalizes a common ML pattern: take Input, apply Context, produce Output, and provides an elegant, type-safe, and fully-transparent framework for ML engineers and researchers."
+readme = "README.md"
+license = {text = "Apache 2.0"}
+authors = [
+    {name = "Sergei Shumilin", email = "shumilinss@gmail.com"}
+]
+maintainers = [
+    {name = "Sergei Shumilin", email = "shumilinss@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed"
+]
+keywords = ["machine-learning", "pipeline", "type-safety", "functional-programming", "framework"]
+requires-python = ">=3.10,<3.11"
+dependencies = [
+    "rich>=14.2.0",
+    "ipywidgets>=8.1.8"
+]
+
+[project.optional-dependencies]
+vision = [
+    "torch>=2.9.1",
+    "torchvision>=0.24.1",
+    "matplotlib>=3.10.7"
+]
+
+[project.urls]
+Homepage = "https://github.com/apriori3d/ico"
+Documentation = "https://github.com/apriori3d/ico/blob/main/README.md"
+Repository = "https://github.com/apriori3d/ico"
+Issues = "https://github.com/apriori3d/ico/issues"
+
 [tool.poetry]
 name = "apriori.ico"
 version = "0.1.0"
@@ -14,6 +61,7 @@ rich = "^14.2.0"
 torch = {version = "^2.9.1", optional = true}
 torchvision = {version = "^0.24.1", optional = true}
 matplotlib = {version = "^3.10.7", optional = true}
+ipywidgets = "^8.1.8"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.18.2"

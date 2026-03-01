@@ -5,7 +5,7 @@
 ![Type Safety](https://img.shields.io/badge/Type_Safety-Guaranteed-green?style=for-the-badge)
 ![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge)
 
-*Transform complex ML code into elegant, type-safe, self-describable flows*
+*Transform complex ML code into elegant, type-safe and self-describable flows*
 
 </div>
 
