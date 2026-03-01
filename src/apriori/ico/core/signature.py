@@ -60,6 +60,7 @@ class IcoSignature:
 
         if self.c is None or self.c is type(None):
             return f"{format_ico_type(self.i)} → {format_ico_type(self.o)}"
+
         return f"{format_ico_type(self.i)}, {format_ico_type(self.c)} → {format_ico_type(self.o)}"
 
     @property

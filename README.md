@@ -1,1 +1,139 @@
-Apriori ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows.
+# ICO Framework
+<div align="center">
+
+![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
+![Type Safety](https://img.shields.io/badge/Type_Safety-Guaranteed-green?style=for-the-badge)
+![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge)
+
+*Transform complex ML code into elegant, type-safe, self-describable flows*
+
+</div>
+
+## ✨ The ICO Concept
+
+ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe and fully-transparent framework for ML engineers and researchers.
+
+## 🚀 Quick Start
+
+```python
+from apriori.ico.core.process import IcoProcess
+
+# Fibonacci as an iterative process
+def fib_step(state: tuple[int, int]) -> tuple[int, int]:
+    return (state[1], state[0] + state[1])
+
+fib_process = IcoProcess(fib_step, num_iterations=8)
+result = fib_process((0, 1))
+print(result)  # (21, 34) - 8th Fibonacci number
+
+```
+
+## 🔥 Key Features
+
+### 🔍 **Introspection and Rich Visualization**
+
+ICO provides beautiful console visualization with fully-defined signature of any operator:
+```python
+fib_process.describe()
+```
+
+<img src="docs/images/fib_describe.jpg" width="800" alt="Fibonacci process visualization">
+
+
+### 🛡️ **Type Safety Everywhere**
+```python
+# Automatic type inference and validation
+def square(x: float) -> float:
+    return x * x
+
+def to_str(x: float) -> str
+    return str(x)
+
+
+# This works ✅
+pipeline = square | to_str
+
+# This fails at type-check time ❌
+bad_pipeline = to_str | square
+```
+
+### ⚡ **Distributed by Design**
+```python
+# Multiprocessing with zero configuration
+workers = IcoAsyncStream(
+    lambda: MPAgent(heavy_computation),
+    pool_size=cpu_count()
+)
+
+# Automatic work distribution and result collection
+distributed_flow = data_source | workers | train
+```
+
+### 📊 **Built-in Progress Tracking**
+```python
+# Rich progress bars and metrics
+progress = IcoProgress(name="Overall progress", total=epochs)
+pipeline = source | progress | processing | train
+
+# Real-time console updates with ETA, speed, etc.
+```
+<img src="docs/images/progress.jpg" width="600" alt="Fibonacci process visualization">
+
+
+### 🎯 **Declarative Pipeline Composition**
+```python
+# Complex workflows become simple
+ml_pipeline = (
+    load_train_indices # Load indices for train split
+    | batcher # Group into batches
+    | augment_pipeline # Fetch items and augment (possible to distribute)
+    | train_epoch
+    | save_checkpoint
+)
+```
+
+
+## 🚀 Getting Started
+
+### 📖 Examples
+- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) — Complete data processing pipeline without PyTorch DataLoader
+- **Basic Introduction**: Linear regression example (coming soon)
+- **Runtime Monitoring**: Progress tracking with Rich tools (coming soon)
+- **Distributed Processing**: Multi-processing data pipeline (coming soon)
+
+## 📚 Use Cases
+
+**Perfect for:**
+- 🧠 **ML Training Pipelines** — Data loading, augmentation, distributed training
+- 📊 **ETL Workflows** — Extract, transform, load with monitoring
+- 🔄 **Stream Processing** — Real-time data processing with backpressure
+- 🧪 **Research Experiments** — Reproducible, monitorable scientific computing
+- 📈 **Data Analytics** — Complex data processing with visualization
+
+## 🎯 Why ICO?
+
+| Feature | ICO | Others |
+|---------|-----|--------|
+| Type Safety | ✅ Full static typing | ❌ Runtime errors |
+| Visualization | ✅ Rich console integration | ❌ External tools needed |
+| Distribution | ✅ Built-in multiprocessing | ❌ Manual setup |
+| Composability | ✅ Pipe syntax `\|` | ❌ Complex APIs |
+| Monitoring | ✅ Real-time state tracking | ❌ Limited introspection |
+
+## 🤝 Contributing
+
+We welcome contributions! Contribution guidelines comming soon.
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+**Built with ❤️ for the ML community**
+
+[Documentation](docs/) • [Examples](examples/) • [Discussions](discussions/)
+
+</div>

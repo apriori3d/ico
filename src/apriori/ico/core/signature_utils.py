@@ -8,9 +8,7 @@ from collections.abc import Callable, Iterator
 from types import FunctionType
 from typing import (
     Any,
-    Literal,
     TypeVar,
-    Union,
     cast,
     get_args,
     get_origin,
@@ -249,31 +247,17 @@ def format_ico_type(tp: object) -> str:
     if tp is Any or tp is object:
         return "Any"
 
-    origin = get_origin(tp)
-    args = get_args(tp)
-
     if tp is None or tp is type(None):
         return "()"
 
-    if origin is Union:
-        args_ = [a for a in args if a is not type(None)]
-        if len(args_) == 1:
-            return f"Optional[{format_ico_type(args_[0])}]"
-        return " | ".join(format_ico_type(a) for a in args_)
+    origin = get_origin(tp)
 
-    if origin is Literal:
-        name = getattr(origin, "__name__", str(origin))
-        if args:
-            return f"{name}[{', '.join(format_ico_type(a) for a in args)}]"
-        return name
+    if origin is None:
+        return getattr(tp, "__name__", str(tp))
 
-    if origin is Iterator:
-        return f"Iterator[{format_ico_type(args[0])}]"
+    name = getattr(origin, "__name__", str(origin))
+    args = get_args(tp)
 
-    if origin is list:
-        return f"list[{format_ico_type(args[0])}]"
-
-    if isinstance(tp, type):
-        return tp.__name__
-
-    return str(tp)
+    if args:
+        return f"{name}[{', '.join(format_ico_type(a) for a in args)}]"
+    return name

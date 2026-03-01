@@ -94,6 +94,14 @@ def test_infer_form_process_from_fn() -> None:
     assert proc.signature.name == "float → float"
 
 
+def test_infer_from_process_fib() -> None:
+    def fib_step(state: tuple[int, int]) -> tuple[int, int]:
+        return (state[1], state[0] + state[1])
+
+    fib_process = IcoProcess(fib_step, num_iterations=8)
+    assert fib_process.signature.name == "tuple[int, int] → tuple[int, int]"
+
+
 # ─── Pipeline ───
 
 
