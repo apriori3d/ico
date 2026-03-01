@@ -9,11 +9,9 @@
 
 </div>
 
-## ✨ The ICO Concept
+ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe, and fully-transparent framework for ML engineers and researchers.
 
-ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe and fully-transparent framework for ML engineers and researchers.
-
-## 🚀 Quick Start
+## 🚀 Quick Demo
 
 ```python
 from apriori.ico.core.process import IcoProcess
@@ -32,7 +30,7 @@ print(result)  # (21, 34) - 8th Fibonacci number
 
 ### 🔍 **Introspection and Rich Visualization**
 
-ICO provides beautiful console visualization with fully-defined signature of any operator:
+ICO provides beautiful console visualization with a fully-defined signature for any operator:
 ```python
 fib_process.describe()
 ```
@@ -57,7 +55,7 @@ ml_pipeline = (
 def square(x: float) -> float:
     return x * x
 
-def to_str(x: float) -> str
+def to_str(x: float) -> str:
     return str(x)
 
 
@@ -114,16 +112,26 @@ pipeline = source | progress | processing | train
 ## 🚀 Getting Started
 
 ### 📖 Examples
+- **Basic Introduction**: [Linear Regression with ICO](src/examples/linear_regression.ipynb) — Type-safe gradient descent training using
 - **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) — Complete data processing pipeline without PyTorch DataLoader
-- **Basic Introduction**: Linear regression example (coming soon)
+IcoEpoch
 - **Runtime Monitoring**: Progress tracking with Rich tools (coming soon)
 - **Distributed Processing**: Multi-processing data pipeline (coming soon)
 
 
 
+## 📈 Future Development
+
+- 📊 Profiler: tools for time/memory metrics analysis
+- 😎 Stateful run: State management API (pause/resume) to support distributed training scenarios on remote computation units
+- 🌐 Live board: Real-time monitoring tool with web interface
+**And much more!**
+
+Start experimenting and create your own innovative ML pipelines! 🎯
+
 ## 🤝 Contributing
 
-We welcome contributions! Contribution guidelines comming soon.
+We welcome contributions! Contribution guidelines coming soon.
 
 ## 📄 License
 
