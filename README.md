@@ -8,7 +8,7 @@
 ![Type Safety](https://img.shields.io/badge/Type_Safety-mypy-green?style=for-the-badge&logo=python)
 ![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge&logo=python)
 
-*Transform complex ML code into elegant, type-safe and self-describing flows*
+*Composable, type-safe ML pipelines with full runtime transparency*
 
 </div>
 
