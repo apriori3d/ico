@@ -1,9 +1,12 @@
 # ICO Framework
 <div align="center">
 
+[![CI](https://github.com/apriori3d/ico/actions/workflows/ci.yml/badge.svg)](https://github.com/apriori3d/ico/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
-![Type Safety](https://img.shields.io/badge/Type_Safety-Guaranteed-green?style=for-the-badge)
-![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=for-the-badge)](https://github.com/astral-sh/ruff)
+![Type Safety](https://img.shields.io/badge/Type_Safety-mypy-green?style=for-the-badge&logo=python)
+![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge&logo=python)
 
 *Transform complex ML code into elegant, type-safe and self-describing flows*
 
