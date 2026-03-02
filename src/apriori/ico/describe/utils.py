@@ -1,3 +1,4 @@
+import contextlib
 import importlib
 import pkgutil
 
@@ -7,19 +8,12 @@ from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 def import_all_renderers(package_name: str) -> None:
     """Import all renderer modules from package for registration."""
-    try:
+    with contextlib.suppress(ImportError):
         package = importlib.import_module(package_name)
         for _, modname, _ in pkgutil.walk_packages(
             package.__path__, package.__name__ + "."
         ):
-            try:
-                importlib.import_module(modname)
-            except ImportError:
-                # Skip modules that can't be imported (e.g., optional dependencies)
-                pass
-    except ImportError:
-        # Package not found, skip
-        pass
+            importlib.import_module(modname)
 
 
 def match_icon(
