@@ -112,19 +112,46 @@ pipeline = source | progress | processing | train
 ## 🚀 Getting Started
 
 ### 📖 Examples
-- **Basic Introduction**: [Linear Regression with ICO](src/examples/linear_regression.ipynb)
-- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) (with PyTorch DataLoader replacement)
-- **Runtime Monitoring**: Runtime Monitoring with ICO Tools (comming soon)
-- **Distributed Processing**: Multi-processing data pipeline (coming soon)
+
+#### 🎯 **ICO Basics**
+- [Basic introduction into ICO approach](src/examples/ico_basics.ipynb): Main building blocks and concept
+- [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb): Progress monitoring, printing and runtime architecture
+
+#### 🔄 **Multiprocessing**
+- [Multi-processing example](src/examples/mp_basic.py): Basic example of distributed computational flow
+- [Parallel Multi-processing Pool example](src/examples/mp_basic_pool.py): Basic example of distributed compute flow with parallel pool of workers
+
+#### 🧠 **Machine Learning**
+- [Linear Regression](src/examples/ml/linear_regression.ipynb): ICO approach to ML pipelines
+- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/complete_flow.ipynb): Full CV pipeline with PyTorch DataLoader replacement
+
 
 
 
 ## 📈 Future Development
 
-- 📊 Profiler: tools for time/memory metrics analysis
-- 😎 Stateful run: State management API (pause/resume) to support distributed training scenarios on remote computation units
-- 🌐 Live board: Real-time monitoring tool with web interface
-**And much more!**
+### 🔮 **Planned Features**
+
+- **📊 ICO Profiler**: Comprehensive performance analysis toolkit
+  - Memory usage tracking across distributed workers
+  - Bottleneck detection in complex pipelines
+  - Time profiling with operator-level granularity
+  - Export reports for optimization insights
+
+- **😎 Stateful Runtime**: Advanced state management for production scenarios
+  - Pause/resume operations for long-running training jobs
+  - Checkpoint recovery after system failures
+  - Migration between different compute environments
+  - Perfect for cloud-native distributed training
+
+- **🌐 ICO Live Board**: Real-time monitoring dashboard
+  - Web-based interface for pipeline visualization
+  - Live progress tracking across multiple experiments
+  - Resource utilization monitoring (CPU, GPU, memory)
+  - Integration with Jupyter notebooks and MLflow
+
+### 🚀 **Community-Driven Roadmap**
+We're building based on real ML engineer needs. Have ideas? [Join discussions](https://github.com/apriori3d/ico/discussions) and help shape ICO's future!
 
 Start experimenting and create your own innovative ML pipelines! 🎯
 
@@ -140,8 +167,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 <div align="center">
 
-**Built with ❤️ for the ML community**
+**Happy Coding with ICO! ☺️**
 
-[Documentation](docs/) • [Examples](examples/) • [Discussions](discussions/)
+[Documentation](docs/) • [Examples](examples/) • [Discussions](https://github.com/apriori3d/ico/discussions)
 
 </div>
