@@ -5,11 +5,12 @@
 ![Type Safety](https://img.shields.io/badge/Type_Safety-Guaranteed-green?style=for-the-badge)
 ![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge)
 
-*Transform complex ML code into elegant, type-safe and self-describable flows*
+*Transform complex ML code into elegant, type-safe and self-describing flows*
 
 </div>
 
-ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe and fully-transparent framework for ML engineers and researchers.
+ICO formalizes a common ML pattern: take **Input**, apply to **Context**, produce **Output**.
+It provides an elegant, type-safe and fully-transparent framework for ML engineers and researchers.
 
 ## 🚀 Quick Demo
 
@@ -50,21 +51,8 @@ ml_pipeline = (
 
 
 ### 🛡️ **Type Safety Everywhere**
-```python
-# Static type checking with mypy, Pylance, and other type checkers
-def square(x: float) -> float:
-    return x * x
-
-def to_str(x: float) -> str:
-    return str(x)
-
-
-# This works ✅
-pipeline = square | to_str
-
-# This fails at type-check time ❌
-bad_pipeline = to_str | square
-```
+Static type checking with mypy, Pylance, and other type checkers.
+<img src="docs/images/type_checking.jpg" width="800" alt="Type checking">
 
 
 ### ⚡ **Distributed by Design**
@@ -85,7 +73,7 @@ distributed_flow = data_source | workers | train
 progress = IcoProgress(name="Overall progress", total=epochs)
 pipeline = source | progress | processing | train
 
-# Real-time console updates with ETA, speed, etc.
+# Real-time console updates with ETA, speed, and more
 ```
 <img src="docs/images/progress.jpg" width="600" alt="Fibonacci process visualization">
 
@@ -93,11 +81,11 @@ pipeline = source | progress | processing | train
 ## 📚 Use Cases
 
 **Perfect for:**
-- 🧠 **ML Training Pipelines** — Data loading, augmentation, distributed training
-- 📊 **ETL Workflows** — Extract, transform, load with monitoring
-- 🔄 **Stream Processing** — Real-time data processing with backpressure
-- 🧪 **Research Experiments** — Reproducible, monitorable scientific computing
-- 📈 **Data Analytics** — Complex data processing with visualization
+- 🧠 **ML Training Pipelines** — Data loading, augmentation and distributed training
+- 📊 **ETL Workflows** — Extract, transform and load with comprehensive monitoring
+- 🔄 **Stream Processing** — Real-time data processing with intelligent backpressure
+- 🧪 **Research Experiments** — Reproducible and monitorable scientific computing
+- 📈 **Data Analytics** — Complex data transformations with rich visualization
 
 ## 🎯 Why ICO?
 
@@ -114,16 +102,17 @@ pipeline = source | progress | processing | train
 ### 📖 Examples
 
 #### 🎯 **ICO Basics**
-- [Basic introduction into ICO approach](src/examples/ico_basics.ipynb): Main building blocks and concept
+- [Basic introduction to ICO approach](src/examples/ico_basics.ipynb): Main building blocks and core concepts
 - [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb): Progress monitoring, printing and runtime architecture
 
 #### 🔄 **Multiprocessing**
-- [Multi-processing example](src/examples/mp_basic.py): Basic example of distributed computational flow
-- [Parallel Multi-processing Pool example](src/examples/mp_basic_pool.py): Basic example of distributed compute flow with parallel pool of workers
+- [Multi-processing example](src/examples/mp_basic.py): Basic example of distributed computational flows
+- [Parallel Multi-processing Pool example](src/examples/mp_basic_pool.py): Distributed compute flows with parallel worker pools
 
 #### 🧠 **Machine Learning**
-- [Linear Regression](src/examples/ml/linear_regression.ipynb): ICO approach to ML pipelines
-- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/complete_flow.ipynb): Full CV pipeline with PyTorch DataLoader replacement
+- [Linear Regression](src/examples/ml/linear_regression.ipynb): ICO-based ML pipeline development
+- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
+- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
 
 
 
@@ -151,13 +140,13 @@ pipeline = source | progress | processing | train
   - Integration with Jupyter notebooks and MLflow
 
 ### 🚀 **Community-Driven Roadmap**
-We're building based on real ML engineer needs. Have ideas? [Join discussions](https://github.com/apriori3d/ico/discussions) and help shape ICO's future!
+We're building based on real ML engineer needs. Have ideas? [Join the discussions](https://github.com/apriori3d/ico/discussions) and help shape ICO's future!
 
 Start experimenting and create your own innovative ML pipelines! 🎯
 
 ## 🤝 Contributing
 
-We welcome contributions! Contribution guidelines coming soon.
+We welcome contributions! Contribution guidelines are coming soon.
 
 ## 📄 License
 
