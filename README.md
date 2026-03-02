@@ -136,20 +136,65 @@ Replace ad-hoc scripts with structured, traceable pipelines for complex data tra
 
 ### 📖 Examples
 
+📓 Examples are provided as **Jupyter notebooks** and can be run instantly in Google Colab — no setup required.
+
 #### 🎯 **ICO Basics**
-- [Basic introduction to ICO approach](src/examples/ico_basics.ipynb): Main building blocks and core concepts
-- [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb): Progress monitoring, printing and runtime architecture
+
+- 📓 [Basic introduction to ICO approach](src/examples/ico_basics.ipynb) — Main building blocks and core concepts
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ico_basics.ipynb)
+
+- 📓 [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb) — Progress monitoring, printing and runtime architecture
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ico_runtime_basics.ipynb)
+
+---
 
 #### 🔄 **Multiprocessing**
-- [Multi-processing example](src/examples/ico_mp_basic.py): Basic example of distributed computational flows
-- [Parallel Multi-processing Pool example](src/examples/ico_mp_basic_pool.py): Distributed compute flows with parallel worker pools
+⚠️ Note: Multiprocessing examples cannot be executed in Jupyter or Google Colab. To run them, please install the framework locally and execute the scripts from a terminal.
+
+See the [Installation](#-installation) section below for setup instructions.
+
+
+- 🐍 [Multi-processing example](src/examples/ico_mp_basic.py) — Basic example of distributed computational flows
+
+- 🐍 [Parallel Multi-processing Pool example](src/examples/ico_mp_basic_pool.py) — Distributed compute flows with parallel worker pools
+
+---
 
 #### 🧠 **Machine Learning**
-- [Linear Regression](src/examples/ml/ico_linear_regression.ipynb): ICO-based ML pipeline development
-- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
-- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
+
+- 📓 [Linear Regression](src/examples/ml/ico_linear_regression.ipynb) — ICO-based ML pipeline development
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ml/ico_linear_regression.ipynb)
+
+- 📓 [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb) — Complete CV pipeline replacing PyTorch DataLoader
+  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb)
+
+- 🐍 [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py) — Complete CV pipeline with parallel data processing workers
 
 
+## ⚙️ Installation
+
+### Using Poetry (recommended)
+
+```bash
+# 1. Install Poetry (if not installed)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# 2. Clone repository
+git clone https://github.com/apriori3d/ico.git
+cd ico
+
+# 3. Install dependencies
+poetry install
+
+# 4. Activate virtual environment
+poetry shell
+```
+
+### Using pip (quick install)
+
+```bash
+pip install git+https://github.com/apriori3d/ico.git
+```
 
 
 ## 📈 Future Development
