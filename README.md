@@ -153,7 +153,6 @@ Replace ad-hoc scripts with structured, traceable pipelines for complex data tra
 
 See the [Installation](#-installation) section below for setup instructions.
 
-
 - 🐍 [Multi-processing example](src/examples/ico_mp_basic.py) — Basic example of distributed computational flows
 
 - 🐍 [Parallel Multi-processing Pool example](src/examples/ico_mp_basic_pool.py) — Distributed compute flows with parallel worker pools
@@ -195,7 +194,6 @@ poetry shell
 ```bash
 pip install git+https://github.com/apriori3d/ico.git
 ```
-
 
 ## 📈 Future Development
 
