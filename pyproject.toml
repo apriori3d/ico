@@ -115,7 +115,8 @@ disallow_any_unimported = true
 disallow_subclassing_any = true
 show_error_codes = true
 
-#disable_error_code = misc
+# Ignore Any-related errors for now
+disable_error_code = ["misc", "redundant-cast", "unused-ignore"]
 
 # this project uses namespace package from src/
 mypy_path = "src"
@@ -125,9 +126,9 @@ explicit_package_bases = true
 
 plugins = []
 
-[[tool.mypy.overrides]]
-#module = "apriori.ico.tools.progress.*"
-disable_error_code = ["misc"]
+# [[tool.mypy.overrides]]
+# module = "apriori.ico.tools.progress.*"
+# disable_error_code = ["misc"]
 
 # ───────────────────────────────────────────────
 # pytest

@@ -5,7 +5,7 @@ from apriori.ico.core.node import IcoNode
 from apriori.ico.core.runtime.node import IcoRuntimeNode
 
 
-def import_all_renderers(package_name: str):
+def import_all_renderers(package_name: str) -> None:
     """Import all renderer modules from package for registration."""
     package = importlib.import_module(package_name)
     for _, modname, _ in pkgutil.walk_packages(

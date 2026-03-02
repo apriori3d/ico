@@ -419,7 +419,7 @@ class IcoRuntimeNode(ABC):
         yield self.runtime_parent
         yield from self.runtime_parent.iterate_parents()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """String representation showing runtime node class, name, and current state."""
         return (
             f"{self.__class__}(name={self.runtime_name}"
@@ -551,7 +551,7 @@ def create_runtime_walker(expand_remote_runtimes: bool = False) -> RuntimeTreeWa
     return RuntimeTreeWalker(get_children_fn=_get_children)
 
 
-def get_placeholder_index(children: list[IcoRuntimeNode]):
+def get_placeholder_index(children: list[IcoRuntimeNode]) -> int:
     """Find the index of the remote placeholder node in children list.
 
     Args:
