@@ -348,7 +348,6 @@ class IcoAsyncStream(
                 # Yield result immediately
                 if isinstance(result, Exception):
                     raise result
-                print("Yield result", result)
                 yield result
 
     # ─── Scheduler coroutine ───

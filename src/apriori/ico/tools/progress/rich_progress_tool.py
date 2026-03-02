@@ -178,11 +178,11 @@ class RichProgressTool(IcoTool):
         """
         super().on_forward_event(event)
 
-        assert (
-            self.progress is not None
-        ), "Progress should be initialized during activation"
-
         if isinstance(event, IcoProgressEvent):
+            assert (
+                self.progress is not None
+            ), "Progress should be initialized during activation"
+
             path = event.trace.reverse()
             if path not in self._tasks:
                 raise RuntimeError(
@@ -277,36 +277,12 @@ if __name__ == "__main__":
 
     @source()
     def numbers() -> Iterator[int]:
-        """Generate sequence of integers with simulated delays.
-
-        Produces numbers 0 through total-1 with 1-second intervals
-        to simulate slow data source and demonstrate progress tracking.
-
-        Returns:
-            Iterator[int]: Sequential integers with timing delays
-
-        Behavior:
-            - Each number emission includes 1s sleep
-            - Demonstrates progress tracking for slow sources
-            - Total iterations known in advance for accurate progress bars
-        """
         for i in range(total):
             time.sleep(1)
             yield i
 
     @sink()
     def print_result(x: int) -> None:
-        """
-        Terminal sink for processed results (discards output in demo).
-
-        Args:
-            x: Processed integer from worker pipeline
-
-        Behavior:
-            - Receives results from distributed worker processing
-            - Discards output for demonstration purposes
-            - Could be replaced with actual result handling
-        """
         pass
 
     # Overall progress tracking for main data flow
