@@ -15,7 +15,7 @@ from apriori.ico.core.source import source
 from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 from apriori.ico.tools.printer.rich_printer_tool import RichPrinterTool
 from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
-from examples.mp_basic import WorkerFlowFactory
+from examples.ico_mp_basic import WorkerFlowFactory
 
 if __name__ == "__main__":
     """
