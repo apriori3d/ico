@@ -125,3 +125,12 @@ if __name__ == "__main__":
     print("   • Different worker speeds visible in progress bars")
     print("   • Async processing enables ensemble/A-B testing patterns")
     print("   • Progress tracking works across async boundaries")
+
+    """
+    🚀 What's Next?
+
+    🧠 Machine Learning Pipelines:
+    • ml/ico_linear_regression.ipynb - ICO-based ML workflow development
+    • ml/cv/cifar/ico_cifar_complete_flow.ipynb - Complete CV pipeline replacing PyTorch DataLoader
+    • ml/cv/cifar/ico_cifar_complete_flow_mp.py - Production-ready CV pipeline with multiprocessing workers
+    """

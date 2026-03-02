@@ -87,7 +87,7 @@ class CifarDataset:
         for i in range(len(self)):
             yield self[i]
 
-    def share_memory_(self):
+    def share_memory_(self) -> None:
         """Enable shared memory for multiprocessing - reduces memory overhead across workers."""
         self.images.share_memory_()
         self.labels.share_memory_()
@@ -283,12 +283,13 @@ class WorkerFlowFactory:
 # ─────────────────────────────────────────────────────────────────────────────────
 
 
-def create_cifar10_resnet18(num_classes: int = 10):
+def create_cifar10_resnet18(num_classes: int = 10) -> nn.Module:
     """Create ResNet-18 model customized for CIFAR-10 dataset."""
     model = resnet18()
     model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
     model.maxpool = nn.Identity()  # pyright: ignore[reportAttributeAccessIssue]
     model.fc = nn.Linear(512, num_classes)
+
     return model
 
 

@@ -173,3 +173,16 @@ if __name__ == "__main__":
     print("   • Progress tracking works across process boundaries")
     print("   • Runtime automatically manages process lifecycle")
     print("   • describe() shows different views before/after activation")
+
+    """
+    🚀 What's Next?
+
+    🔄 Advanced Multiprocessing:
+    • ico_mp_basic_pool.py - Parallel worker pools with IcoAsyncStream
+    • Advanced load balancing & concurrent processing
+
+    🧠 Machine Learning Pipelines:
+    • ml/ico_linear_regression.ipynb - ICO-based ML workflow development
+    • ml/cv/cifar/ico_cifar_complete_flow.ipynb - Complete CV pipeline replacing PyTorch DataLoader
+    • ml/cv/cifar/ico_cifar_complete_flow_mp.py - Production-ready CV pipeline with multiprocessing workers
+    """
