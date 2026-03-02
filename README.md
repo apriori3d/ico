@@ -111,8 +111,8 @@ pipeline = source | progress | processing | train
 
 #### 🧠 **Machine Learning**
 - [Linear Regression](src/examples/ml/ico_linear_regression.ipynb): ICO-based ML pipeline development
-- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
-- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
+- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
+- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
 
 
 
