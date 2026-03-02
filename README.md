@@ -106,13 +106,13 @@ pipeline = source | progress | processing | train
 - [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb): Progress monitoring, printing and runtime architecture
 
 #### 🔄 **Multiprocessing**
-- [Multi-processing example](src/examples/mp_basic.py): Basic example of distributed computational flows
-- [Parallel Multi-processing Pool example](src/examples/mp_basic_pool.py): Distributed compute flows with parallel worker pools
+- [Multi-processing example](src/examples/ico_mp_basic.py): Basic example of distributed computational flows
+- [Parallel Multi-processing Pool example](src/examples/ico_mp_basic_pool.py): Distributed compute flows with parallel worker pools
 
 #### 🧠 **Machine Learning**
-- [Linear Regression](src/examples/ml/linear_regression.ipynb): ICO-based ML pipeline development
-- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
-- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
+- [Linear Regression](src/examples/ml/ico_linear_regression.ipynb): ICO-based ML pipeline development
+- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
+- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
 
 
 
