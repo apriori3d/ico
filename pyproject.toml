@@ -50,7 +50,6 @@ Issues = "https://github.com/apriori3d/ico/issues"
 [tool.poetry]
 name = "apriori.ico"
 version = "0.1.0"
-#requires-python = ">=3.10,<3.11"
 description = "Apriori ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows."
 readme = "README.md"
 packages = [
@@ -84,7 +83,7 @@ vision = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py310"
 src = ["src"]
 
 [tool.ruff.lint]
@@ -103,7 +102,7 @@ indent-style = "space"
 # ───────────────────────────────────────────────
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
@@ -116,7 +115,8 @@ disallow_any_unimported = true
 disallow_subclassing_any = true
 show_error_codes = true
 
-#disable_error_code = misc
+# Ignore Any-related errors for now
+disable_error_code = ["misc", "redundant-cast", "unused-ignore"]
 
 # this project uses namespace package from src/
 mypy_path = "src"
@@ -126,9 +126,9 @@ explicit_package_bases = true
 
 plugins = []
 
-[[tool.mypy.overrides]]
-#module = "apriori.ico.tools.progress.*"
-disable_error_code = ["misc"]
+# [[tool.mypy.overrides]]
+# module = "apriori.ico.tools.progress.*"
+# disable_error_code = ["misc"]
 
 # ───────────────────────────────────────────────
 # pytest

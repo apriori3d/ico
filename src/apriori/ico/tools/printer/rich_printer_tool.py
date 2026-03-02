@@ -44,10 +44,10 @@ class RichPrinterTool(IcoTool):
 
     _console: Console
 
-    def __init__(self, console: Console):
+    def __init__(self, console: Console | None = None):
         """Initialize with Rich Console instance."""
         super().__init__()
-        self._console = console
+        self._console = console or Console()
 
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         """Handle IcoPrintEvent messages through Rich console output."""

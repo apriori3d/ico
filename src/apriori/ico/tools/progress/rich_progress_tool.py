@@ -2,6 +2,7 @@ import time
 from collections.abc import Iterator
 from typing import final
 
+from rich.console import Console
 from rich.progress import Progress, TaskID
 
 from apriori.ico.core.operator import IcoOperator, operator
@@ -60,27 +61,31 @@ class RichProgressTool(IcoTool):
         - Thread-safe through Rich Progress component
     """
 
-    __slots__ = ("progress", "_tasks")
+    __slots__ = ("progress", "console", "_registered_nodes", "_tasks")
 
-    progress: Progress
+    console: Console
+    progress: Progress | None
+    _registered_nodes: list[tuple[TreePathIndex, float, str]]
     _tasks: dict[TreePathIndex, TaskID]
 
-    def __init__(self, progress: Progress):
+    def __init__(self, console: Console | None = None):
         """
         Initialize Rich progress tool with existing Progress instance.
 
         Args:
-            progress: Rich Progress instance for visual display
-                     Must be active (within Progress context manager)
+            console: Rich Console instance for visual display
+                     Must be active (within Console context manager)
 
         State:
             - Creates empty task mapping dictionary
-            - Stores reference to Rich Progress component
+            - Stores reference to Rich Console component
             - Inherits IcoTool runtime integration capabilities
         """
         super().__init__()
-        self.progress = progress
+        self.console = console or Console()
+        self.progress = None
         self._tasks = {}
+        self._registered_nodes = []
 
     def register_node(self, node: IcoRuntimeNode, path: TreePathIndex) -> None:
         """
@@ -105,11 +110,42 @@ class RichProgressTool(IcoTool):
             - Description appears in Rich progress bar display
         """
         if isinstance(node, IcoProgress):
+            name = node.name or f"Progress {len(self._registered_nodes)}"
+            self._registered_nodes.append((path, node.total, name))
+
+    def on_activate(self) -> None:
+        """Handle activation command to prepare for execution."""
+        super().on_activate()
+
+        assert (
+            len(self._tasks) == 0
+        ), "Progress nodes should be registered before activation"
+
+        self.progress = Progress(console=self.console)
+        self.progress.start()
+
+        for path, total, name in self._registered_nodes:
             task_id = self.progress.add_task(
-                description=node.name or f"Progress {len(self._tasks)}",
-                total=node.total,
+                description=name,
+                total=total,
             )
             self._tasks[path] = task_id
+
+    def on_deactivate(self) -> None:
+        """Handle deactivation command to cleanup after execution."""
+        super().on_deactivate()
+
+        assert (
+            self.progress is not None
+        ), "Progress should be initialized during activation"
+
+        for task_id in self._tasks.values():
+            self.progress.remove_task(task_id)
+
+        # Fix Rich bug and reset internal task index to 0
+        self.progress.stop()
+        self.progress = None  # ._task_index = TaskID(0)  # type: ignore
+        self._tasks.clear()
 
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         """
@@ -143,6 +179,10 @@ class RichProgressTool(IcoTool):
         super().on_forward_event(event)
 
         if isinstance(event, IcoProgressEvent):
+            assert (
+                self.progress is not None
+            ), "Progress should be initialized during activation"
+
             path = event.trace.reverse()
             if path not in self._tasks:
                 raise RuntimeError(
@@ -237,36 +277,12 @@ if __name__ == "__main__":
 
     @source()
     def numbers() -> Iterator[int]:
-        """Generate sequence of integers with simulated delays.
-
-        Produces numbers 0 through total-1 with 1-second intervals
-        to simulate slow data source and demonstrate progress tracking.
-
-        Returns:
-            Iterator[int]: Sequential integers with timing delays
-
-        Behavior:
-            - Each number emission includes 1s sleep
-            - Demonstrates progress tracking for slow sources
-            - Total iterations known in advance for accurate progress bars
-        """
         for i in range(total):
             time.sleep(1)
             yield i
 
     @sink()
     def print_result(x: int) -> None:
-        """
-        Terminal sink for processed results (discards output in demo).
-
-        Args:
-            x: Processed integer from worker pipeline
-
-        Behavior:
-            - Receives results from distributed worker processing
-            - Discards output for demonstration purposes
-            - Could be replaced with actual result handling
-        """
         pass
 
     # Overall progress tracking for main data flow
@@ -280,24 +296,22 @@ if __name__ == "__main__":
     flow = numbers | (progress | mp_process1 | mp_process2).stream() | print_result
     flow.name = "Example Flow"
 
-    with Progress() as progress:
-        """Rich Progress context for visual progress monitoring."""
-        console = progress.console
+    console = Console()
 
-        # Display initial flow structure
-        describe(flow, console=console)
+    # Display initial flow structure
+    describe(flow, console=console)
 
-        # Create and configure runtime with progress tool
-        progress_tool = RichProgressTool(progress)
-        runtime = IcoRuntime(flow, tools=[progress_tool])
-        runtime.activate()
+    # Create and configure runtime with progress tool
+    progress_tool = RichProgressTool(console=console)
+    runtime = IcoRuntime(flow, tools=[progress_tool])
+    runtime.activate()
 
-        # Display runtime tree with progress nodes
-        describe(runtime, console=console)
+    # Display runtime tree with progress nodes
+    describe(runtime, console=console)
 
-        # Execute flow with live progress visualization
-        runtime.run()
+    # Execute flow with live progress visualization
+    runtime.run()
 
-        # Cleanup and final state display
-        runtime.deactivate()
-        describe(flow, console=console)
+    # Cleanup and final state display
+    runtime.deactivate()
+    describe(flow, console=console)

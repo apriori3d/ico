@@ -1,15 +1,26 @@
 # ICO Framework
 <div align="center">
 
+[![CI](https://img.shields.io/github/actions/workflow/status/apriori3d/ico/ci.yml?style=for-the-badge&label=CI&logo=github)](https://github.com/apriori3d/ico/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
-![Type Safety](https://img.shields.io/badge/Type_Safety-Guaranteed-green?style=for-the-badge)
-![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=for-the-badge)](https://github.com/astral-sh/ruff)
+![Type Safety](https://img.shields.io/badge/Type_Safety-mypy-green?style=for-the-badge&logo=python)
+![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge&logo=python)
 
-*Transform complex ML code into elegant, type-safe and self-describable flows*
+*Composable, type-safe ML pipelines with full runtime transparency*
 
 </div>
 
-ICO formalizes a common ML pattern: take **Input**, apply **Context**, produce **Output**, and provides an elegant, type-safe and fully-transparent framework for ML engineers and researchers.
+ICO is a type-safe framework for building composable ML pipelines with built-in multiprocessing, progress tracking, and full runtime introspection.
+
+It helps you replace complex, ad-hoc training and data processing code with clear, reusable, and debuggable flows.
+
+At its core, ICO formalizes a simple pattern:
+
+**Input → Context → Output**
+
+Each step is a typed operator that composes into pipelines, runs locally or in parallel, and remains fully inspectable at runtime.
 
 ## 🚀 Quick Demo
 
@@ -26,111 +37,160 @@ print(result)  # (21, 34) - 8th Fibonacci number
 
 ```
 
-## 🔥 Key Features
+## 🔥 Key Capabilities
 
-### 🔍 **Introspection and Rich Visualization**
+### 🔍 **Full Runtime Introspection**
 
-ICO provides beautiful console visualization with a fully-defined signature for any operator:
+Every operator and pipeline can be inspected at runtime:
 ```python
 fib_process.describe()
 ```
-
 <img src="docs/images/fib_describe.jpg" width="800" alt="Fibonacci process visualization">
 
-### 🎯 **Declarative Elegance**
+You always know:
+- what is running
+- how data flows
+- where failures occur
+
+No more black-box pipelines.
+
+
+### 🧩 **Composable Declarative Pipelines**
+Build complex workflows from simple, reusable operators using a clean pipe syntax:
+
 ```python
-# Complex workflows become simple
 ml_pipeline = (
     load_train_data
-    | augment_pipeline
+    | augment
     | train_epoch
     | save_checkpoint
 )
 ```
+No hidden control flow — the structure of your pipeline is explicit and readable.
+
+### 🛡️ **End-to-End Type Safety**
+All operators are fully typed (Input → Context → Output) and validated by static type checkers like mypy or Pylance.
+
+This catches integration errors early and makes large pipelines easier to reason about.
+<img src="docs/images/type_checking.jpg" width="800" alt="Type checking">
 
 
-### 🛡️ **Type Safety Everywhere**
+### ⚡ **Built-in Multiprocessing**
+Parallel execution is part of the core design — no need to rewrite your pipeline:
 ```python
-# Static type checking with mypy, Pylance, and other type checkers
-def square(x: float) -> float:
-    return x * x
-
-def to_str(x: float) -> str:
-    return str(x)
-
-
-# This works ✅
-pipeline = square | to_str
-
-# This fails at type-check time ❌
-bad_pipeline = to_str | square
-```
-
-
-### ⚡ **Distributed by Design**
-```python
-# Multiprocessing with zero configuration
 workers = IcoAsyncStream(
     lambda: MPAgent(heavy_computation),
     pool_size=cpu_count()
 )
 
-# Automatic work distribution and result collection
-distributed_flow = data_source | workers | train
+pipeline = source | workers | train
 ```
+The same pipeline scales from local execution to multi-process workloads.
 
-### 📊 **Built-in Progress Tracking**
+### 📊 **Integrated Progress and Monitoring**
+Track execution in real time with built-in progress and metrics:
 ```python
 # Rich progress bars and metrics
 progress = IcoProgress(name="Overall progress", total=epochs)
 pipeline = source | progress | processing | train
 
-# Real-time console updates with ETA, speed, etc.
 ```
 <img src="docs/images/progress.jpg" width="600" alt="Fibonacci process visualization">
+
+Includes ETA, throughput, and structured execution state.
 
 
 ## 📚 Use Cases
 
-**Perfect for:**
-- 🧠 **ML Training Pipelines** — Data loading, augmentation, distributed training
-- 📊 **ETL Workflows** — Extract, transform, load with monitoring
-- 🔄 **Stream Processing** — Real-time data processing with backpressure
-- 🧪 **Research Experiments** — Reproducible, monitorable scientific computing
-- 📈 **Data Analytics** — Complex data processing with visualization
+### 🚀 PyTorch DataLoader Replacement
+Build fully customizable, inspectable, and parallel data pipelines without the limitations of traditional DataLoader abstractions.
 
-## 🎯 Why ICO?
+---
 
-| Feature | ICO | Others |
-|---------|-----|--------|
-| Type Safety | ✅ Static type checking (mypy/Pylance) | ❌ Runtime errors |
-| Visualization | ✅ Rich console integration | ❌ External tools needed |
-| Distribution | ✅ Built-in multiprocessing | ❌ Manual setup |
-| Composability | ✅ Pipe syntax `\|` | ❌ Complex APIs |
-| Monitoring | ✅ Real-time state tracking | ❌ Limited introspection |
+### 🧠 ML Training Pipelines
+Structure end-to-end training workflows with clear, composable steps:
+data loading, augmentation, batching, training, and logging — all in one pipeline.
+
+---
+
+
+### ⚡ Parallel Data Processing
+Scale CPU-heavy preprocessing and feature extraction with built-in multiprocessing — without rewriting your pipeline.
+
+---
+
+### 🔄 Streaming and Online Processing
+Build streaming pipelines with backpressure-aware execution and continuous data flow.
+
+---
+
+### 🧪 Research and Experimentation
+Prototype and iterate quickly with fully transparent pipelines that are easy to inspect, modify, and debug.
+
+---
+
+### 📊 Data Transformation Workflows
+Replace ad-hoc scripts with structured, traceable pipelines for complex data transformations.
 
 ## 🚀 Getting Started
 
 ### 📖 Examples
-- **Basic Introduction**: [Linear Regression with ICO](src/examples/linear_regression.ipynb)
-- **Real ML Pipeline**: [CIFAR-10 Classification with ICO](src/examples/vision/cifar/complete_flow.ipynb) (with PyTorch DataLoader replacement)
-- **Runtime Monitoring**: Runtime Monitoring with ICO Tools (comming soon)
-- **Distributed Processing**: Multi-processing data pipeline (coming soon)
+
+#### 🎯 **ICO Basics**
+- [Basic introduction to ICO approach](src/examples/ico_basics.ipynb): Main building blocks and core concepts
+- [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb): Progress monitoring, printing and runtime architecture
+
+#### 🔄 **Multiprocessing**
+- [Multi-processing example](src/examples/ico_mp_basic.py): Basic example of distributed computational flows
+- [Parallel Multi-processing Pool example](src/examples/ico_mp_basic_pool.py): Distributed compute flows with parallel worker pools
+
+#### 🧠 **Machine Learning**
+- [Linear Regression](src/examples/ml/ico_linear_regression.ipynb): ICO-based ML pipeline development
+- [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb): Complete CV pipeline replacing PyTorch DataLoader
+- [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py): Complete CV pipeline with parallel data processing workers
+
 
 
 
 ## 📈 Future Development
 
-- 📊 Profiler: tools for time/memory metrics analysis
-- 😎 Stateful run: State management API (pause/resume) to support distributed training scenarios on remote computation units
-- 🌐 Live board: Real-time monitoring tool with web interface
-**And much more!**
+### 🔮 Planned Features
+
+#### 📊 ICO Profiler
+Performance analysis for complex pipelines:
+- Operator-level timing and bottleneck detection
+- Memory usage tracking across workers
+- End-to-end pipeline profiling
+- Exportable reports for optimization
+
+---
+
+#### 🧠 Stateful Runtime
+Robust execution for long-running workflows:
+- Pause and resume pipeline execution
+- Checkpointing and recovery after failures
+- Reproducible runs across environments
+- Designed for large-scale training workloads
+
+---
+
+#### 🌐 ICO Live Board
+Real-time monitoring and visualization:
+- Web-based pipeline visualization
+- Live progress tracking across runs
+- Resource monitoring (CPU, GPU, memory)
+- Integration with Jupyter and ML tooling
+
+---
+
+### 🚀 **Community-Driven Roadmap**
+We're building based on real ML engineer needs. Have ideas? [Join the discussions](https://github.com/apriori3d/ico/discussions) and help shape ICO's future!
 
 Start experimenting and create your own innovative ML pipelines! 🎯
 
 ## 🤝 Contributing
 
-We welcome contributions! Contribution guidelines coming soon.
+We welcome contributions! Contribution guidelines are coming soon.
 
 ## 📄 License
 
@@ -140,8 +200,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 <div align="center">
 
-**Built with ❤️ for the ML community**
+**Happy Coding with ICO! ☺️**
 
-[Documentation](docs/) • [Examples](examples/) • [Discussions](discussions/)
+[Documentation](docs/) • [Examples](examples/) • [Discussions](https://github.com/apriori3d/ico/discussions)
 
 </div>

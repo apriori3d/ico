@@ -3,9 +3,9 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import replace
-from typing import TypeAlias
+from typing import Protocol, TypeAlias
 
-from typing_extensions import Protocol, Self, runtime_checkable
+from typing_extensions import Self, runtime_checkable
 
 from apriori.ico.core.runtime.command import (
     IcoActivateCommand,
@@ -181,6 +181,24 @@ class IcoRuntimeNode(ABC):
             self.bubble_event(
                 IcoStateEvent.create(state=self.state),
             )
+        elif isinstance(command, IcoActivateCommand):
+            self.on_activate()
+        elif isinstance(command, IcoRunCommand):
+            self.on_run()
+        elif isinstance(command, IcoDeactivateCommand):
+            self.on_deactivate()
+
+    def on_activate(self) -> None:  # noqa: B027
+        """Handle activation command to prepare for execution."""
+        pass
+
+    def on_run(self) -> None:  # noqa: B027
+        """Handle run command to begin execution."""
+        pass
+
+    def on_deactivate(self) -> None:  # noqa: B027
+        """Handle deactivation command to cleanup after execution."""
+        pass
 
     def broadcast_command(self, command: IcoRuntimeCommand) -> None:
         """Distribute runtime command to all nodes in the runtime subtree.
@@ -401,7 +419,7 @@ class IcoRuntimeNode(ABC):
         yield self.runtime_parent
         yield from self.runtime_parent.iterate_parents()
 
-    def __str__(self):
+    def __str__(self) -> str:
         """String representation showing runtime node class, name, and current state."""
         return (
             f"{self.__class__}(name={self.runtime_name}"
@@ -533,7 +551,7 @@ def create_runtime_walker(expand_remote_runtimes: bool = False) -> RuntimeTreeWa
     return RuntimeTreeWalker(get_children_fn=_get_children)
 
 
-def get_placeholder_index(children: list[IcoRuntimeNode]):
+def get_placeholder_index(children: list[IcoRuntimeNode]) -> int:
     """Find the index of the remote placeholder node in children list.
 
     Args:
