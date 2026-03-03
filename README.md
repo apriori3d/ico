@@ -54,7 +54,7 @@ print(fib8((0, 1)))  # 21
 
 Every operator and pipeline can be inspected at runtime:
 ```python
-fib_process.describe()
+fib8.describe()
 ```
 <img src="docs/images/fib_describe.jpg" width="800" alt="Fibonacci process visualization">
 
