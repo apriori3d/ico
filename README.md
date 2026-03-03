@@ -23,17 +23,28 @@ At its core, ICO formalizes a simple pattern:
 Each step is a typed operator that composes into pipelines, runs locally or in parallel, and remains fully inspectable at runtime.
 
 ## 🚀 Quick Demo
+A Fibonacci toy example showing how ICO models iterative stateful computation as a composable flow.
 
 ```python
-from apriori.ico.core.process import IcoProcess
+from apriori.ico import IcoProcess, operator
 
-# Fibonacci as an iterative process
-def fib_step(state: tuple[int, int]) -> tuple[int, int]:
-    return (state[1], state[0] + state[1])
+Context = tuple[int, int]
 
-fib_process = IcoProcess(fib_step, num_iterations=8)
-result = fib_process((0, 1))
-print(result)  # (21, 34) - 8th Fibonacci number
+
+@operator()
+def fib_step(state: Context) -> Context:
+    a, b = state
+    return (b, a + b)
+
+
+@operator()
+def first(state: Context) -> int:
+    return state[0]
+
+
+fib8 = IcoProcess(fib_step, num_iterations=8) | first
+
+print(fib8((0, 1)))  # 21
 
 ```
 
@@ -245,6 +256,6 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 
 **Happy Coding with ICO! ☺️**
 
-[Documentation](docs/) • [Examples](examples/) • [Discussions](https://github.com/apriori3d/ico/discussions)
+[Documentation](docs/) • [Examples](src/examples/) • [Discussions](https://github.com/apriori3d/ico/discussions)
 
 </div>
