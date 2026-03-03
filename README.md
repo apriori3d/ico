@@ -56,7 +56,7 @@ Every operator and pipeline can be inspected at runtime:
 ```python
 fib8.describe()
 ```
-<img src="docs/images/fib_describe.jpg" width="800" alt="Fibonacci process visualization">
+<img src="docs/images/fib_describe.jpg" width="700" alt="Fibonacci process visualization">
 
 You always know:
 - what is running
