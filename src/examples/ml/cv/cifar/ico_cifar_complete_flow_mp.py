@@ -380,7 +380,7 @@ def calculate_accuracy(item: CifarItem, context: CifarEvalContext) -> CifarEvalC
         predicted = torch.argmax(outputs, dim=1)
         correct = predicted.item() == item.label
         context.total_samples += 1
-        context.accuracy += int(correct)
+        context.accuracy += float(correct)
 
     return context
 
