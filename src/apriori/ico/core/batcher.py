@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from typing import Generic
+from typing import Any, Generic
 
 from apriori.ico.core.operator import I, IcoOperator
 from apriori.ico.core.signature import IcoSignature
@@ -127,8 +127,11 @@ class IcoBatcher(
         """
         signature = super().signature
 
+        # Help mypy to understand this is a type, not just a variable
+        i_type: Any = signature.i
+
         return IcoSignature(
-            i=Iterator[signature.i],
+            i=Iterator[i_type],
             c=None,
-            o=Iterator[Iterator[signature.i]],
+            o=Iterator[Iterator[i_type]],
         )

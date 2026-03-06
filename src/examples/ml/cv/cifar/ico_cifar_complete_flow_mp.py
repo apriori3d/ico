@@ -30,10 +30,10 @@ from typing import final
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torchvision.datasets import CIFAR10  # pyright: ignore[reportMissingTypeStubs]
-from torchvision.models import resnet18  # pyright: ignore[reportMissingTypeStubs]
-from torchvision.transforms import ToTensor  # pyright: ignore[reportMissingTypeStubs]
-from torchvision.transforms import (  # pyright: ignore[reportMissingTypeStubs]
+from torchvision.datasets import CIFAR10  # type: ignore
+from torchvision.models import resnet18  # type: ignore
+from torchvision.transforms import ToTensor  # type: ignore
+from torchvision.transforms import (  # type: ignore
     functional as F,
 )
 
@@ -168,7 +168,7 @@ class CifarBatch:
         self.images = torch.stack([item.image for item in items_list])  # (B, 3, 32, 32)
         self.labels = torch.tensor([item.label for item in items_list])  # (B,)
 
-    def share_memory_(self):
+    def share_memory_(self) -> None:
         self.images.share_memory_()
         self.labels.share_memory_()
 
@@ -523,24 +523,26 @@ if __name__ == "__main__":
     #    - Fetch different dataset items by indices (no GIL contention)
     #    - Apply independent data augmentations per worker
     #    - Create shared memory batches for zero-copy transfer
-    train_flow = train_source | track_train_progress.stream() | batcher | workers_pool
-    train_flow.name = "Train Flow"
+    train_data_flow = (
+        train_source | track_train_progress.stream() | batcher | workers_pool
+    )
+    train_data_flow.name = "Train Flow"
 
     print("Train flow structure with MPAgent pool (workers run in parallel):")
-    train_flow.describe()
+    train_data_flow.describe()
 
     # ──────── Create model train flow ────────
     train_pipeline = IcoContextPipeline(train_step, logging_step, save_checkpoint_step)
     train_pipeline.name = "Training Pipeline"
 
     train_epoch = IcoEpoch(
-        source=train_flow,
+        source=train_data_flow,
         context_operator=train_pipeline,
     )
     train_epoch.name = "Training Epoch"
 
     train_flow = start_train | train_epoch
-    train_flow.name = "Train Flow"
+    train_flow.name = "Complete Train Flow"
 
     print("\nComplete train flow structure with MPAgent pool and training pipeline:")
     train_flow.describe()

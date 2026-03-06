@@ -115,7 +115,7 @@ class RowRenderer:
 
         signature = node.signature
         i = format_ico_type(signature.i) if signature.has_input else None
-        c = format_ico_type(signature.c) if signature.has_context else None
+        c = format_ico_type(signature.c) if signature.c is not None else None
         o = format_ico_type(signature.o) if signature.has_output else None
         prefix_length = 0
 
@@ -161,12 +161,12 @@ class RowRenderer:
 
     def _render_node_args_info(self, node: IcoNode) -> Text | None:
         if type(node) is IcoOperator:
-            fn = cast(IcoOperator[Any, Any], node).fn
-            return render_callable(fn, options=self.options)
+            op_fn = cast(IcoOperator[Any, Any], node).fn
+            return render_callable(op_fn, options=self.options)
 
         if type(node) is IcoContextOperator:
-            fn = cast(IcoContextOperator[Any, Any, Any], node).fn
-            return render_callable(fn, options=self.options)
+            ctx_fn = cast(IcoContextOperator[Any, Any, Any], node).fn
+            return render_callable(ctx_fn, options=self.options)
 
         return None
 

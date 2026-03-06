@@ -1,5 +1,5 @@
 from collections.abc import Callable, Iterator
-from typing import Generic
+from typing import Any, Generic
 
 from apriori.ico.core.context_operator import (
     C,
@@ -189,8 +189,12 @@ class IcoEpoch(
         if not signature.infered:
             signature = self.context_operator.signature
 
+        # Help mypy to understand this is a type, not just a variable
+        i_type: Any = signature.i
+        c_type: Any = signature.c
+
         return IcoSignature(
-            i=Iterator[signature.i],
-            c=signature.c,
-            o=signature.c,
+            i=Iterator[i_type],
+            c=c_type,
+            o=c_type,
         )

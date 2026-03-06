@@ -46,9 +46,9 @@ jobs:
         poetry run ruff check src/
         poetry run ruff format --check src/
 
-    # - name: Run type checking with mypy
-    #   run: |
-    #     poetry run mypy src/
+    - name: Run type checking with mypy
+      run: |
+        poetry run mypy src/
 
     - name: Run tests with pytest
       run: |

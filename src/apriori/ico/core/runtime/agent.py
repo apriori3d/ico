@@ -457,10 +457,11 @@ class IcoAgent(
         signature = super().signature
 
         if not signature.infered:
-            signature = infer_from_flow_factory(self.flow_factory)
+            signature_from_factory = infer_from_flow_factory(self.flow_factory)
+            signature = signature_from_factory or IcoSignature(
+                i=type(Any), c=None, o=type(Any), infered=False
+            )
 
-            if signature is None:
-                signature = IcoSignature(i=Any, c=None, o=Any, infered=False)
         return signature
 
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from typing import Generic, final
+from typing import Any, Generic, final
 
 from apriori.ico.core.operator import (
     I,
@@ -125,8 +125,12 @@ class IcoStream(
         if not signature.infered:
             signature = self.body.signature
 
+        # Help mypy to understand this is a type, not just a variable
+        i_type: Any = signature.i
+        o_type: Any = signature.o
+
         return IcoSignature(
-            i=Iterator[signature.i],
+            i=Iterator[i_type],
             c=None,
-            o=Iterator[signature.o],
+            o=Iterator[o_type],
         )

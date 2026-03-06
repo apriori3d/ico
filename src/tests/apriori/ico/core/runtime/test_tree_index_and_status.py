@@ -28,7 +28,7 @@ from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 class StateCollectorTool(IcoTool):
     """Tool for collecting node states with their paths in the tree."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.collected_states: OrderedDict[TreePathIndex, IcoRuntimeState] = (
             OrderedDict()
@@ -46,7 +46,7 @@ class StateCollectorTool(IcoTool):
 
         super().on_forward_event(event)
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset collected data."""
         self.collected_states.clear()
         self.collected_events.clear()

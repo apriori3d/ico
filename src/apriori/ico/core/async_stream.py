@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
-from typing import Generic, TypeVar, final, overload
+from typing import Any, Generic, TypeVar, final, overload
 
 from apriori.ico.core.async_operator import IcoAsyncOperator
 from apriori.ico.core.operator import I, IcoOperator, O
@@ -198,10 +198,12 @@ class IcoAsyncStream(
         if not signature.infered:
             signature = self.pool[0].signature
 
+        i_type: Any = signature.i
+        o_type: Any = signature.o
         return IcoSignature(
-            i=Iterator[signature.i],
+            i=Iterator[i_type],
             c=None,
-            o=Iterator[signature.o],
+            o=Iterator[o_type],
         )
 
     # ─── Async iterator state management ───

@@ -129,10 +129,11 @@ class IcoChain(
                 c=None,
                 o=right.o,
             )
+        # Fallback to Any types
         return IcoSignature(
-            i=Any,
+            i=type[Any],
             c=None,
-            o=Any,
+            o=type[Any],
             infered=False,
         )
 

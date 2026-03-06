@@ -130,6 +130,10 @@ plugins = []
 # module = "apriori.ico.tools.progress.*"
 # disable_error_code = ["misc"]
 
+[[tool.mypy.overrides]]
+module = "examples.*"
+disable_error_code = ["no-untyped-call", "no-any-return"]
+
 # ───────────────────────────────────────────────
 # pytest
 # ───────────────────────────────────────────────

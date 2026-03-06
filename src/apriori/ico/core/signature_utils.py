@@ -17,7 +17,7 @@ from typing import (
 
 from apriori.ico.core.context_operator import IcoContextOperator
 from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.signature import IcoSignature
+from apriori.ico.core.signature import IcoSignature, SignatureParamType
 
 
 def infer_from_generic(obj: object) -> IcoSignature | None:
@@ -52,7 +52,7 @@ def infer_from_generic(obj: object) -> IcoSignature | None:
     return None
 
 
-def get_generic_args(obj: object) -> tuple[object, ...] | None:
+def get_generic_args(obj: object) -> tuple[type, ...] | None:
     """Extract generic type arguments from an object's __orig_class__.
 
     Retrieves the concrete types used when instantiating a generic class,
@@ -78,7 +78,7 @@ def get_generic_args(obj: object) -> tuple[object, ...] | None:
     return args
 
 
-def wrap_iterator_or_none(tp: object) -> object:
+def wrap_iterator_or_none(tp: type | None) -> type | None:
     """Wrap a type in Iterator, preserving None values.
 
     Utility function for transforming types to their iterator equivalents
@@ -120,7 +120,7 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     if not callable(fn):
         return None
 
-    if type(fn) is not FunctionType:
+    if type(fn) is not FunctionType:  # type: ignore[comparison-overlap]
         fn = fn.__call__
 
     hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
@@ -163,69 +163,85 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
         fn = cast(Callable[[Any], Any], obj.fn)  # type: ignore
     elif isinstance(obj, IcoContextOperator):
         fn = cast(Callable[[Any, Any], Any], obj.fn)  # type: ignore
-    elif type(obj) is not FunctionType:
+    elif not (
+        inspect.isfunction(obj) or inspect.ismethod(obj) or inspect.isbuiltin(obj)
+    ):
+        # Assume it's a callable class instance
         fn = obj.__call__
     else:
         fn = obj
 
-    # try:
     sig = inspect.signature(fn)
     hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
 
     params = list(sig.parameters.values())
-    i = hints.get(params[0].name, None) if params else None
-    c = hints.get(params[1].name, None) if len(params) > 1 else None
-    o = hints.get("return", None)
 
-    # No hints
-    if i is None and o is None:
+    # If 'i', 'c' or 'o' is present in params, they will be set to type from hints
+    # or to type(None) if hints is not present.
+    # 'c' is optional and can be None if not present.
+
+    i = hints.get(params[0].name, type(Any)) if params else type(None)
+    c = (
+        hints.get(params[1].name, type(Any)) if len(params) > 1 else None
+    )  # Context parameter is optional
+    o = hints.get("return", type(Any))
+
+    # ──────── Unresolved cases ────────
+    # We can't infer a meaningful signature:
+
+    # 1. Both input and output are TypeVars
+    if isinstance(i, TypeVar) and isinstance(o, TypeVar):
         return None
 
-    # Both input and output are unresolved
-    if (
-        i is not None
-        and isinstance(i, TypeVar)
-        and o is not None
-        and isinstance(o, TypeVar)
-    ):
+    # 2. Generic Alias with TypeVars, like Iterator[O].
+    origins_args = get_args(i) if isinstance(i, type) else ()
+    origins_args += get_args(c) if isinstance(c, type) else ()
+    origins_args += get_args(o) if isinstance(o, type) else ()
+    if any((type(a) is TypeVar) for a in origins_args):
         return None
 
-    # Special case: method can be a flow factory.
-    # In this case we try to extract ico form from return value annotation.
-    o_origin = get_origin(o)
+    # ──────── Method is a flow factory ────────
+    # In this case we try to extract ico signature from return value annotation.
+    if o is not type(None):
+        o_origin = get_origin(o)
 
-    if o_origin is not None and issubclass(o_origin, IcoOperator):
-        o_args = get_args(o)
+        if o_origin is not None and issubclass(o_origin, IcoOperator):  # type: ignore[arg-type]
+            o_args = get_args(o)
 
-        match len(o_args):
-            case 1:
-                i = o_args[0]
-                o = o_args[0]
-            case 2:
-                i = o_args[0]
-                o = o_args[1]
-            case 3:
-                i = o_args[0]
-                c = o_args[1]
-                o = o_args[2]
-            case _:
-                pass
+            match len(o_args):
+                case 1:
+                    i = o_args[0]
+                    o = o_args[0]
+                case 2:
+                    i = o_args[0]
+                    o = o_args[1]
+                case 3:
+                    i = o_args[0]
+                    c = o_args[1] or type(None)  # Context is optional
+                    o = o_args[2]
+                case _:
+                    pass
+
+            i = i or type(None)
+            o = o or type(None)
+
+    if isinstance(i, SignatureParamType) and isinstance(o, SignatureParamType):
         return IcoSignature(i, c, o)
 
-    return IcoSignature(i, c, o)
+    return None
 
 
 # ─── Type formatting ───
 
 
-def format_ico_type(tp: object) -> str:
+def format_ico_type(tp: SignatureParamType) -> str:
     """Format a type object into a human-readable string for display.
 
     Converts Python type objects into clean, readable strings suitable
     for ICO signature display, handling generics, unions, and special types.
 
     Args:
-        tp: Type object to format (can be Any, generic, Union, etc.).
+        tp: Type object to format.
 
     Returns:
         Human-readable string representation of the type.
@@ -233,7 +249,7 @@ def format_ico_type(tp: object) -> str:
     Example:
         >>> format_ico_type(int)  # "int"
         >>> format_ico_type(list[str])  # "list[str]"
-        >>> format_ico_type(None)  # "()"
+        >>> format_ico_type(type(None))  # "()"
         >>> format_ico_type(Union[int, str])  # "int | str"
 
     Note:
@@ -244,10 +260,10 @@ def format_ico_type(tp: object) -> str:
         - Union types → "T1 | T2 | ..."
         - Generic containers like Iterator, list
     """
-    if tp is Any or tp is object:
+    if tp is type(Any):
         return "Any"
 
-    if tp is None or tp is type(None):
+    if tp is type(None):
         return "()"
 
     origin = get_origin(tp)

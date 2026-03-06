@@ -170,7 +170,7 @@ class IcoOperator(Generic[I, O], IcoNode):
             return signature
 
         # 3. Fallback to Any types
-        return IcoSignature(i=Any, c=None, o=Any, infered=False)
+        return IcoSignature(i=type(Any), c=None, o=type(Any), infered=False)
 
 
 # ─────────────────────────────────────────────
