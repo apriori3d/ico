@@ -70,7 +70,7 @@ class IcoNode:
         Returns:
             IcoSignature with None types and infered=False.
         """
-        return IcoSignature(i=None, c=None, o=None, infered=False)
+        return IcoSignature(i=type(None), c=None, o=type[None], infered=False)
 
     # ────────────────────────────────────────────────
     # Describe utility interface

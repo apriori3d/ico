@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import GenericAlias
 
 # ────────────────────────────────────────────────
 # Signature descriptions
 # ────────────────────────────────────────────────
+
+
+SignatureParamType = type | GenericAlias
 
 
 @dataclass(slots=True)
@@ -39,9 +43,9 @@ class IcoSignature:
         infered: Whether this signature was successfully inferred from code.
     """
 
-    i: object
-    c: object | None
-    o: object
+    i: SignatureParamType
+    c: SignatureParamType | None
+    o: SignatureParamType
     infered: bool = True
 
     def format(self) -> str:
@@ -58,7 +62,7 @@ class IcoSignature:
         """
         from apriori.ico.core.signature_utils import format_ico_type
 
-        if self.c is None or self.c is type(None):
+        if self.c is None:
             return f"{format_ico_type(self.i)} → {format_ico_type(self.o)}"
 
         return f"{format_ico_type(self.i)}, {format_ico_type(self.c)} → {format_ico_type(self.o)}"
@@ -85,7 +89,7 @@ class IcoSignature:
         Note:
             Used for validation and signature analysis.
         """
-        return self.i is not None and self.i is not type(None)
+        return self.i is not type(None)
 
     @property
     def has_context(self) -> bool:
@@ -109,4 +113,4 @@ class IcoSignature:
         Note:
             Used for validation and ensuring proper type flow in compositions.
         """
-        return self.o is not None and self.o is not type(None)
+        return self.o is not type(None)

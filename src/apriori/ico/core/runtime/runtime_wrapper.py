@@ -115,7 +115,7 @@ class IcoRuntimeWrapper(
         """Delegate computation to wrapped operator."""
         return self.operator(item)
 
-    def on_command(self, command: IcoRuntimeCommand):
+    def on_command(self, command: IcoRuntimeCommand) -> None:
         """Handle runtime commands via standard IcoRuntimeNode processing."""
         return super().on_command(command)
 

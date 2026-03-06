@@ -63,8 +63,8 @@ def describe(
                 PlanRenderer,
             )
 
-            renderer = PlanRenderer(console=console, options=options)
-            renderer.render(node)
+            plan_renderer = PlanRenderer(console=console, options=options)
+            plan_renderer.render(node)
         else:
             raise ValueError("Backend is not yet supported in API.")
 
@@ -81,7 +81,7 @@ def describe(
                 RuntimeTreeRenderer,
             )
 
-            renderer = RuntimeTreeRenderer(console=console, options=options)
-            renderer.render(node)
+            runtime_renderer = RuntimeTreeRenderer(console=console, options=options)
+            runtime_renderer.render(node)
         else:
             raise ValueError("Backend is not yet supported in API.")

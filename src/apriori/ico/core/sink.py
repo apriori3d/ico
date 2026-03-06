@@ -99,26 +99,32 @@ class IcoSink(
         signature = super().signature
 
         if signature.infered:
+            # Help mypy to understand this is a type, not just a variable
+            i_type: Any = signature.i
+
             return IcoSignature(
-                i=Iterator[signature.i],
+                i=Iterator[i_type],
                 c=None,
-                o=None,
+                o=type(None),
             )
 
         # Infer from consumer callable
         consumer_signature = infer_from_callable(self.consumer)
 
         if consumer_signature is not None:
+            ci_type: Any = consumer_signature.i
+
             return IcoSignature(
-                i=Iterator[consumer_signature.i],
+                i=Iterator[ci_type],
                 c=None,
-                o=None,
+                o=type(None),
             )
 
+        # Fallback to Any types
         return IcoSignature(
             i=Iterator[Any],
             c=None,
-            o=None,
+            o=type(None),
             infered=False,
         )
 

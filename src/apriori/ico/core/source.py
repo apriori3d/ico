@@ -111,10 +111,13 @@ class IcoSource(
 
         signature = super().signature
         if signature.infered:
+            # Help mypy to understand this is a type, not just a variable
+            o_type: Any = signature.o
+
             return IcoSignature(
-                i=None,
+                i=type(None),
                 c=None,
-                o=Iterator[signature.o],
+                o=Iterator[o_type],
             )
 
         # Infer from provider callable
@@ -126,15 +129,17 @@ class IcoSource(
             provider_signature.o, GenericAlias
         ):
             o_args = get_args(provider_signature.o)
+            o_arg: Any = o_args[0]
 
             return IcoSignature(
                 i=type(None),
-                c=type(None),
-                o=Iterator[o_args],
+                c=None,
+                o=Iterator[o_arg],
             )
 
+        # Fallback to Any types
         return IcoSignature(
-            i=None,
+            i=type(None),
             c=None,
             o=Iterator[Any],
             infered=False,

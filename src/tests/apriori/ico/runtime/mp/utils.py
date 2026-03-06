@@ -34,9 +34,17 @@ class MPProcessMock(
         assert item is not None
         return item
 
+    def on_channel_command(self, command: IcoRuntimeCommand) -> None:
+        """Handle commands received from the channel."""
+        self.on_command(command)
+
     def on_command(self, command: IcoRuntimeCommand) -> None:
         super().on_command(command)
         self._channel.send_command(command)
+
+    def on_channel_event(self, event: IcoRuntimeEvent) -> None:
+        """Handle events received from the channel."""
+        self.on_event(event)
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoFaultEvent):

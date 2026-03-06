@@ -489,15 +489,12 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
         signature = super().signature
 
         if signature.infered:
-            signature = infer_from_flow_factory(self.flow_factory)
+            return signature
 
-        if signature is None:
-            return IcoSignature(i=Any, c=None, o=Any, infered=False)
+        factory_signature = infer_from_flow_factory(self.flow_factory)
 
-        return IcoSignature(
-            i=signature.i,
-            c=None,
-            o=signature.o,
+        return factory_signature or IcoSignature(
+            i=type(Any), c=None, o=type(Any), infered=False
         )
 
 

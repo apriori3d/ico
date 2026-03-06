@@ -5,11 +5,9 @@ from typing import Protocol, TypeAlias
 
 from rich.text import Text
 
-from apriori.ico.core.runtime.agent import (
-    IcoRemotePlaceholderNode,
-)
 from apriori.ico.core.runtime.node import (
     HasRemoteRuntime,
+    IcoRemotePlaceholderNode,
     IcoRuntimeNode,
     RuntimeTreeWalker,
 )

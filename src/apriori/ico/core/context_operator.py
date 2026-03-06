@@ -4,7 +4,8 @@ from collections.abc import Callable, Sequence
 from typing import Any, Generic, TypeVar, overload
 
 from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import I, O
+from apriori.ico.core.operator import I as I
+from apriori.ico.core.operator import O
 from apriori.ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
@@ -132,7 +133,7 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
             return signature
 
         # 3. Fallback to Any types
-        return IcoSignature(i=Any, c=Any, o=Any, infered=False)
+        return IcoSignature(i=type[Any], c=type[Any], o=type[Any], infered=False)
 
 
 # ─────────────────────────────────────────────
