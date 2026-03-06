@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterator
-from types import FunctionType
+from types import FunctionType, GenericAlias
 from typing import (
     Any,
     TypeVar,
@@ -194,9 +194,9 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
         return None
 
     # 2. Generic Alias with TypeVars, like Iterator[O].
-    origins_args = get_args(i) if isinstance(i, type) else ()
-    origins_args += get_args(c) if isinstance(c, type) else ()
-    origins_args += get_args(o) if isinstance(o, type) else ()
+    origins_args = get_args(i) if isinstance(i, GenericAlias) else ()
+    origins_args += get_args(c) if isinstance(c, GenericAlias) else ()
+    origins_args += get_args(o) if isinstance(o, GenericAlias) else ()
     if any((type(a) is TypeVar) for a in origins_args):
         return None
 
