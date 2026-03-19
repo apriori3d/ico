@@ -38,7 +38,7 @@ class PlanRendererOptions(RendererOptions):
     """Display columns: Flow tree, Type signatures, Node names"""
 
     renderers_paths: list[str] = field(
-        default_factory=lambda: ["apriori.ico.describe.plan.rich_renderer.node"]
+        default_factory=lambda: ["ico.describe.plan.rich_renderer.node"]
     )
     """Paths to renderer modules for auto-import"""
 
