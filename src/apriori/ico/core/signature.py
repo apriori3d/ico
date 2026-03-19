@@ -114,3 +114,9 @@ class IcoSignature:
             Used for validation and ensuring proper type flow in compositions.
         """
         return self.o is not type(None)
+
+    def __str__(self):
+        return self.format()
+
+    def __repr__(self):
+        return self.format()

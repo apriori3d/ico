@@ -67,12 +67,12 @@ class WorkerFlowFactory:
 
 if __name__ == "__main__":
     """
-    🎓 MPAgent Lifecycle Demonstration
+    MPAgent Lifecycle Demonstration
 
     This example walks through the complete MPAgent lifecycle, showing how worker
     processes are created, managed, and terminated by the ICO runtime system.
 
-    📋 Demonstration Steps:
+    Demonstration Steps:
 
     1. **Worker Flow Structure**:
        - Display the computation that will run in each worker process
@@ -89,10 +89,10 @@ if __name__ == "__main__":
        - **Running** state: Execute flow with live progress bars showing distributed work
        - **Idle** state: At deactivation, worker processes are cleaned up and shutdown
 
-    🏗️ Flow Architecture:
+    Flow Architecture:
         numbers (source) → overall_progress → [worker1 | worker2].stream() → sink
 
-    📊 Progress Tracking:
+    Progress Tracking:
         - "Overall Progress": main flow progress (10 items)
         - "Worker 1": internal iterations in first process
         - "Worker 2": internal iterations in second process

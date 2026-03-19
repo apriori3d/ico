@@ -37,19 +37,22 @@ from torchvision.transforms import (  # type: ignore
     functional as F,
 )
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.batcher import IcoBatcher
-from apriori.ico.core.context_operator import IcoContextOperator
-from apriori.ico.core.context_pipeline import IcoContextPipeline
-from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.process import IcoProcess
-from apriori.ico.core.runtime.progress import IcoProgress
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
-from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
+from ico import (
+    IcoAsyncStream,
+    IcoBatcher,
+    IcoContextOperator,
+    IcoContextPipeline,
+    IcoEpoch,
+    IcoOperator,
+    IcoPipeline,
+    IcoProcess,
+    IcoProgress,
+    IcoRuntime,
+    IcoSource,
+    MPAgent,
+    RichProgressTool,
+    operator,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────────
 # DATA STRUCTURES & DATASET CLASSES
@@ -188,6 +191,7 @@ def collate(items: Iterator[CifarItem]) -> CifarBatch:
     with multiprocessing-aware batching that maintains tensor sharing.
     """
     batch = CifarBatch(items)
+
     # CRITICAL: Share memory to enable zero-copy inter-process communication
     # Without this, tensors would be copied/pickled between processes (expensive!)
     batch.share_memory_()
@@ -251,7 +255,7 @@ class WorkerFlowFactory:
             return self.dataset[idx]
 
         # ─────────────────────────────────────────────────────────────────────────────────
-        # 🎨 PARALLEL AUGMENTATION PIPELINE
+        # PARALLEL AUGMENTATION PIPELINE
         # ─────────────────────────────────────────────────────────────────────────────────
         # Each worker process applies same transformations with independent random state
         # Result: Diverse augmented data across workers (different random seeds per worker)
@@ -264,7 +268,7 @@ class WorkerFlowFactory:
         )
 
         # ─────────────────────────────────────────────────────────────────────────────────
-        # 🔄 MULTIPROCESSING WORKER PIPELINE COMPOSITION
+        # MULTIPROCESSING WORKER PIPELINE COMPOSITION
         # ─────────────────────────────────────────────────────────────────────────────────
         # This pipeline runs entirely within each worker process:
         # 1. worker_progress: Tracks batch progress across process boundaries
@@ -347,14 +351,14 @@ def train_step(batch: CifarBatch, context: CifarTrainContext) -> CifarTrainConte
 def logging_step(context: CifarTrainContext) -> CifarTrainContext:
     """Log training progress every 10 iterations."""
     if context.iter_num % 10 == 0:
-        print(f"Iteration {context.iter_num}, Loss: {context.total_loss:.4f}")
+        print(f"{context.iter_num=}, {context.total_loss=:.4f}")
     return context
 
 
 def save_checkpoint_step(context: CifarTrainContext) -> CifarTrainContext:
     """Save model checkpoint every 100 iterations."""
     if context.iter_num % 100 == 0:
-        print(f"Checkpointing model at iteration {context.iter_num}")
+        print(f"Checkpointing model at {context.iter_num=}")
     return context
 
 
@@ -398,9 +402,10 @@ def log_accuracy(context: CifarEvalContext) -> CifarEvalContext:
     accuracy = (
         context.accuracy / context.total_samples if context.total_samples > 0 else 0.0
     )
-    print(
-        f"Validation Accuracy: {accuracy * 100:.2f}% ({context.accuracy}/{context.total_samples})"
-    )
+
+    validation_accuracy = accuracy * 100
+    print(f"{validation_accuracy =:.2f}% ({context.accuracy}/{context.total_samples})")
+
     return context
 
 
