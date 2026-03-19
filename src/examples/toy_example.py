@@ -16,6 +16,6 @@ def first(state: Context) -> int:
 
 fib8 = IcoProcess(fib_step, num_iterations=8) | first
 
-print(fib8((0, 1)))  # 21
+print(f"{fib8((0, 1))=}")  # 21
 
 fib8.describe()
