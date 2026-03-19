@@ -115,8 +115,8 @@ class IcoSignature:
         """
         return self.o is not type(None)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.format()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.format()
