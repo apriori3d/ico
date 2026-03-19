@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from ico.core.node import IcoNode
+from ico.core.runtime.node import IcoRuntimeNode
 
 RenderBackend = Literal["RichText",]
 

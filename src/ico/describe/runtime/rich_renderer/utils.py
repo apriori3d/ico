@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from apriori.ico.core.runtime.state import (
+from ico.core.runtime.state import (
     FaultState,
     IcoRuntimeState,
     ReadyState,

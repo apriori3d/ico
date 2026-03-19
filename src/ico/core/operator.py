@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Sequence
 from typing import Any, Generic, TypeVar, overload
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.signature import IcoSignature
+from ico.core.node import IcoNode
+from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
@@ -41,7 +41,7 @@ class IcoOperator(Generic[I, O], IcoNode):
     • wrapping into an `Iterable` with `.stream()`
 
     Example:
-        >>> from apriori.ico import IcoOperator
+        >>> from ico import IcoOperator
 
         >>> to_float = IcoOperator(float)
         >>> scale = IcoOperator(lambda x: x * 2)
@@ -108,7 +108,7 @@ class IcoOperator(Generic[I, O], IcoNode):
 
     def chain(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
         """Function chaining: (I → O, O → O2) == I → O2."""
-        from apriori.ico.core.chain import chain
+        from ico.core.chain import chain
 
         return chain(self, other)
 
@@ -131,7 +131,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             An IcoStream that applies this operator to each element of an iterable.
         """
-        from apriori.ico.core.stream import IcoStream
+        from ico.core.stream import IcoStream
 
         return IcoStream(self)
 
@@ -151,7 +151,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             IcoSignature containing input, context, and output type information.
         """
-        from apriori.ico.core.signature_utils import (
+        from ico.core.signature_utils import (
             get_generic_args,
             infer_from_callable,
         )

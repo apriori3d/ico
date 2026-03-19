@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import IcoRuntimeNode
 
 # ────────────────────────────────────────────────
 # Runtime tool base architecture

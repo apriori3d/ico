@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, Generic
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import (
+from ico.core.node import IcoNode
+from ico.core.operator import (
     I,
     O,
 )
-from apriori.ico.core.signature import IcoSignature
+from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Asynchronous Operator Class
@@ -113,7 +113,7 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
             The signature represents I → O (not I → Awaitable[O]) since
             the awaiting is handled by the async call mechanism.
         """
-        from apriori.ico.core.signature_utils import (
+        from ico.core.signature_utils import (
             get_generic_args,
             infer_from_callable,
         )

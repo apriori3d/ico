@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from apriori.ico.core.node import IcoNode, create_flow_walker
-from apriori.ico.core.runtime.node import (
+from ico.core.node import IcoNode, create_flow_walker
+from ico.core.runtime.node import (
     IcoRuntimeNode,
 )
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from apriori.ico.core.operator import I, IcoOperator
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
+from ico.core.operator import I, IcoOperator
+from ico.core.runtime.runtime import IcoRuntime
+from ico.core.sink import IcoSink
+from ico.core.source import IcoSource
 
 
 def drain_all(xs: Iterator[I]) -> None:

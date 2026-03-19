@@ -2,9 +2,9 @@ import asyncio
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from typing import Any, Generic, TypeVar, final, overload
 
-from apriori.ico.core.async_operator import IcoAsyncOperator
-from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.signature import IcoSignature
+from ico.core.async_operator import IcoAsyncOperator
+from ico.core.operator import I, IcoOperator, O
+from ico.core.signature import IcoSignature
 
 
 @final
@@ -30,7 +30,7 @@ class IcoAsyncStream(
 
     Example:
         >>> import asyncio
-        >>> from apriori.ico.core.async_operator import IcoAsyncOperator
+        >>> from ico.core.async_operator import IcoAsyncOperator
 
         >>> # Create async workers
         >>> async def slow_process(x: int) -> int:
@@ -52,7 +52,7 @@ class IcoAsyncStream(
         >>> # Results in order: [2, 4, 6]
 
         >>> # Factory-based worker creation with MPAgent for CPU-bound work
-        >>> from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+        >>> from ico.runtime.agent.mp.mp_agent import MPAgent
         >>> def make_worker() -> IcoAsyncOperator[int, int]:
         ...     return IcoAsyncOperator(slow_process)
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol, runtime_checkable
 
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode, create_runtime_walker
-from apriori.ico.core.runtime.tool import IcoTool
-from apriori.ico.core.tree_utils import TreePathIndex
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import IcoRuntimeNode, create_runtime_walker
+from ico.core.runtime.tool import IcoTool
+from ico.core.tree_utils import TreePathIndex
 
 # ────────────────────────────────────────────────
 # Tool registration protocol

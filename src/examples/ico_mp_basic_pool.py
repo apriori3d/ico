@@ -5,12 +5,12 @@ from collections.abc import Iterator
 
 from rich.console import Console
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.runtime.progress import (
-    IcoProgress,
-)
 from examples.ico_mp_basic import WorkerFlowFactory
 from ico import IcoRuntime, MPAgent, RichPrinterTool, RichProgressTool, sink, source
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.runtime.progress import (
+    IcoProgress,
+)
 
 if __name__ == "__main__":
     """

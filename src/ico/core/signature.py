@@ -60,7 +60,7 @@ class IcoSignature:
             >>> sig = IcoSignature(i=int, c=str, o=float)
             >>> print(sig.format())  # "int, str → float"
         """
-        from apriori.ico.core.signature_utils import format_ico_type
+        from ico.core.signature_utils import format_ico_type
 
         if self.c is None:
             return f"{format_ico_type(self.i)} → {format_ico_type(self.o)}"

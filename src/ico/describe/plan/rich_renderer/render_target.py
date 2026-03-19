@@ -6,13 +6,13 @@ from typing import Protocol, TypeAlias
 
 from rich.text import Text
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.node import (
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.node import (
     HasRemoteFlow,
     IcoNode,
 )
-from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
-from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
+from ico.core.tree_utils import TraversalInfo, TreeWalker
+from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 
 
 class PlanRenderTarget(Protocol):

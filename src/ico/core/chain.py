@@ -1,7 +1,7 @@
 from typing import Any, Generic
 
-from apriori.ico.core.operator import O2, I, IcoOperator, O
-from apriori.ico.core.signature import IcoSignature
+from ico.core.operator import O2, I, IcoOperator, O
+from ico.core.signature import IcoSignature
 
 
 class IcoChain(

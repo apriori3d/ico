@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, final
 
-from apriori.ico.core.operator import I
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.monitor import IcoMonitor
-from apriori.ico.core.tree_utils import TreePathIndex
+from ico.core.operator import I
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.monitor import IcoMonitor
+from ico.core.tree_utils import TreePathIndex
 
 # ────────────────────────────────────────────────
 # Progress tracking events
@@ -89,10 +89,10 @@ class IcoProgress(Generic[I], IcoMonitor[I]):
 
     Example - Basic Data Processing Progress:
         ```python
-        from apriori.ico.core import IcoSource, IcoSink, IcoOperator
-        from apriori.ico.core.runtime.progress import IcoProgress
-        from apriori.ico.core.runtime.runtime import IcoRuntime
-        from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
+        from ico.core import IcoSource, IcoSink, IcoOperator
+        from ico.core.runtime.progress import IcoProgress
+        from ico.core.runtime.runtime import IcoRuntime
+        from ico.tools.progress.rich_progress_tool import RichProgressTool
 
         # Computation flow with embedded progress tracking
         def create_dataset():

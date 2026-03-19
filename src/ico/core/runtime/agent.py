@@ -5,23 +5,23 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic
 
-from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.channel.channel import IcoChannel
-from apriori.ico.core.runtime.command import (
+from ico.core.operator import I, IcoOperator, O
+from ico.core.runtime.channel.channel import IcoChannel
+from ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
     IcoRuntimeCommand,
 )
-from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
-from apriori.ico.core.runtime.state import (
+from ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
+from ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
+from ico.core.runtime.state import (
     BaseStateModel,
     IcoRuntimeState,
     ReadyState,
 )
-from apriori.ico.core.runtime.utils import discover_and_connect_runtime_nodes
-from apriori.ico.core.signature import IcoSignature
-from apriori.ico.core.signature_utils import infer_from_flow_factory
+from ico.core.runtime.utils import discover_and_connect_runtime_nodes
+from ico.core.signature import IcoSignature
+from ico.core.signature_utils import infer_from_flow_factory
 
 # ────────────────────────────────────────────────
 # Agent-specific runtime states

@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Any, Generic, TypeVar, overload
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import I as I
-from apriori.ico.core.operator import O
-from apriori.ico.core.signature import IcoSignature
+from ico.core.node import IcoNode
+from ico.core.operator import I as I
+from ico.core.operator import O
+from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
@@ -117,7 +117,7 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
     @property
     def signature(self) -> IcoSignature:
         """Infer ICO signature of this operator."""
-        from apriori.ico.core.signature_utils import (
+        from ico.core.signature_utils import (
             get_generic_args,
             infer_from_callable,
         )

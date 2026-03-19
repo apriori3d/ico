@@ -1,6 +1,6 @@
 from typing import Generic
 
-from apriori.ico.core.operator import I, IcoOperator
+from ico.core.operator import I, IcoOperator
 
 
 class IcoIdentity(Generic[I], IcoOperator[I, I]):

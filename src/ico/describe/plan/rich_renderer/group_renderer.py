@@ -2,9 +2,9 @@ from dataclasses import replace
 
 from rich.text import Text
 
-from apriori.ico.describe.plan.options import PlanRendererOptions
-from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
-from apriori.ico.describe.rich_style import DescribeStyle
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
+from ico.describe.rich_style import DescribeStyle
 
 
 class GroupRenderer:

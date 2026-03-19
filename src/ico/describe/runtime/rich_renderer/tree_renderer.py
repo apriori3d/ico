@@ -4,35 +4,35 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from apriori.ico.core.runtime.agent import IcoAgentWorker
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import (
+from ico.core.runtime.agent import IcoAgentWorker
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import (
     IcoRuntimeNode,
     RuntimeTraversalInfo,
 )
-from apriori.ico.core.runtime.runtime import IcoRuntime, OnForwardEventProtocol
-from apriori.ico.core.runtime.state import (
+from ico.core.runtime.runtime import IcoRuntime, OnForwardEventProtocol
+from ico.core.runtime.state import (
     IcoRuntimeState,
     IcoStateEvent,
     IcoStateRequestCommand,
 )
-from apriori.ico.core.runtime.tool import IcoTool
-from apriori.ico.core.tree_utils import TreePathIndex
-from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.describe.runtime.options import RuntimeRendererOptions
-from apriori.ico.describe.runtime.rich_renderer.custom_renderer import (
+from ico.core.runtime.tool import IcoTool
+from ico.core.tree_utils import TreePathIndex
+from ico.describe.rich_style import DescribeStyle
+from ico.describe.runtime.options import RuntimeRendererOptions
+from ico.describe.runtime.rich_renderer.custom_renderer import (
     RuntimeCustomRenderer,
 )
-from apriori.ico.describe.runtime.rich_renderer.render_target import (
+from ico.describe.runtime.rich_renderer.render_target import (
     create_runtime_renderer_walker,
 )
-from apriori.ico.describe.runtime.rich_renderer.renderer_registry import (
+from ico.describe.runtime.rich_renderer.renderer_registry import (
     RendererRegistry,
 )
-from apriori.ico.describe.runtime.rich_renderer.row_renderer import (
+from ico.describe.runtime.rich_renderer.row_renderer import (
     RuntimeRowRenderer,
 )
-from apriori.ico.describe.utils import import_all_renderers
+from ico.describe.utils import import_all_renderers
 
 RendererTypes: TypeAlias = RuntimeRowRenderer | RuntimeCustomRenderer
 

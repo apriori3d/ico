@@ -5,14 +5,14 @@ from multiprocessing import Queue
 from multiprocessing.context import SpawnContext
 from typing import Generic, final
 
-from apriori.ico.core.operator import I, O
-from apriori.ico.core.runtime.channel.channel import (
+from ico.core.operator import I, O
+from ico.core.runtime.channel.channel import (
     IcoChannel,
     IcoChannelRuntimePort,
     IcoReceiveEndpoint,
     IcoSendEndpoint,
 )
-from apriori.ico.core.runtime.channel.messages import DataMessage, RuntimeMessage
+from ico.core.runtime.channel.messages import DataMessage, RuntimeMessage
 
 # ────────────────────────────────────────────────
 # Multiprocessing queue-based endpoints

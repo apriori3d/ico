@@ -5,17 +5,17 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.describe.plan.options import PlanRendererOptions
-from apriori.ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
-from apriori.ico.describe.plan.rich_renderer.node.stream import (
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.node import IcoNode
+from ico.core.operator import IcoOperator, operator
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
+from ico.describe.plan.rich_renderer.node.stream import (
     StreamGroupPartRenderer,
 )
-from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
-from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from ico.describe.rich_style import DescribeStyle
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @register_renderer(IcoAsyncStream)
@@ -69,7 +69,7 @@ def create_worker_flow() -> IcoOperator[float, float]:
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
+    from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     pool = [MPAgent(create_worker_flow) for _ in range(4)]
 

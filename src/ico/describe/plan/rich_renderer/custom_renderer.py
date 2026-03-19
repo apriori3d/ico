@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.describe.plan.options import PlanRendererOptions
-from apriori.ico.describe.plan.rich_renderer.render_target import PlanRenderTarget
+from ico.core.node import IcoNode
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.render_target import PlanRenderTarget
 
 
 class CustomRenderer(ABC):

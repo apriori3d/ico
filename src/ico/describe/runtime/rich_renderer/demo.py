@@ -1,15 +1,15 @@
 from collections.abc import Iterable, Iterator
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.batcher import IcoBatcher
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.runtime.progress import IcoProgress
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.sink import sink
-from apriori.ico.core.source import source
-from apriori.ico.describe.runtime.rich_renderer.tree_renderer import RuntimeTreeRenderer
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.batcher import IcoBatcher
+from ico.core.operator import IcoOperator, operator
+from ico.core.pipeline import IcoPipeline
+from ico.core.runtime.progress import IcoProgress
+from ico.core.runtime.runtime import IcoRuntime
+from ico.core.sink import sink
+from ico.core.source import source
+from ico.describe.runtime.rich_renderer.tree_renderer import RuntimeTreeRenderer
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 """
 Runtime Tree Renderer Visualization Demo

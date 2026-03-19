@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import (
+from ico.core.operator import IcoOperator
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import (
     IcoRuntimeNode,
 )
-from apriori.ico.core.runtime.state import BaseStateModel
-from apriori.ico.core.runtime.tool import IcoTool
-from apriori.ico.core.runtime.toolbox import IcoToolBox
-from apriori.ico.core.runtime.utils import discover_and_connect_runtime_nodes
+from ico.core.runtime.state import BaseStateModel
+from ico.core.runtime.tool import IcoTool
+from ico.core.runtime.toolbox import IcoToolBox
+from ico.core.runtime.utils import discover_and_connect_runtime_nodes
 
 # ────────────────────────────────────────────────
 # Event forwarding protocol
@@ -119,10 +119,10 @@ class IcoRuntime(IcoRuntimeNode):
 
     Example - Runtime with Progress Tracking:
         ```python
-        from apriori.ico.core import IcoSource, IcoSink, IcoOperator
-        from apriori.ico.core.runtime.progress import IcoProgress
-        from apriori.ico.core.runtime.runtime import IcoRuntime
-        from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
+        from ico.core import IcoSource, IcoSink, IcoOperator
+        from ico.core.runtime.progress import IcoProgress
+        from ico.core.runtime.runtime import IcoRuntime
+        from ico.tools.progress.rich_progress_tool import RichProgressTool
         import time
 
         # Build computation flow with embedded progress tracking

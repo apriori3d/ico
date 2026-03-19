@@ -1,12 +1,12 @@
 from collections.abc import Iterable, Iterator
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.batcher import IcoBatcher
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.sink import sink
-from apriori.ico.core.source import source
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.batcher import IcoBatcher
+from ico.core.operator import IcoOperator, operator
+from ico.core.pipeline import IcoPipeline
+from ico.core.sink import sink
+from ico.core.source import source
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 """
 Plan Renderer Visualization Demo
@@ -89,7 +89,7 @@ def create_augment_flow() -> IcoOperator[Iterator[int], str]:
 # Run the visualization demo
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
+    from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     print("\n🎨 ICO Plan Renderer Demo")
     print("=" * 50)

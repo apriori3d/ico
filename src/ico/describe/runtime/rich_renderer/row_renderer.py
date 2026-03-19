@@ -4,17 +4,17 @@ from collections.abc import Callable
 
 from rich.text import Text
 
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.describe.rich_utils import (
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.describe.rich_style import DescribeStyle
+from ico.describe.rich_utils import (
     render_node_class,
 )
-from apriori.ico.describe.runtime.options import (
+from ico.describe.runtime.options import (
     RuntimeRendererColumn,
     RuntimeRendererOptions,
 )
-from apriori.ico.describe.runtime.rich_renderer.utils import get_state_color
-from apriori.ico.describe.utils import match_icon
+from ico.describe.runtime.rich_renderer.utils import get_state_color
+from ico.describe.utils import match_icon
 
 
 class RuntimeRowRenderer:

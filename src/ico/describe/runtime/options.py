@@ -2,15 +2,15 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.printer import IcoPrinter
-from apriori.ico.core.runtime.progress import IcoProgress
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.describe.options import RendererOptions
-from apriori.ico.tools.printer.rich_printer_tool import RichPrinterTool
-from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
+from ico.core.node import IcoNode
+from ico.core.runtime.agent import IcoAgent, IcoAgentWorker
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.printer import IcoPrinter
+from ico.core.runtime.progress import IcoProgress
+from ico.core.runtime.runtime import IcoRuntime
+from ico.describe.options import RendererOptions
+from ico.tools.printer.rich_printer_tool import RichPrinterTool
+from ico.tools.progress.rich_progress_tool import RichProgressTool
 
 RuntimeRendererColumn: TypeAlias = Literal["Tree", "State", "Name"]
 

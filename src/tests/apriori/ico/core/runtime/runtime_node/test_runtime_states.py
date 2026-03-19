@@ -1,14 +1,14 @@
 import pytest
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.state import (
+from ico.core.operator import IcoOperator
+from ico.core.runtime.state import (
     FaultState,
     IdleState,
     ReadyState,
     RunningState,
 )
-from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
+from ico.core.sink import IcoSink
+from ico.core.source import IcoSource
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntime
 
 # ──── Test: normal execution ────

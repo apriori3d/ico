@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Generic, final
 
-from apriori.ico.core.context_operator import C
-from apriori.ico.core.operator import (
+from ico.core.context_operator import C
+from ico.core.operator import (
     IcoOperator,
     wrap_operator,
 )
-from apriori.ico.core.signature import IcoSignature
+from ico.core.signature import IcoSignature
 
 
 @final

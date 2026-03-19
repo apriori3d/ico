@@ -15,9 +15,9 @@ from typing import (
     get_type_hints,
 )
 
-from apriori.ico.core.context_operator import IcoContextOperator
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.signature import IcoSignature, SignatureParamType
+from ico.core.context_operator import IcoContextOperator
+from ico.core.operator import IcoOperator
+from ico.core.signature import IcoSignature, SignatureParamType
 
 
 def infer_from_generic(obj: object) -> IcoSignature | None:

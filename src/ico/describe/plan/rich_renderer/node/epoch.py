@@ -4,27 +4,27 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.context_operator import context_operator
-from apriori.ico.core.context_pipeline import IcoContextPipeline
-from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.process import IcoProcess
-from apriori.ico.core.source import source
-from apriori.ico.describe.plan.options import PlanRendererOptions
-from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
-from apriori.ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
-from apriori.ico.describe.plan.rich_renderer.render_target import (
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.context_operator import context_operator
+from ico.core.context_pipeline import IcoContextPipeline
+from ico.core.epoch import IcoEpoch
+from ico.core.node import IcoNode
+from ico.core.operator import IcoOperator, operator
+from ico.core.process import IcoProcess
+from ico.core.source import source
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
+from ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
+from ico.describe.plan.rich_renderer.render_target import (
     PlanRenderTarget,
     create_plan_walker,
 )
-from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_renderer.row_renderer import (
+from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
-from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.describe.rich_style import DescribeStyle
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @register_renderer(IcoEpoch)
@@ -153,7 +153,7 @@ def logging_step(context: TrainContext) -> TrainContext:
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
+    from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     """
     IcoEpoch()

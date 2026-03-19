@@ -4,7 +4,7 @@ import traceback
 from dataclasses import dataclass
 from typing import final
 
-from apriori.ico.core.tree_utils import TreePathIndex
+from ico.core.tree_utils import TreePathIndex
 
 # ───── Event class ─────
 

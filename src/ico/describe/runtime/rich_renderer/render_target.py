@@ -5,14 +5,14 @@ from typing import Protocol, TypeAlias
 
 from rich.text import Text
 
-from apriori.ico.core.runtime.node import (
+from ico.core.runtime.node import (
     HasRemoteRuntime,
     IcoRemotePlaceholderNode,
     IcoRuntimeNode,
     RuntimeTreeWalker,
 )
-from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
-from apriori.ico.describe.runtime.rich_renderer.row_renderer import RuntimeRowRenderer
+from ico.core.tree_utils import TraversalInfo, TreeWalker
+from ico.describe.runtime.rich_renderer.row_renderer import RuntimeRowRenderer
 
 
 class RuntimeRenderTarget(Protocol):

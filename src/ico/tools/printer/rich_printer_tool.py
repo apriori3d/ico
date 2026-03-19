@@ -3,17 +3,17 @@ from typing import final
 
 from rich.console import Console
 
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.runtime.event import (
+from ico.core.operator import IcoOperator, operator
+from ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.printer import IcoPrinter, IcoPrintEvent
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.runtime_wrapper import wrap_runtime
-from apriori.ico.core.runtime.tool import IcoTool
-from apriori.ico.core.sink import sink
-from apriori.ico.core.source import source
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.runtime.printer import IcoPrinter, IcoPrintEvent
+from ico.core.runtime.runtime import IcoRuntime
+from ico.core.runtime.runtime_wrapper import wrap_runtime
+from ico.core.runtime.tool import IcoTool
+from ico.core.sink import sink
+from ico.core.source import source
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @final

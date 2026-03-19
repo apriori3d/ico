@@ -1,8 +1,8 @@
 from collections.abc import Iterator
 from typing import Any, Generic
 
-from apriori.ico.core.operator import I, IcoOperator
-from apriori.ico.core.signature import IcoSignature
+from ico.core.operator import I, IcoOperator
+from ico.core.signature import IcoSignature
 
 
 class IcoBatcher(

@@ -10,7 +10,7 @@ To generate the pipeline visualization image:
 
 1. Run the simple pipeline example:
 ```python
-from apriori.ico.core.operator import operator
+from ico import operator
 
 @operator()
 def square(x: int) -> int:

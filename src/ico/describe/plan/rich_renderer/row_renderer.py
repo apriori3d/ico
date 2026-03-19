@@ -5,20 +5,20 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from apriori.ico.core.context_operator import IcoContextOperator
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.signature_utils import format_ico_type
-from apriori.ico.describe.plan.options import (
+from ico.core.context_operator import IcoContextOperator
+from ico.core.node import IcoNode
+from ico.core.operator import IcoOperator
+from ico.core.signature_utils import format_ico_type
+from ico.describe.plan.options import (
     PlanRendererColumn,
     PlanRendererOptions,
 )
-from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.describe.rich_utils import (
+from ico.describe.rich_style import DescribeStyle
+from ico.describe.rich_utils import (
     render_callable,
     render_node_class,
 )
-from apriori.ico.describe.utils import match_icon
+from ico.describe.utils import match_icon
 
 
 class RowRenderer:

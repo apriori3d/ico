@@ -1,8 +1,8 @@
 from typing import Generic
 
-from apriori.ico.core.identity import IcoIdentity
-from apriori.ico.core.operator import I
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from ico.core.identity import IcoIdentity
+from ico.core.operator import I
+from ico.core.runtime.node import IcoRuntimeNode
 
 
 class IcoMonitor(

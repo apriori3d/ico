@@ -1,11 +1,11 @@
 from collections.abc import Callable, Iterator
 from typing import Any, Generic
 
-from apriori.ico.core.operator import (
+from ico.core.operator import (
     I,
     IcoOperator,
 )
-from apriori.ico.core.signature import IcoSignature
+from ico.core.signature import IcoSignature
 
 
 class IcoSink(
@@ -92,7 +92,7 @@ class IcoSink(
             Falls back to Iterator[Any] → () if type inference fails.
             The output is always None since sinks are terminal operations.
         """
-        from apriori.ico.core.signature_utils import (
+        from ico.core.signature_utils import (
             infer_from_callable,
         )
 

@@ -1,22 +1,22 @@
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.batcher import IcoBatcher
-from apriori.ico.core.chain import IcoChain
-from apriori.ico.core.context_pipeline import IcoContextPipeline
-from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.process import IcoProcess
-from apriori.ico.core.runtime.agent import IcoAgent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.progress import IcoProgress
-from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
-from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
-from apriori.ico.core.stream import IcoStream
-from apriori.ico.describe.options import RendererOptions
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.batcher import IcoBatcher
+from ico.core.chain import IcoChain
+from ico.core.context_pipeline import IcoContextPipeline
+from ico.core.epoch import IcoEpoch
+from ico.core.node import IcoNode
+from ico.core.pipeline import IcoPipeline
+from ico.core.process import IcoProcess
+from ico.core.runtime.agent import IcoAgent
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.progress import IcoProgress
+from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
+from ico.core.sink import IcoSink
+from ico.core.source import IcoSource
+from ico.core.stream import IcoStream
+from ico.describe.options import RendererOptions
 
 PlanRendererColumn: TypeAlias = Literal["Flow", "Signature", "Name"]
 CallableFormat: TypeAlias = Literal["__name__", "str()"]

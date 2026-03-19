@@ -5,14 +5,14 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from apriori.ico.core.batcher import IcoBatcher
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.source import source
-from apriori.ico.describe.plan.rich_renderer.renderer_registry import register_renderer
-from apriori.ico.describe.plan.rich_renderer.row_renderer import (
+from ico.core.batcher import IcoBatcher
+from ico.core.node import IcoNode
+from ico.core.source import source
+from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
-from apriori.ico.describe.rich_style import DescribeStyle
+from ico.describe.rich_style import DescribeStyle
 
 
 @register_renderer(IcoBatcher)
@@ -27,7 +27,7 @@ class IcoBatcherRender(RowRenderer):
 
 
 if __name__ == "__main__":
-    from apriori.ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
+    from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
     data = [0.5, 1.0, 1.5, 2.0, 0.8, 0.2, 1.0, 1.2, 0.9]
 

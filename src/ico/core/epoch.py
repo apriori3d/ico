@@ -1,14 +1,14 @@
 from collections.abc import Callable, Iterator
 from typing import Any, Generic
 
-from apriori.ico.core.context_operator import (
+from ico.core.context_operator import (
     C,
     I,
     IcoContextOperator,
     wrap_context_operator,
 )
-from apriori.ico.core.operator import IcoOperator, wrap_operator
-from apriori.ico.core.signature import IcoSignature
+from ico.core.operator import IcoOperator, wrap_operator
+from ico.core.signature import IcoSignature
 
 
 class IcoEpoch(
@@ -32,7 +32,7 @@ class IcoEpoch(
         >>> from collections.abc import Iterator
         >>> from dataclasses import dataclass
         >>> from typing import TypeAlias
-        >>> from apriori.ico.core.source import source
+        >>> from ico.core.source import source
 
         >>> # Type definitions for training data
         >>> TrainingBatch: TypeAlias = tuple[float, float]

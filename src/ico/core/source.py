@@ -1,11 +1,11 @@
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, Generic, final
 
-from apriori.ico.core.operator import (
+from ico.core.operator import (
     IcoOperator,
     O,
 )
-from apriori.ico.core.signature import IcoSignature
+from ico.core.signature import IcoSignature
 
 
 @final
@@ -105,7 +105,7 @@ class IcoSource(
         from types import GenericAlias
         from typing import get_args
 
-        from apriori.ico.core.signature_utils import (
+        from ico.core.signature_utils import (
             infer_from_callable,
         )
 

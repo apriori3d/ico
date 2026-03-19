@@ -6,27 +6,27 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from apriori.ico.core.node import (
+from ico.core.node import (
     IcoNode,
 )
-from apriori.ico.describe.plan.options import (
+from ico.describe.plan.options import (
     PlanRendererOptions,
 )
-from apriori.ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
-from apriori.ico.describe.plan.rich_renderer.group_renderer import (
+from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
+from ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
 )
-from apriori.ico.describe.plan.rich_renderer.render_target import (
+from ico.describe.plan.rich_renderer.render_target import (
     PlanTraversalInfo,
     PlanTreeWalkerContext,
     create_plan_walker,
 )
-from apriori.ico.describe.plan.rich_renderer.renderer_registry import (
+from ico.describe.plan.rich_renderer.renderer_registry import (
     RendererRegistry,
 )
-from apriori.ico.describe.plan.rich_renderer.row_renderer import RowRenderer
-from apriori.ico.describe.rich_style import DescribeStyle
-from apriori.ico.describe.utils import import_all_renderers
+from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
+from ico.describe.rich_style import DescribeStyle
+from ico.describe.utils import import_all_renderers
 
 RendererTypes: TypeAlias = RowRenderer | GroupRenderer | CustomRenderer
 

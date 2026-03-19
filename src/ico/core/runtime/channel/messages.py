@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.command import IcoRuntimeCommand
+from ico.core.runtime.event import IcoRuntimeEvent
 
 # ──────────────────────────────────────────────────────────────
 # Channel Message System for Inter-Process Communication

@@ -5,22 +5,22 @@ from typing import final
 from rich.console import Console
 from rich.progress import Progress, TaskID
 
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.process import IcoProcess
-from apriori.ico.core.runtime.event import (
+from ico.core.operator import IcoOperator, operator
+from ico.core.process import IcoProcess
+from ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.progress import (
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.progress import (
     IcoProgress,
     IcoProgressEvent,
 )
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.tool import IcoTool
-from apriori.ico.core.sink import sink
-from apriori.ico.core.source import source
-from apriori.ico.core.tree_utils import TreePathIndex
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.runtime.runtime import IcoRuntime
+from ico.core.runtime.tool import IcoTool
+from ico.core.sink import sink
+from ico.core.source import source
+from ico.core.tree_utils import TreePathIndex
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 @final
@@ -271,7 +271,7 @@ if __name__ == "__main__":
         - Runtime state visualization before/during/after execution
         - Tool-based architecture for progress monitoring
     """
-    from apriori.ico.describe.describer import describe
+    from ico.describe.describer import describe
 
     total = 10
 

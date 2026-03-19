@@ -7,20 +7,20 @@ from typing import Protocol, TypeAlias
 
 from typing_extensions import Self, runtime_checkable
 
-from apriori.ico.core.runtime.command import (
+from ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
     IcoRunCommand,
     IcoRuntimeCommand,
 )
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.state import (
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.state import (
     BaseStateModel,
     IcoRuntimeState,
     IcoStateEvent,
     IcoStateRequestCommand,
 )
-from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
+from ico.core.tree_utils import TraversalInfo, TreeWalker
 
 # ────────────────────────────────────────────────
 # Runtime node
@@ -388,7 +388,7 @@ class IcoRuntimeNode(ABC):
         Renders a formatted table showing the runtime tree hierarchy, node states,
         and relationships for debugging and monitoring purposes.
         """
-        from apriori.ico.describe.describer import describe as describe_util
+        from ico.describe.describer import describe as describe_util
 
         describe_util(self)
 

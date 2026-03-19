@@ -1,10 +1,10 @@
 from collections.abc import Callable
 
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.describe.runtime.rich_renderer.custom_renderer import (
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.describe.runtime.rich_renderer.custom_renderer import (
     RuntimeCustomRenderer,
 )
-from apriori.ico.describe.runtime.rich_renderer.row_renderer import RuntimeRowRenderer
+from ico.describe.runtime.rich_renderer.row_renderer import RuntimeRowRenderer
 
 RendererMetaTypes = type[RuntimeRowRenderer | RuntimeCustomRenderer]
 RendererRegistry: dict[type[IcoRuntimeNode], RendererMetaTypes] = {}

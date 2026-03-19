@@ -6,11 +6,11 @@ from typing import overload
 
 from typing_extensions import final
 
-from apriori.ico.core.operator import I, IcoOperator, O, wrap_operator
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
-from apriori.ico.core.tree_utils import TreePathIndex
+from ico.core.operator import I, IcoOperator, O, wrap_operator
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
+from ico.core.tree_utils import TreePathIndex
 
 
 @final

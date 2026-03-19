@@ -8,8 +8,8 @@ from typing import (
 
 from typing_extensions import runtime_checkable
 
-from apriori.ico.core.signature import IcoSignature
-from apriori.ico.core.tree_utils import TraversalInfo, TreeWalker
+from ico.core.signature import IcoSignature
+from ico.core.tree_utils import TraversalInfo, TreeWalker
 
 
 class IcoNode:
@@ -82,7 +82,7 @@ class IcoNode:
         Uses the ICO describe system to render tree structure, signatures,
         and other relevant information to the console.
         """
-        from apriori.ico.describe.describer import describe
+        from ico.describe.describer import describe
 
         describe(self)
 

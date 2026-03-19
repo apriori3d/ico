@@ -5,15 +5,15 @@ from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Any, Generic, final
 
-from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.agent import IcoAgent, IcoAgentWorker
-from apriori.ico.core.runtime.channel.channel import IcoChannel
-from apriori.ico.core.runtime.event import (
+from ico.core.operator import I, IcoOperator, O
+from ico.core.runtime.agent import IcoAgent, IcoAgentWorker
+from ico.core.runtime.channel.channel import IcoChannel
+from ico.core.runtime.event import (
     IcoFaultEvent,
 )
-from apriori.ico.core.signature import IcoSignature
-from apriori.ico.core.signature_utils import infer_from_flow_factory
-from apriori.ico.runtime.agent.mp.mp_channel import (
+from ico.core.signature import IcoSignature
+from ico.core.signature_utils import infer_from_flow_factory
+from ico.runtime.agent.mp.mp_channel import (
     MPChannel,
 )
 
@@ -105,11 +105,11 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     Example - Distributed Computation Flow:
         ```python
-        from apriori.ico.core import IcoSource, IcoSink, IcoOperator
-        from apriori.ico.core.runtime.progress import IcoProgress
-        from apriori.ico.core.runtime.runtime import IcoRuntime
-        from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
-        from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
+        from ico.core import IcoSource, IcoSink, IcoOperator
+        from ico.core.runtime.progress import IcoProgress
+        from ico.core.runtime.runtime import IcoRuntime
+        from ico.runtime.agent.mp.mp_agent import MPAgent
+        from ico.tools.progress.rich_progress_tool import RichProgressTool
         import time
 
         # Define computation that will run in worker process

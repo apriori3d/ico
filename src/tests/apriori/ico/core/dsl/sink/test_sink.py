@@ -1,8 +1,8 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
+from ico.core.operator import IcoOperator
+from ico.core.sink import IcoSink
+from ico.core.source import IcoSource
 
 IntOperator = IcoOperator[int, int]
 

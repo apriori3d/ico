@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar, final
 
-from apriori.ico.core.runtime.command import (
+from ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
     IcoRuntimeCommand,
 )
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.tree_utils import TreePathIndex
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.tree_utils import TreePathIndex
 
 
 @dataclass(slots=True, frozen=True)

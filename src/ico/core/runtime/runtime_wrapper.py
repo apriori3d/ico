@@ -1,10 +1,10 @@
 from collections.abc import Callable, Sequence
 from typing import Generic
 
-from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.signature import IcoSignature
+from ico.core.operator import I, IcoOperator, O
+from ico.core.runtime.command import IcoRuntimeCommand
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.signature import IcoSignature
 
 
 class IcoRuntimeWrapper(

@@ -4,9 +4,9 @@ from types import FunctionType
 
 from rich.text import Text
 
-from apriori.ico.describe.options import RendererOptions
-from apriori.ico.describe.plan.options import PlanRendererOptions
-from apriori.ico.describe.rich_style import DescribeStyle
+from ico.describe.options import RendererOptions
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.rich_style import DescribeStyle
 
 
 def render_node_class(

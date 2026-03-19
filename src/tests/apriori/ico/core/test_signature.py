@@ -1,16 +1,16 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.batcher import IcoBatcher
-from apriori.ico.core.context_operator import IcoContextOperator
-from apriori.ico.core.context_pipeline import IcoContextPipeline
-from apriori.ico.core.epoch import IcoEpoch
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.pipeline import IcoPipeline
-from apriori.ico.core.process import IcoProcess
-from apriori.ico.core.sink import IcoSink
-from apriori.ico.core.source import IcoSource
-from apriori.ico.core.stream import IcoStream
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.batcher import IcoBatcher
+from ico.core.context_operator import IcoContextOperator
+from ico.core.context_pipeline import IcoContextPipeline
+from ico.core.epoch import IcoEpoch
+from ico.core.operator import IcoOperator
+from ico.core.pipeline import IcoPipeline
+from ico.core.process import IcoProcess
+from ico.core.sink import IcoSink
+from ico.core.source import IcoSource
+from ico.core.stream import IcoStream
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 # ─── Operator ───
 

@@ -1,6 +1,6 @@
 import pytest
 
-from apriori.ico.core.operator import IcoOperator
+from ico.core.operator import IcoOperator
 
 
 def test_basic_composition() -> None:

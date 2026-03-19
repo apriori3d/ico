@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from rich.console import Console
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.describe.options import RendererOptions
-from apriori.ico.describe.plan.options import PlanRendererOptions
-from apriori.ico.describe.runtime.options import RuntimeRendererOptions
+from ico.core.node import IcoNode
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.describe.options import RendererOptions
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.runtime.options import RuntimeRendererOptions
 
 
 def describe(
@@ -59,7 +59,7 @@ def describe(
             )
 
         if options.backend == "RichText":
-            from apriori.ico.describe.plan.rich_renderer.plan_renderer import (
+            from ico.describe.plan.rich_renderer.plan_renderer import (
                 PlanRenderer,
             )
 
@@ -77,7 +77,7 @@ def describe(
             )
 
         if options.backend == "RichText":
-            from apriori.ico.describe.runtime.rich_renderer.tree_renderer import (
+            from ico.describe.runtime.rich_renderer.tree_renderer import (
                 RuntimeTreeRenderer,
             )
 

@@ -4,17 +4,17 @@ from abc import ABC, abstractmethod
 from queue import Empty
 from typing import Generic, Protocol
 
-from apriori.ico.core.operator import I, O
-from apriori.ico.core.runtime.channel.messages import (
+from ico.core.operator import I, O
+from ico.core.runtime.channel.messages import (
     AcknowledgeMessage,
     CommandMessage,
     DataMessage,
     EventMessage,
     RuntimeMessage,
 )
-from apriori.ico.core.runtime.command import IcoDeactivateCommand, IcoRuntimeCommand
-from apriori.ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
-from apriori.ico.core.runtime.exceptions import IcoRuntimeError
+from ico.core.runtime.command import IcoDeactivateCommand, IcoRuntimeCommand
+from ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
+from ico.core.runtime.exceptions import IcoRuntimeError
 
 # ────────────────────────────────────────────────
 # Channel endpoint abstractions

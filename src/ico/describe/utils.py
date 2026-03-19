@@ -2,8 +2,8 @@ import contextlib
 import importlib
 import pkgutil
 
-from apriori.ico.core.node import IcoNode
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from ico.core.node import IcoNode
+from ico.core.runtime.node import IcoRuntimeNode
 
 
 def import_all_renderers(package_name: str) -> None:
