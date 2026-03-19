@@ -4,10 +4,10 @@ import time
 
 import pytest
 
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.source import IcoSource
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.operator import IcoOperator
+from ico.core.source import IcoSource
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 def flow_identity() -> IcoOperator[int, int]:

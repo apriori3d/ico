@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.state import BaseStateModel, IcoRuntimeState
+from ico.core.operator import IcoOperator
+from ico.core.runtime.command import IcoRuntimeCommand
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.runtime import IcoRuntime
+from ico.core.runtime.state import BaseStateModel, IcoRuntimeState
 
 
 class RecordingStateModel(BaseStateModel):

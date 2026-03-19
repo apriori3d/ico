@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from apriori.ico.core.runtime.command import IcoActivateCommand
-from apriori.ico.core.runtime.event import (
+from ico.core.runtime.command import IcoActivateCommand
+from ico.core.runtime.event import (
     IcoHeartbeatEvent,
 )
-from apriori.ico.core.runtime.state import IdleState, ReadyState
+from ico.core.runtime.state import IdleState, ReadyState
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import (
     RecordingRuntimeNode,
 )

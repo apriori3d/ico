@@ -4,9 +4,9 @@ import time
 
 import pytest
 
-from apriori.ico.core.async_operator import IcoAsyncOperator
-from apriori.ico.core.async_stream import IcoAsyncStream
-from apriori.ico.core.operator import IcoOperator
+from ico.core.async_operator import IcoAsyncOperator
+from ico.core.async_stream import IcoAsyncStream
+from ico.core.operator import IcoOperator
 
 # ───────────────────────────────────────────────
 #  Test: basic synchronous processing

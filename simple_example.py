@@ -1,4 +1,4 @@
-from apriori.ico.core.process import IcoProcess
+from ico.core.process import IcoProcess
 
 
 # Fibonacci as an iterative process
