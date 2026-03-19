@@ -3,7 +3,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "apriori.ico"
+name = "ico"
 version = "0.1.0"
 description = "ICO formalizes a common ML pattern: take Input, apply Context, produce Output, and provides an elegant, type-safe, and fully-transparent framework for ML engineers and researchers."
 readme = "README.md"
@@ -51,13 +51,12 @@ Repository = "https://github.com/apriori3d/ico"
 Issues = "https://github.com/apriori3d/ico/issues"
 
 [tool.poetry]
-name = "apriori.ico"
+name = "ico"
 version = "0.1.0"
 description = "ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows."
 readme = "README.md"
 packages = [
-    { include = "apriori", from = "src" },
-    { include = "ico", from = "src"},
+    { include = "ico", from = "src" },
 ]
 
 [tool.poetry.dependencies]

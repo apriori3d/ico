@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.pipeline import IcoPipeline
+from ico.core.operator import IcoOperator
+from ico.core.pipeline import IcoPipeline
 
 FloatPipeline = IcoPipeline[float]
 FloatOperator = IcoOperator[float, float]

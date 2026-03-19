@@ -1,5 +1,5 @@
-from apriori.ico.core.node import iterate_nodes, iterate_parents
-from apriori.ico.core.operator import IcoOperator
+from ico.core.node import iterate_nodes, iterate_parents
+from ico.core.operator import IcoOperator
 
 IntOperator = IcoOperator[int, int]
 

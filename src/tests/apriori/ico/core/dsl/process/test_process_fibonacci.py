@@ -1,5 +1,5 @@
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.process import IcoProcess
+from ico.core.operator import IcoOperator
+from ico.core.process import IcoProcess
 
 
 def test_fibonacci_process() -> None:

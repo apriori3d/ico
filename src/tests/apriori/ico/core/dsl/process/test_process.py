@@ -1,5 +1,5 @@
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.process import IcoProcess
+from ico.core.operator import IcoOperator
+from ico.core.process import IcoProcess
 
 
 def test_process_applies_body_multiple_times() -> None:

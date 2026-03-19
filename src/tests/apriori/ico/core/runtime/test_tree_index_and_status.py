@@ -8,21 +8,21 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any
 
-from apriori.ico.core.identity import IcoIdentity
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.event import IcoRuntimeEvent
-from apriori.ico.core.runtime.node import IcoRuntimeNode
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.runtime_wrapper import wrap_runtime_fn
-from apriori.ico.core.runtime.state import (
+from ico.core.identity import IcoIdentity
+from ico.core.operator import IcoOperator
+from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.runtime import IcoRuntime
+from ico.core.runtime.runtime_wrapper import wrap_runtime_fn
+from ico.core.runtime.state import (
     IcoRuntimeState,
     IcoStateRequestCommand,
     IdleState,
     ReadyState,
 )
-from apriori.ico.core.runtime.tool import IcoTool
-from apriori.ico.core.tree_utils import TreePathIndex
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.core.runtime.tool import IcoTool
+from ico.core.tree_utils import TreePathIndex
+from ico.runtime.agent.mp.mp_agent import MPAgent
 
 
 class StateCollectorTool(IcoTool):
@@ -37,7 +37,7 @@ class StateCollectorTool(IcoTool):
 
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         """Collect state events with their paths."""
-        from apriori.ico.core.runtime.state import IcoStateEvent
+        from ico.core.runtime.state import IcoStateEvent
 
         if isinstance(event, IcoStateEvent):
             tree_path = event.trace.reverse()

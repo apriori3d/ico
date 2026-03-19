@@ -4,17 +4,17 @@ import time
 
 import pytest
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.runtime.command import (
+from ico.core.operator import IcoOperator
+from ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
 )
-from apriori.ico.core.runtime.event import (
+from ico.core.runtime.event import (
     IcoHeartbeatEvent,
 )
-from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.runtime.agent.mp.mp_agent import (
+from ico.core.runtime.exceptions import IcoRuntimeError
+from ico.core.runtime.runtime import IcoRuntime
+from ico.runtime.agent.mp.mp_agent import (
     MPAgent,
 )
 from tests.apriori.ico.core.runtime.runtime_node.test_utils import RecordingRuntimeNode

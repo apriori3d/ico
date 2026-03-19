@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Generic
 
-from apriori.ico.core.operator import I, IcoOperator, O
-from apriori.ico.core.runtime.channel.channel import IcoChannel
-from apriori.ico.core.runtime.command import IcoRuntimeCommand
-from apriori.ico.core.runtime.event import (
+from ico.core.operator import I, IcoOperator, O
+from ico.core.runtime.channel.channel import IcoChannel
+from ico.core.runtime.command import IcoRuntimeCommand
+from ico.core.runtime.event import (
     IcoFaultEvent,
     IcoRuntimeEvent,
 )
-from apriori.ico.core.runtime.exceptions import IcoRuntimeError
-from apriori.ico.core.runtime.node import IcoRuntimeNode
+from ico.core.runtime.exceptions import IcoRuntimeError
+from ico.core.runtime.node import IcoRuntimeNode
 
 
 class MPProcessMock(

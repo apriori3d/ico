@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.operator import IcoOperator
-from apriori.ico.core.stream import IcoStream
+from ico.core.operator import IcoOperator
+from ico.core.stream import IcoStream
 
 IntOperator = IcoOperator[int, int]
 

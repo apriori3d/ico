@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from apriori.ico.core.operator import IcoOperator
+from ico.core.operator import IcoOperator
 
 IntOperator = IcoOperator[int, int]
 
