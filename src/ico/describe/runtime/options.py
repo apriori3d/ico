@@ -30,7 +30,7 @@ class RuntimeRendererOptions(RendererOptions):
     """Display columns: Tree structure, Runtime state, Node names"""
 
     renderers_paths: list[str] = field(
-        default_factory=lambda: ["apriori.ico.describe.runtime.rich_renderer.node"]
+        default_factory=lambda: ["ico.describe.runtime.rich_renderer.node"]
     )
     """Paths to runtime renderer modules"""
 
