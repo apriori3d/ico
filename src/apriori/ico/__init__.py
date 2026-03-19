@@ -1,44 +1,44 @@
 # core
-from .core.async_operator import IcoAsyncOperator
-from .core.async_stream import IcoAsyncStream
-from .core.batcher import IcoBatcher
-from .core.chain import IcoChain
-from .core.context_operator import IcoContextOperator
-from .core.context_pipeline import IcoContextPipeline
-from .core.epoch import IcoEpoch
-from .core.identity import IcoIdentity
-from .core.node import HasRemoteFlow, IcoNode
-from .core.operator import IcoOperator, operator
-from .core.pipeline import IcoPipeline
-from .core.process import IcoProcess
+from apriori.ico.core.async_operator import IcoAsyncOperator
+from apriori.ico.core.async_stream import IcoAsyncStream
+from apriori.ico.core.batcher import IcoBatcher
+from apriori.ico.core.chain import IcoChain
+from apriori.ico.core.context_operator import IcoContextOperator, context_operator
+from apriori.ico.core.context_pipeline import IcoContextPipeline
+from apriori.ico.core.epoch import IcoEpoch
+from apriori.ico.core.identity import IcoIdentity
+from apriori.ico.core.node import HasRemoteFlow, IcoNode
+from apriori.ico.core.operator import IcoOperator, operator
+from apriori.ico.core.pipeline import IcoPipeline
+from apriori.ico.core.process import IcoProcess
 
 # core/runtime
-from .core.runtime.exceptions import IcoRuntimeError
-from .core.runtime.monitor import IcoMonitor
-from .core.runtime.node import IcoRuntimeNode
-from .core.runtime.printer import IcoPrinter
-from .core.runtime.progress import IcoProgress
-from .core.runtime.runtime import IcoRuntime
-from .core.runtime.runtime_wrapper import IcoRuntimeWrapper
-from .core.signature import IcoSignature
-from .core.sink import IcoSink
-from .core.source import IcoSource
-from .core.stream import IcoStream
-from .core.tree_utils import TraversalInfo, TreePathIndex, TreeWalker
+from apriori.ico.core.runtime.exceptions import IcoRuntimeError
+from apriori.ico.core.runtime.monitor import IcoMonitor
+from apriori.ico.core.runtime.node import IcoRuntimeNode
+from apriori.ico.core.runtime.printer import IcoPrinter
+from apriori.ico.core.runtime.progress import IcoProgress
+from apriori.ico.core.runtime.runtime import IcoRuntime
+from apriori.ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper, wrap_runtime
+from apriori.ico.core.signature import IcoSignature
+from apriori.ico.core.sink import IcoSink, sink
+from apriori.ico.core.source import IcoSource, source
+from apriori.ico.core.stream import IcoStream
+from apriori.ico.core.tree_utils import TraversalInfo, TreePathIndex, TreeWalker
 
 # describe
-from .describe.describer import describe
-from .describe.options import RendererOptions
-from .describe.plan.options import PlanRendererOptions
-from .describe.rich_style import DescribeStyle
-from .describe.runtime.options import RuntimeRendererOptions
+from apriori.ico.describe.describer import describe
+from apriori.ico.describe.options import RendererOptions
+from apriori.ico.describe.plan.options import PlanRendererOptions
+from apriori.ico.describe.rich_style import DescribeStyle
+from apriori.ico.describe.runtime.options import RuntimeRendererOptions
 
 # runtime
-from .runtime.agent.mp.mp_agent import MPAgent
+from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
 
 # tools
-from .tools.printer.rich_printer_tool import RichPrinterTool
-from .tools.progress.rich_progress_tool import RichProgressTool, WorkerFlow
+from apriori.ico.tools.printer.rich_printer_tool import RichPrinterTool
+from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool, WorkerFlow
 
 __all__ = [
     # core
@@ -48,6 +48,7 @@ __all__ = [
     "IcoBatcher",
     "IcoChain",
     "IcoContextOperator",
+    "context_operator",
     "IcoContextPipeline",
     "IcoEpoch",
     "IcoIdentity",
@@ -58,7 +59,9 @@ __all__ = [
     "IcoProcess",
     "IcoSignature",
     "IcoSink",
+    "sink",
     "IcoSource",
+    "source",
     "IcoStream",
     "TraversalInfo",
     "TreePathIndex",
@@ -71,6 +74,7 @@ __all__ = [
     "IcoRuntimeError",
     "IcoRuntimeNode",
     "IcoRuntimeWrapper",
+    "wrap_runtime",
     # runtime
     "MPAgent",
     # tools

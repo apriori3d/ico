@@ -1,4 +1,4 @@
-from apriori.ico import IcoProcess, operator
+from ico import IcoProcess, operator
 
 Context = tuple[int, int]
 

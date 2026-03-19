@@ -176,7 +176,7 @@ class BaseStateModel:
         """
         self._state = new_state
 
-    def update(self, command: IcoRuntimeCommand) -> None:
+    def update(self, command: IcoRuntimeCommand) -> bool:
         """Process runtime command and trigger appropriate state transition.
 
         Automatically transitions state based on received runtime commands
@@ -185,6 +185,9 @@ class BaseStateModel:
 
         Args:
             command: Runtime command to process (activate, deactivate, etc.).
+
+        Returns:
+            True if state was updated based on command, False otherwise.
 
         Note:
             Subclasses can override transitions dict to customize which
@@ -196,8 +199,11 @@ class BaseStateModel:
             if isinstance(command, command_cls):
                 new_state = state_cls()
 
-        if new_state:
+        if new_state and new_state != self._state:
             self.update_state(new_state)
+            return True
+
+        return False
 
     def idle(self) -> None:
         """Transition to idle state (no resources allocated).

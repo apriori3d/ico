@@ -26,7 +26,7 @@ Each step is a typed operator that composes into pipelines, runs locally or in p
 A Fibonacci toy example showing how ICO models iterative stateful computation as a composable flow.
 
 ```python
-from apriori.ico import IcoProcess, operator
+from ico import IcoProcess, operator
 
 Context = tuple[int, int]
 
