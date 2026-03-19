@@ -53,10 +53,11 @@ Issues = "https://github.com/apriori3d/ico/issues"
 [tool.poetry]
 name = "apriori.ico"
 version = "0.1.0"
-description = "Apriori ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows."
+description = "ICO (Input → Context → Output) declarative, strictly typed DSL and runtime for composable computation flows."
 readme = "README.md"
 packages = [
     { include = "apriori", from = "src" },
+    { include = "ico", from = "src"},
 ]
 
 [tool.poetry.dependencies]
