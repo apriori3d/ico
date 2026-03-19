@@ -5,19 +5,20 @@ from collections.abc import Iterator
 
 from rich.console import Console
 
-from apriori.ico.core.operator import IcoOperator, operator
-from apriori.ico.core.process import IcoProcess
-from apriori.ico.core.runtime.printer import IcoPrinter
-from apriori.ico.core.runtime.progress import (
+from ico import (
+    IcoOperator,
+    IcoPrinter,
+    IcoProcess,
     IcoProgress,
+    IcoRuntime,
+    MPAgent,
+    RichPrinterTool,
+    RichProgressTool,
+    operator,
+    sink,
+    source,
+    wrap_runtime,
 )
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.runtime.runtime_wrapper import wrap_runtime
-from apriori.ico.core.sink import sink
-from apriori.ico.core.source import source
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
-from apriori.ico.tools.printer.rich_printer_tool import RichPrinterTool
-from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
 
 
 class WorkerFlowFactory:
@@ -66,12 +67,12 @@ class WorkerFlowFactory:
 
 if __name__ == "__main__":
     """
-    🎓 MPAgent Lifecycle Demonstration
+    MPAgent Lifecycle Demonstration
 
     This example walks through the complete MPAgent lifecycle, showing how worker
     processes are created, managed, and terminated by the ICO runtime system.
 
-    📋 Demonstration Steps:
+    Demonstration Steps:
 
     1. **Worker Flow Structure**:
        - Display the computation that will run in each worker process
@@ -88,10 +89,10 @@ if __name__ == "__main__":
        - **Running** state: Execute flow with live progress bars showing distributed work
        - **Idle** state: At deactivation, worker processes are cleaned up and shutdown
 
-    🏗️ Flow Architecture:
+    Flow Architecture:
         numbers (source) → overall_progress → [worker1 | worker2].stream() → sink
 
-    📊 Progress Tracking:
+    Progress Tracking:
         - "Overall Progress": main flow progress (10 items)
         - "Worker 1": internal iterations in first process
         - "Worker 2": internal iterations in second process

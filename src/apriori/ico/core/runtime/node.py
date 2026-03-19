@@ -174,13 +174,18 @@ class IcoRuntimeNode(ABC):
             allocation, computation setup, or cleanup logic while maintaining
             the standard state management pattern.
         """
-        self.state_model.update(command)
 
         if isinstance(command, IcoStateRequestCommand):
             # Respond with current state
             self.bubble_event(
                 IcoStateEvent.create(state=self.state),
             )
+            return
+
+        # If the command triggers a state transition, update state and handle lifecycle events
+        if not self.state_model.update(command):
+            return
+
         elif isinstance(command, IcoActivateCommand):
             self.on_activate()
         elif isinstance(command, IcoRunCommand):

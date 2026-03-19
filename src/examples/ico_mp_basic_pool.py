@@ -9,41 +9,36 @@ from apriori.ico.core.async_stream import IcoAsyncStream
 from apriori.ico.core.runtime.progress import (
     IcoProgress,
 )
-from apriori.ico.core.runtime.runtime import IcoRuntime
-from apriori.ico.core.sink import sink
-from apriori.ico.core.source import source
-from apriori.ico.runtime.agent.mp.mp_agent import MPAgent
-from apriori.ico.tools.printer.rich_printer_tool import RichPrinterTool
-from apriori.ico.tools.progress.rich_progress_tool import RichProgressTool
 from examples.ico_mp_basic import WorkerFlowFactory
+from ico import IcoRuntime, MPAgent, RichPrinterTool, RichProgressTool, sink, source
 
 if __name__ == "__main__":
     """
-    🎓 MPAgent Pool with IcoAsyncStream Demonstration
+    MPAgent Pool with IcoAsyncStream Demonstration
 
     This example shows how to use IcoAsyncStream for parallel processing with multiple
     MPAgent workers, enabling concurrent execution instead of sequential processing.
 
-    📋 Key Features:
+    Key Features:
 
     1. **IcoAsyncStream**: Runs multiple MPAgent workers in parallel (not sequential)
     2. **Worker Differentiation**: Different workers have different iteration counts
     3. **Concurrent Processing**: Each input item is processed by ALL workers simultaneously
     4. **Independent Progress**: Each worker shows its own progress tracking
 
-    🔄 Async vs Sequential Processing:
+    Async vs Sequential Processing:
     - **Sequential .stream()**: item1→worker1→worker2, then item2→worker1→worker2
     - **IcoAsyncStream**: item1→(worker1 || worker2), item2→(worker1 || worker2)
 
-    🏗️ Flow Architecture:
+    Flow Architecture:
         numbers (source) → overall_progress → IcoAsyncStream([worker1, worker2]) → sink
 
-    📊 Progress Tracking:
+    Progress Tracking:
         - "Overall Progress": main flow progress (10 items)
         - "Worker 1": 5 iterations per item (faster completion)
         - "Worker 2": 10 iterations per item (slower completion)
 
-    🎯 Real-world Use Case:
+    Real-world Use Case:
     Processing same data through different models or algorithms concurrently,
     like ensemble ML inference or A/B testing scenarios.
     """
