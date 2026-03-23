@@ -26,12 +26,12 @@ def test_infer_form_operator_fn() -> None:
         return len(x)
 
     op = IcoOperator(fn)
-    assert op.signature.name == "str → int"
+    assert op.signature.format() == "str → int"
 
 
 def test_infer_form_operator_no_hints() -> None:
     op = IcoOperator(lambda x: x)  # type: ignore
-    assert op.signature.name == "Any → Any"  # type: ignore
+    assert op.signature.format() == "Any → Any"  # type: ignore
 
 
 def test_infer_form_operator_with_class_callable() -> None:
@@ -41,7 +41,7 @@ def test_infer_form_operator_with_class_callable() -> None:
 
     adder = Adder()
     op = IcoOperator(adder)
-    assert op.signature.name == "int → int"
+    assert op.signature.format() == "int → int"
 
 
 # ─── Composition ───
@@ -56,16 +56,21 @@ def test_infer_form_compose() -> None:
     assert form.name == "int → str"
 
 
-# ─── Map / Stream ───
+# ─── Stream ───
 
 
-def test_infer_form_map_and_stream() -> None:
+def test_infer_form_stream() -> None:
     base = IcoOperator[int, float](lambda x: float(x))
     iterate = base.stream()
     streamed = IcoStream(base)
 
-    assert iterate.signature.name == "Iterator[int] → Iterator[float]"
-    assert streamed.signature.name == "Iterator[int] → Iterator[float]"
+    assert iterate.signature.format() == "Iterator[int] → Iterator[float]"
+    assert streamed.signature.format() == "Iterator[int] → Iterator[float]"
+
+    # Test inference with hints
+    stream = IcoStream[int, float](lambda x: float(x))
+
+    assert stream.signature.format() == "Iterator[int] → Iterator[float]"
 
 
 # ─── Process ───
@@ -73,7 +78,7 @@ def test_infer_form_map_and_stream() -> None:
 
 def test_infer_form_process_from_generic() -> None:
     proc = IcoProcess[float](lambda c: c + 1, num_iterations=3)
-    assert proc.signature.name == "float → float"
+    assert proc.signature.format() == "float → float"
 
 
 def test_infer_form_process_from_body() -> None:
@@ -83,7 +88,7 @@ def test_infer_form_process_from_body() -> None:
     body_op = IcoOperator(increment_fn)
 
     proc = IcoProcess(body_op, num_iterations=3)
-    assert proc.signature.name == "float → float"
+    assert proc.signature.format() == "float → float"
 
 
 def test_infer_form_process_from_fn() -> None:
@@ -91,7 +96,7 @@ def test_infer_form_process_from_fn() -> None:
         return c + 1
 
     proc = IcoProcess(increment_fn, num_iterations=3)
-    assert proc.signature.name == "float → float"
+    assert proc.signature.format() == "float → float"
 
 
 def test_infer_from_process_fib() -> None:
@@ -99,7 +104,7 @@ def test_infer_from_process_fib() -> None:
         return (state[1], state[0] + state[1])
 
     fib_process = IcoProcess(fib_step, num_iterations=8)
-    assert fib_process.signature.name == "tuple[int, int] → tuple[int, int]"
+    assert fib_process.signature.format() == "tuple[int, int] → tuple[int, int]"
 
 
 # ─── Pipeline ───
@@ -110,7 +115,7 @@ def test_infer_form_pipeline_generics() -> None:
         IcoOperator[int, int](lambda x: x * 2),
         IcoOperator[int, int](lambda x: x + 1),
     )
-    assert p.signature.name == "int → int"
+    assert p.signature.format() == "int → int"
 
 
 def test_infer_form_pipeline_without_hints() -> None:
@@ -118,7 +123,7 @@ def test_infer_form_pipeline_without_hints() -> None:
         lambda x: x * 2,
         lambda x: x + 1,
     )
-    assert p.signature.name == "int → int"
+    assert p.signature.format() == "int → int"
 
 
 def test_infer_form_pipeline_with_fn() -> None:
@@ -126,7 +131,7 @@ def test_infer_form_pipeline_with_fn() -> None:
         return x * 2
 
     p = IcoPipeline(body_fn)
-    assert p.signature.name == "int → int"
+    assert p.signature.format() == "int → int"
 
 
 # ─── Source ───
@@ -134,7 +139,7 @@ def test_infer_form_pipeline_with_fn() -> None:
 
 def test_infer_form_source_with_generics() -> None:
     src = IcoSource[float](lambda: iter([1.0, 2.0, 3.0]))
-    assert src.signature.name == "() → Iterator[float]"
+    assert src.signature.format() == "() → Iterator[float]"
 
 
 def test_infer_form_source_with_fn() -> None:
@@ -142,7 +147,7 @@ def test_infer_form_source_with_fn() -> None:
         yield from [1.0, 2.0, 3.0]
 
     src = IcoSource(source_fn)
-    assert src.signature.name == "() → Iterator[float]"
+    assert src.signature.format() == "() → Iterator[float]"
 
 
 # ─── Sink ───
@@ -154,12 +159,12 @@ def sink_fn(x: float) -> None:
 
 def test_infer_form_sink_with_generics() -> None:
     sink = IcoSink[float](sink_fn)
-    assert sink.signature.name == "Iterator[float] → ()"
+    assert sink.signature.format() == "Iterator[float] → ()"
 
 
 def test_infer_form_sink_with_fn() -> None:
     sink = IcoSink(sink_fn)
-    assert sink.signature.name == "Iterator[float] → ()"
+    assert sink.signature.format() == "Iterator[float] → ()"
 
 
 # ─── Batcher ───
@@ -167,7 +172,7 @@ def test_infer_form_sink_with_fn() -> None:
 
 def test_infer_form_batcher() -> None:
     batcher = IcoBatcher[int](batch_size=2)
-    assert batcher.signature.name == "Iterator[int] → Iterator[Iterator[int]]"
+    assert batcher.signature.format() == "Iterator[int] → Iterator[Iterator[int]]"
 
 
 # ─── Context operator ───
@@ -175,7 +180,7 @@ def test_infer_form_batcher() -> None:
 
 def test_infer_form_context_operator_from_generics() -> None:
     ctx_op = IcoContextOperator[int, str, str](lambda i, c: c + str(i))
-    assert ctx_op.signature.name == "int, str → str"
+    assert ctx_op.signature.format() == "int, str → str"
 
 
 def test_infer_form_context_operator_from_hints() -> None:
@@ -183,7 +188,7 @@ def test_infer_form_context_operator_from_hints() -> None:
         return c + str(i)
 
     ctx_op = IcoContextOperator(ctx_fn)
-    assert ctx_op.signature.name == "int, str → str"
+    assert ctx_op.signature.format() == "int, str → str"
 
 
 # ─── Context Pipeline ───
@@ -194,7 +199,7 @@ def test_infer_form_context_pipeline_from_generics() -> None:
         IcoContextOperator[int, str, str](lambda i, c: c + str(i)),
         IcoOperator[str, str](lambda c: c.upper()),
     )
-    assert ctx_pipe.signature.name == "int, str → str"
+    assert ctx_pipe.signature.format() == "int, str → str"
 
 
 def test_infer_form_context_pipeline_from_type_hints() -> None:
@@ -208,7 +213,7 @@ def test_infer_form_context_pipeline_from_type_hints() -> None:
         apply_fn,
         step_fn,
     )
-    assert ctx_pipe.signature.name == "int, str → str"
+    assert ctx_pipe.signature.format() == "int, str → str"
 
 
 # ─── Epoch ───
@@ -219,7 +224,7 @@ def test_infer_form_epoch_from_generics() -> None:
     context_op = IcoContextOperator[int, str, str](lambda i, c: c + str(i))
 
     epoch = IcoEpoch(source, context_op)
-    assert epoch.signature.name == "Iterator[int], str → str"
+    assert epoch.signature.format() == "Iterator[int], str → str"
 
 
 def test_infer_form_epoch_from_type_hints() -> None:
@@ -233,7 +238,7 @@ def test_infer_form_epoch_from_type_hints() -> None:
     context_op = IcoContextOperator(context_fn)
 
     epoch = IcoEpoch(source, context_op)
-    assert epoch.signature.name == "Iterator[int], str → str"
+    assert epoch.signature.format() == "Iterator[int], str → str"
 
 
 def test_infer_form_epoch_from_type_hints_fn_only() -> None:
@@ -244,7 +249,7 @@ def test_infer_form_epoch_from_type_hints_fn_only() -> None:
         return c + str(i)
 
     epoch = IcoEpoch(source_fn, context_fn)
-    assert epoch.signature.name == "Iterator[int], str → str"
+    assert epoch.signature.format() == "Iterator[int], str → str"
 
 
 def test_infer_form_epoch_from_type_hints_with_source() -> None:
@@ -256,7 +261,7 @@ def test_infer_form_epoch_from_type_hints_with_source() -> None:
 
     source = IcoSource(source_fn)
     epoch = IcoEpoch(source, context_fn)
-    assert epoch.signature.name == "Iterator[int], str → str"
+    assert epoch.signature.format() == "Iterator[int], str → str"
 
 
 # ─── MPAgent ───
@@ -273,7 +278,7 @@ def test_infer_form_mp_agent_from_generics() -> None:
 
     # MPAgent should have signature: str → int (input → output)
     # Context (c) should be None for agents
-    assert signature.name == "str → int"
+    assert signature.format() == "str → int"
 
 
 def test_infer_form_mp_agent_with_type_hints() -> None:
@@ -287,7 +292,7 @@ def test_infer_form_mp_agent_with_type_hints() -> None:
 
     agent = MPAgent(flow_factory=create_worker_flow)
     signature = agent.signature
-    assert signature.name == "int → float"
+    assert signature.format() == "int → float"
 
 
 def test_infer_form_mp_agent_complex_computation() -> None:
@@ -303,7 +308,7 @@ def test_infer_form_mp_agent_complex_computation() -> None:
     signature = agent.signature
 
     # Test complex type handling
-    assert signature.name == "str → list[str]"  # Should be "str → list[str]?"
+    assert signature.format() == "str → list[str]"  # Should be "str → list[str]?"
 
 
 if __name__ == "__main__":

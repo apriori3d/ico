@@ -118,14 +118,17 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
     def signature(self) -> IcoSignature:
         """Infer ICO signature of this operator."""
         from ico.core.signature_utils import (
-            get_generic_args,
             infer_from_callable,
+            resolve_types_from_generic,
         )
 
         # 1. Infer from generic type parameters if available
-        args = get_generic_args(self)
-        if args is not None and len(args) == 3:
-            return IcoSignature(i=args[0], c=args[1], o=args[2])
+        i_type, c_type, o_type = resolve_types_from_generic(
+            self, IcoContextOperator, I, C, O
+        )
+
+        if i_type is not None and c_type is not None and o_type is not None:
+            return IcoSignature(i=i_type, c=c_type, o=o_type, infered=True)
 
         # 2. Infer from callable signature
         signature = infer_from_callable(self.fn)

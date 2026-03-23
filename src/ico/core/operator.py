@@ -123,6 +123,17 @@ class IcoOperator(Generic[I, O], IcoNode):
         """
         return self.chain(other)
 
+    def __ior__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
+        """In-place pipe composition operator: a |= b == a.chain(b).
+
+        Args:
+            other: The operator to chain with this one.
+
+        Returns:
+            A new operator that applies this operator followed by the other.
+        """
+        return self.chain(other)
+
     def stream(self) -> IcoOperator[Iterator[I], Iterator[O]]:
         """Apply this operator element-wise over an iterable (lazy generator).
 
@@ -152,17 +163,15 @@ class IcoOperator(Generic[I, O], IcoNode):
             IcoSignature containing input, context, and output type information.
         """
         from ico.core.signature_utils import (
-            get_generic_args,
             infer_from_callable,
+            resolve_types_from_generic,
         )
 
         # 1. Infer from generic type parameters if available
-        args = get_generic_args(self)
-        if args is not None:
-            if len(args) == 1:
-                return IcoSignature(i=args[0], c=None, o=args[0])
-            if len(args) == 2:
-                return IcoSignature(i=args[0], c=None, o=args[1])
+        i_type, o_type = resolve_types_from_generic(self, IcoOperator, I, O)
+
+        if i_type is not None and o_type is not None:
+            return IcoSignature(i=i_type, c=None, o=o_type, infered=True)
 
         # 2. Infer from callable signature
         signature = infer_from_callable(self.fn)
@@ -170,7 +179,11 @@ class IcoOperator(Generic[I, O], IcoNode):
             return signature
 
         # 3. Fallback to Any types
-        return IcoSignature(i=type(Any), c=None, o=type(Any), infered=False)
+        signature = signature or IcoSignature(
+            i=type(Any), c=None, o=type(Any), infered=False
+        )
+
+        return signature
 
 
 # ─────────────────────────────────────────────

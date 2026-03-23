@@ -111,14 +111,7 @@ class IcoSource(
 
         signature = super().signature
         if signature.infered:
-            # Help mypy to understand this is a type, not just a variable
-            o_type: Any = signature.o
-
-            return IcoSignature(
-                i=type(None),
-                c=None,
-                o=Iterator[o_type],
-            )
+            return signature
 
         # Infer from provider callable
         provider_signature = infer_from_callable(self.provider)

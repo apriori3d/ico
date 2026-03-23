@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from typing import Any, Generic, final
+from typing import Generic, final
 
 from ico.core.operator import (
     I,
@@ -122,15 +122,16 @@ class IcoStream(
         signature = super().signature
 
         # If signature is undefined, infer from body operator
-        if not signature.infered:
-            signature = self.body.signature
+        if signature.infered:
+            return signature
 
-        # Help mypy to understand this is a type, not just a variable
-        i_type: Any = signature.i
-        o_type: Any = signature.o
+        # Infer from body operator's signature and wrap in Iterator
+        signature = self.body.signature
+        if signature.infered:
+            i_type = signature.i
+            o_type = signature.o
+            return IcoSignature(
+                i=Iterator[i_type], c=None, o=Iterator[o_type], infered=True
+            )
 
-        return IcoSignature(
-            i=Iterator[i_type],
-            c=None,
-            o=Iterator[o_type],
-        )
+        return signature

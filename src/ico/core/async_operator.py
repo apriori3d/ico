@@ -114,17 +114,15 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
             the awaiting is handled by the async call mechanism.
         """
         from ico.core.signature_utils import (
-            get_generic_args,
             infer_from_callable,
+            resolve_types_from_generic,
         )
 
         # 1. Infer from generic type parameters if available
-        args = get_generic_args(self)
-        if args is not None:
-            if len(args) == 1:
-                return IcoSignature(i=args[0], c=None, o=args[0])
-            if len(args) == 2:
-                return IcoSignature(i=args[0], c=None, o=args[1])
+        i_type, o_type = resolve_types_from_generic(self, IcoAsyncOperator, I, O)
+
+        if i_type is not None and o_type is not None:
+            return IcoSignature(i=i_type, c=None, o=o_type, infered=True)
 
         # 2. Infer from callable signature
         signature = infer_from_callable(self.fn)

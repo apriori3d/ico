@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Generic, final
+from typing import Generic
 
 from ico.core.operator import (
     I,
@@ -11,7 +11,6 @@ from ico.core.operator import (
 from ico.core.signature import IcoSignature
 
 
-@final
 class IcoPipeline(
     Generic[I],
     IcoOperator[I, I],

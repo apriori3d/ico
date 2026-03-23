@@ -1,8 +1,7 @@
 from collections.abc import Iterator
-from typing import Any, Generic
+from typing import Generic
 
 from ico.core.operator import I, IcoOperator
-from ico.core.signature import IcoSignature
 
 
 class IcoBatcher(
@@ -109,29 +108,3 @@ class IcoBatcher(
 
         if len(batch) > 0 and not self.drop_last:
             yield iter(batch)
-
-    @property
-    def signature(self) -> IcoSignature:
-        """Infer the ICO type signature for this batcher.
-
-        Creates a signature that transforms Iterator[I] into Iterator[Iterator[I]]
-        while preserving the inner type I from the parent operator signature.
-
-        Returns:
-            IcoSignature with nested iterator types representing the batching
-            transformation: Iterator[I] → Iterator[Iterator[I]].
-
-        Note:
-            The signature maintains type safety by ensuring the inner type I
-            is consistent throughout the batching transformation.
-        """
-        signature = super().signature
-
-        # Help mypy to understand this is a type, not just a variable
-        i_type: Any = signature.i
-
-        return IcoSignature(
-            i=Iterator[i_type],
-            c=None,
-            o=Iterator[Iterator[i_type]],
-        )

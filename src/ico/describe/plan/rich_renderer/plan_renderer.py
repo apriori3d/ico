@@ -22,7 +22,7 @@ from ico.describe.plan.rich_renderer.render_target import (
     create_plan_walker,
 )
 from ico.describe.plan.rich_renderer.renderer_registry import (
-    RendererRegistry,
+    select_renderer,
 )
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 from ico.describe.rich_style import DescribeStyle
@@ -95,7 +95,7 @@ class PlanRenderer:
         if renderer is not None:
             return renderer
 
-        renderer_class = RendererRegistry.get(type(node))
+        renderer_class = select_renderer(type(node))
 
         if renderer_class is not None:
             renderer = renderer_class(self.options)

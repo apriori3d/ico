@@ -4,6 +4,10 @@ from rich.console import Console
 
 from ico.core.node import IcoNode
 from ico.core.runtime.node import IcoRuntimeNode
+from ico.describe import (
+    PlanRendererDefaultOptions,
+    RuntimeRendererDefaultOptions,
+)
 from ico.describe.options import RendererOptions
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.runtime.options import RuntimeRendererOptions
@@ -51,12 +55,11 @@ def describe(
     Note: Currently supports only RichText backend
     """
     if isinstance(node, IcoNode):
-        options = options or PlanRendererOptions()
-
-        if not isinstance(options, PlanRendererOptions):
+        if options and not isinstance(options, PlanRendererOptions):
             raise ValueError(
                 "Describe of IcoNode requires options to be an instance of PlanRendererOptions class."
             )
+        options = options or PlanRendererDefaultOptions
 
         if options.backend == "RichText":
             from ico.describe.plan.rich_renderer.plan_renderer import (
@@ -69,12 +72,12 @@ def describe(
             raise ValueError("Backend is not yet supported in API.")
 
     else:
-        options = options or RuntimeRendererOptions()
-
-        if not isinstance(options, RuntimeRendererOptions):
+        if options and not isinstance(options, RuntimeRendererOptions):
             raise ValueError(
                 "Describe of IcoRuntimeNode requires options to be an instance of RuntimeRendererOptions class."
             )
+
+        options = options or RuntimeRendererDefaultOptions
 
         if options.backend == "RichText":
             from ico.describe.runtime.rich_renderer.tree_renderer import (

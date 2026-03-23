@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable, Iterator
+from collections import OrderedDict
+from collections.abc import Callable
 from types import FunctionType, GenericAlias
 from typing import (
     Any,
+    Generic,
     TypeVar,
     cast,
     get_args,
@@ -19,84 +21,115 @@ from ico.core.context_operator import IcoContextOperator
 from ico.core.operator import IcoOperator
 from ico.core.signature import IcoSignature, SignatureParamType
 
+# ──────── Generic Type Resolution  ────────
 
-def infer_from_generic(obj: object) -> IcoSignature | None:
-    """Infer ICO signature from generic type parameters on an object.
 
-    Analyzes the generic type arguments (e.g., MyClass[int, str]) to extract
-    input, context, and output types for ICO signature construction.
+def resolve_types_from_generic(
+    obj: object, base_class: type, *vars: TypeVar
+) -> list[SignatureParamType | None]:
+    # Collect generic bases in MRO that are subclasses of base_class
+    resolve_list: list[GenericAlias] = [
+        orig
+        for c in obj.__class__.__mro__
+        for orig in getattr(c, "__orig_bases__", ())
+        if issubclass(get_origin(orig) or object, base_class | Generic)
+    ]
 
+    # If the instance itself is a generic with concrete types, add it to the list to resolve.
+    if instance_class := getattr(obj, "__orig_class__", None):
+        resolve_list.insert(0, instance_class)
+
+    if len(resolve_list) < 2:
+        return [None] * len(vars)  # No generic bases found, can't resolve.
+
+    resolving_vars = OrderedDict[TypeVar, TypeVar | SignatureParamType](
+        (var, var) for var in vars
+    )
+
+    resolve_list = list(reversed(resolve_list))
+    resolve_generic_list = resolve_list[::2]
+    resolve_class_list = resolve_list[1::2]
+
+    # Resolve given vars in generic arguments using reverse MRO as we go.
+    for generic, cls in zip(resolve_generic_list, resolve_class_list, strict=False):
+        generic_args: list[Any] = get_args(generic)  # pyright: ignore[reportAssignmentType]
+        cls_args: list[Any] = get_args(cls)  # pyright: ignore[reportAssignmentType]
+        assert len(generic_args) == len(
+            cls_args
+        ), "Mismatch in number of generic arguments."
+
+        for var, var_cls in resolving_vars.items():
+            for generic_arg, cls_arg in zip(generic_args, cls_args, strict=False):
+                var_cls = replace_typevar(var_cls, generic_arg, cls_arg)
+            resolving_vars[var] = var_cls
+
+    return [
+        t if type(t) is not TypeVar and not type_contain_any_typevar(t, *vars) else None
+        for t in resolving_vars.values()
+    ]
+
+
+# ──────── Generic Type Resolution and Replacement Utilities ────────
+
+
+def type_contain_any_typevar(
+    target_type: TypeVar | SignatureParamType | None, *vars: TypeVar
+) -> bool:
+    """Check if a type annotation contains any of the specified TypeVars.
     Args:
-        obj: Object that may have generic type parameters (__orig_class__).
+        target_type: The type annotation to check, which may be a TypeVar or a typing generic or concrete type.
+        *vars: The TypeVars to look for within the target_type.
 
     Returns:
-        IcoSignature if generic args can be parsed, None otherwise.
+        True if any of the specified TypeVars are found within the target_type, False otherwise.
+    """
+    if target_type is None:
+        return False
 
+    if type(target_type) is TypeVar:
+        return target_type in vars
+
+    # GenericAlias can contain nested TypeVars, so we check recursively
+    return any(
+        type_contain_any_typevar(arg, *vars)
+        for arg in get_args(target_type)  # pyright: ignore[reportArgumentType]
+    )
+
+
+def replace_typevar(
+    value: TypeVar | SignatureParamType,
+    var: TypeVar,
+    replacement: SignatureParamType,
+) -> TypeVar | SignatureParamType:
+    """Recursively replace a TypeVar in a type annotation with a concrete or generic type.
+
+    Args:
+        value: The type annotation to process, which may contain the TypeVar.
+        var: The TypeVar to replace.
+        replacement: The concrete or generic type to substitute for the TypeVar.
+
+    Returns:
+        A new type annotation with the TypeVar replaced by the concrete type if found,
+        otherwise returns the original type annotation.
     Example:
-        >>> class MyOp(IcoOperator[int, str]): pass
-        >>> op = MyOp(lambda x: str(x))
-        >>> sig = infer_from_generic(op)
-        >>> # Returns IcoSignature(i=int, c=None, o=str)
-    """
-    args = get_generic_args(obj)
-    if args is None:
-        return None
+        >>> replace_typevar(I, list[I], int)  # Returns list[int]
+        >>> replace_typevar(I, list[O], int)  # Returns list[I]"""
+    if value == var:
+        return replacement
 
-    match len(args):
-        case 2:
-            return IcoSignature(args[0], None, args[1])
-        case 3:
-            return IcoSignature(args[0], args[1], args[2])
-        case _:
-            pass
-    return None
+    origin = get_origin(value)
+    if origin is None:
+        return value
 
-
-def get_generic_args(obj: object) -> tuple[type, ...] | None:
-    """Extract generic type arguments from an object's __orig_class__.
-
-    Retrieves the concrete types used when instantiating a generic class,
-    filtering out unresolved TypeVars that can't be used for inference.
-
-    Args:
-        obj: Object that may have been instantiated from a generic class.
-
-    Returns:
-        Tuple of concrete type arguments, or None if no usable args found.
-
-    Note:
-        Returns None if any arguments are TypeVars, indicating incomplete
-        type information that can't be used for signature inference.
-    """
-    args = get_args(getattr(obj, "__orig_class__", None))
+    args = get_args(value)
     if not args:
-        return None
+        return value
 
-    if any((type(a) is TypeVar) for a in args):
-        return None
-
-    return args
+    replaced_args = tuple(replace_typevar(arg, var, replacement) for arg in args)
+    return origin[replaced_args]  # type: ignore
 
 
-def wrap_iterator_or_none(tp: type | None) -> type | None:
-    """Wrap a type in Iterator, preserving None values.
-
-    Utility function for transforming types to their iterator equivalents
-    while handling None/NoneType specially.
-
-    Args:
-        tp: Type to potentially wrap in Iterator.
-
-    Returns:
-        Iterator[tp] if tp is not None/NoneType, otherwise tp unchanged.
-
-    Example:
-        >>> wrap_iterator_or_none(int)  # Returns Iterator[int]
-        >>> wrap_iterator_or_none(None)  # Returns None
-    """
-    if tp is None or tp is type(None):
-        return tp
-    return Iterator[tp]  # type: ignore
+# ──────── Flow Factory Signature Inference ────────
 
 
 def infer_from_flow_factory(fn: object) -> IcoSignature | None:
@@ -128,6 +161,9 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     i, o = get_args(return_hint)
 
     return IcoSignature(i, None, o)
+
+
+# ──────── Callable Signature Inference ────────
 
 
 def infer_from_callable(obj: object) -> IcoSignature | None:
