@@ -25,44 +25,75 @@ from ico.core.signature import IcoSignature, SignatureParamType
 
 
 def resolve_types_from_generic(
-    obj: object, base_class: type, *vars: TypeVar
+    obj: object,
+    base_class: type,
+    *vars: TypeVar,
 ) -> list[SignatureParamType | None]:
-    # Collect generic bases in MRO that are subclasses of base_class
-    resolve_list: list[GenericAlias] = [
+    """Resolve concrete types for specified TypeVars from an object's generic bases.
+    This function traverses the MRO of the object's class to find generic base classes
+    that are subclasses of the specified base_class, and attempts to resolve the provided TypeVars
+    to concrete types based on the generic arguments of those bases.
+    Args:
+        obj: The object whose class hierarchy to inspect for generic type resolution.
+        base_class: The base class to look for in the MRO (e.g., IcoOperator).
+        *vars: The TypeVars to resolve (e.g., I, O).
+    """
+
+    # Collect generic bases in MRO that are subclasses of base_class.
+    # Result would be in form :
+    #  - ..., Generic[I, O], Operator[I, O], ... for the case of generic type parameters in class definition,
+    #  - ..., Generic[I, O], Operator[int, float], ... for the case of concrete type in class definitions.
+    # This allows to build a mapping of TypeVars:
+    #  - (I, C, O) -> (int, str, etc.) to concrete types
+    #  - (I, O) -> (I, I) to other TypeVars
+    # and resolve them as we go through the MRO.
+
+    resolve_hint_order = [
         orig
         for c in obj.__class__.__mro__
-        for orig in getattr(c, "__orig_bases__", ())
+        for orig in place_generic_first(getattr(c, "__orig_bases__", ()))
         if issubclass(get_origin(orig) or object, base_class | Generic)
     ]
 
-    # If the instance itself is a generic with concrete types, add it to the list to resolve.
-    if instance_class := getattr(obj, "__orig_class__", None):
-        resolve_list.insert(0, instance_class)
+    # If the instance itself has a generic type hint - add it to the list to resolve.
+    # Expected
+    #  - all generic args are concrete types: for the case of generic type parameters in class definition.
+    #  - None for the case of staticly typed classes,
+    # otherwise we won't be able to resolve them.
 
-    if len(resolve_list) < 2:
+    if instance_class := getattr(obj, "__orig_class__", None):
+        resolve_hint_order.insert(0, instance_class)
+
+    if len(resolve_hint_order) < 2:
         return [None] * len(vars)  # No generic bases found, can't resolve.
 
     resolving_vars = OrderedDict[TypeVar, TypeVar | SignatureParamType](
         (var, var) for var in vars
     )
 
-    resolve_list = list(reversed(resolve_list))
-    resolve_generic_list = resolve_list[::2]
-    resolve_class_list = resolve_list[1::2]
+    resolve_hint_order = list(reversed(resolve_hint_order))
+    resolve_generic_hints = resolve_hint_order[::2]
+    resolve_class_hints = resolve_hint_order[1::2]
 
     # Resolve given vars in generic arguments using reverse MRO as we go.
-    for generic, cls in zip(resolve_generic_list, resolve_class_list, strict=False):
-        generic_args: list[Any] = get_args(generic)  # pyright: ignore[reportAssignmentType]
-        cls_args: list[Any] = get_args(cls)  # pyright: ignore[reportAssignmentType]
+    for generic_hint, cls_hint in zip(
+        resolve_generic_hints, resolve_class_hints, strict=False
+    ):
+        # Make pairs of generic and class hints
+        generic_args: list[Any] = get_args(generic_hint)  # pyright: ignore[reportAssignmentType]
+        cls_args: list[Any] = get_args(cls_hint)  # pyright: ignore[reportAssignmentType]
+
         assert len(generic_args) == len(
             cls_args
         ), "Mismatch in number of generic arguments."
 
+        # Resoulute TypeVars in generic args using substitution from previous iterations.
         for var, var_cls in resolving_vars.items():
             for generic_arg, cls_arg in zip(generic_args, cls_args, strict=False):
                 var_cls = replace_typevar(var_cls, generic_arg, cls_arg)
             resolving_vars[var] = var_cls
 
+    # Return resolved types for the requested vars, or None if they couldn't be resolved to concrete types.
     return [
         t if type(t) is not TypeVar and not type_contain_any_typevar(t, *vars) else None
         for t in resolving_vars.values()
@@ -70,6 +101,28 @@ def resolve_types_from_generic(
 
 
 # ──────── Generic Type Resolution and Replacement Utilities ────────
+
+
+def place_generic_first(
+    args: tuple[SignatureParamType, ...],
+) -> tuple[SignatureParamType, ...]:
+    """Utility to reorder generic arguments, placing the first Generic found at the front.
+    This is used to ensure that when resolving generic type parameters, we get expected order:
+    ..., Generic[I, O], Operator[I,O] instead of ..., Operator[I,O], Generic[I, O]."""
+
+    generic_arg = next(
+        (arg for arg in args if get_origin(arg) is Generic),
+        None,
+    )
+    if generic_arg is None:
+        return args
+
+    generic_index = args.index(generic_arg)
+
+    if generic_index == 0:
+        return args
+
+    return (generic_arg,) + args[:generic_index] + args[generic_index + 1 :]
 
 
 def type_contain_any_typevar(
