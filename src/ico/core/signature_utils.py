@@ -79,6 +79,11 @@ def resolve_types_from_generic(
     for generic_hint, cls_hint in zip(
         resolve_generic_hints, resolve_class_hints, strict=False
     ):
+        if get_origin(generic_hint) is not Generic or not issubclass(
+            get_origin(cls_hint) or object, base_class
+        ):
+            break  # We expect pairs of Generic and base_class, if not - we can't resolve further.
+
         # Make pairs of generic and class hints
         generic_args: list[Any] = get_args(generic_hint)  # pyright: ignore[reportAssignmentType]
         cls_args: list[Any] = get_args(cls_hint)  # pyright: ignore[reportAssignmentType]
