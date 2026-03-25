@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import abc
 import warnings
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast, overload
+from typing import Generic, Literal, cast
 
 import pandas as pd  # type: ignore[import-untyped]
 import scipy.sparse as sp  # type: ignore[import-untyped]
 import sklearn  # type: ignore[import-untyped]
-from rich.text import Text
 from sklearn.decomposition import TruncatedSVD  # type: ignore[import-untyped]
 from sklearn.feature_extraction.text import (  # type: ignore[import-untyped]
     HashingVectorizer,
@@ -17,141 +14,25 @@ from sklearn.feature_extraction.text import (  # type: ignore[import-untyped]
     TfidfVectorizer,
 )
 from skrub._scaling_factor import (  # type: ignore[import-untyped]
-    scaling_factor,
+    scaling_factor,  # pyright: ignore[reportUnknownVariableType]
 )
 from skrub._to_str import ToStr  # type: ignore[import-untyped]
 
-from ico.core.node import IcoNode
+from examples.ml.skrub.base import (
+    SKBaseEstimator,
+    SKData,
+    SKResultTypes,
+    XDataFrame,
+    XSeries,
+    XyDataFrame,
+    XySeries,
+    wrap_result_data,
+)
+from examples.ml.skrub.renderer import (
+    setup_renderer_show_args,
+    setup_renderer_show_estimator,
+)
 from ico.core.operator import I, IcoOperator, O
-from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
-from ico.describe.plan.rich_renderer.row_renderer import (
-    RowRenderer,
-)
-from ico.describe.rich_style import DescribeStyle
-from ico.describe.rich_utils import (
-    render_node_class,
-)
-from ico.describe.utils import match_icon
-
-SKMode = Literal["fit", "predict"]
-
-
-class ModeMixin:
-    mode: SKMode = "fit"
-
-    def fit_mode(self) -> None:
-        self.mode = "fit"
-
-    def predict_mode(self) -> None:
-        self.mode = "predict"
-
-
-@dataclass(slots=True)
-class XDataFrame:
-    X: pd.DataFrame
-
-
-@dataclass(slots=True)
-class XyDataFrame(XDataFrame):
-    y: pd.Series
-
-
-@dataclass(slots=True)
-class XSeries:
-    X: pd.Series
-
-
-@dataclass(slots=True)
-class XySeries(XSeries):
-    y: pd.Series
-
-
-SKDataFrame = XyDataFrame | XDataFrame
-SKSeries = XySeries | XSeries
-SKData = SKDataFrame | SKSeries
-
-SKResultTypes: TypeAlias = pd.Series | pd.DataFrame | sp.spmatrix
-
-
-@overload
-def wrap_result(input: XyDataFrame, x1: pd.DataFrame) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XDataFrame, x1: pd.DataFrame) -> XDataFrame: ...
-
-
-@overload
-def wrap_result(input: XySeries, x1: pd.Series) -> XySeries: ...
-
-
-@overload
-def wrap_result(input: XSeries, x1: pd.Series) -> XSeries: ...
-
-
-@overload
-def wrap_result(input: XySeries, x1: pd.DataFrame) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XSeries, x1: pd.DataFrame) -> XDataFrame: ...
-
-
-@overload
-def wrap_result(input: XyDataFrame, x1: sp.spmatrix) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XDataFrame, x1: sp.spmatrix) -> XDataFrame: ...
-
-
-@overload
-def wrap_result(input: XySeries, x1: sp.spmatrix) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XSeries, x1: sp.spmatrix) -> XDataFrame: ...
-
-
-def wrap_result(input: SKData, x1: SKResultTypes) -> SKData:  # type: ignore[misc]
-    return _wrap_result_impl(input, x1)
-
-
-def _wrap_result_impl(input: SKData, x1: SKResultTypes) -> SKData:
-    match (input, x1):
-        case (XyDataFrame(y=y), sp.spmatrix() as sparse_matrix):
-            return XyDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix), y=y)
-        case (XDataFrame(), sp.spmatrix() as sparse_matrix):
-            return XDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix))
-        case (XySeries(y=y), sp.spmatrix() as sparse_matrix):
-            return XyDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix), y=y)
-        case (XSeries(), sp.spmatrix() as sparse_matrix):
-            return XDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix))
-        case (XyDataFrame(y=y), pd.DataFrame() as data_frame):
-            return XyDataFrame(X=data_frame, y=y)
-        case (XDataFrame(), pd.DataFrame() as data_frame):
-            return XDataFrame(X=data_frame)
-        case (XySeries(y=y), pd.Series() as series):
-            return XySeries(X=series, y=y)
-        case (XSeries(), pd.Series() as series):
-            return XSeries(X=series)
-        case _:
-            raise TypeError(
-                "Unsupported input/result combination: "
-                f"input={type(input).__name__}, result={type(x1).__name__}"
-            )
-
-
-class SKBaseEstimator(Generic[I, O], IcoOperator[I, O], abc.ABC, ModeMixin):
-    def __init__(
-        self,
-        *,
-        name: str | None = None,
-    ) -> None:
-        super().__init__(self._estimator_fn, name=name)
-
-    @abc.abstractmethod
-    def _estimator_fn(self, input: I) -> O: ...
 
 
 class SKBaseTransformer(Generic[I, O], SKBaseEstimator[I, O], abc.ABC):
@@ -175,117 +56,7 @@ class SKBaseTransformer(Generic[I, O], SKBaseEstimator[I, O], abc.ABC):
     def _transform(self, input: I) -> SKResultTypes: ...
 
     def _wrap_result(self, input: I, x1: SKResultTypes) -> O:
-        return cast(O, _wrap_result_impl(cast(SKData, input), x1))
-
-
-@dataclass
-class RendererOperatorOptions:
-    show_estimator_class: bool = False
-    show_args_named: list[str] | None = None
-
-
-AnyBaseEstimator = SKBaseEstimator[Any, Any]
-TEstimator = TypeVar("TEstimator", bound=SKBaseEstimator[Any, Any])
-
-SKRendererPerOperatorOptions = dict[type[AnyBaseEstimator], RendererOperatorOptions]()
-
-
-def setup_renderer(
-    options: RendererOperatorOptions,
-) -> Callable[[type[TEstimator]], type[TEstimator]]:
-    def decorator(
-        operator_cls: type[TEstimator],
-    ) -> type[TEstimator]:
-        SKRendererPerOperatorOptions[operator_cls] = options
-        return operator_cls
-
-    return decorator
-
-
-def setup_renderer_show_estimator() -> Callable[[type[TEstimator]], type[TEstimator]]:
-    def decorator(
-        operator_cls: type[TEstimator],
-    ) -> type[TEstimator]:
-        options = RendererOperatorOptions(show_estimator_class=True)
-        SKRendererPerOperatorOptions[operator_cls] = options
-        return operator_cls
-
-    return decorator
-
-
-@register_renderer(SKBaseEstimator)
-class BaseRender(RowRenderer):
-    def render_flow_column(self, node: IcoNode) -> Text:
-        """Render Flow column: icons, class name, and arguments."""
-
-        if not isinstance(node, SKBaseEstimator):
-            return super().render_flow_column(node)
-
-        any_estimator = cast(AnyBaseEstimator, node)
-
-        # Predefined subclasses of SKBaseTransformer will be rendered using the class name
-        # of their estimator, for better readability
-        text = self.flow_column_prefix or Text("")
-
-        if not self.flow_includes_node_info:
-            return text
-
-        if self.options.show_node_icons:
-            icon = match_icon(self.options.node_icons, any_estimator)
-            if icon:
-                text += Text(icon)
-
-        if isinstance(any_estimator, SKTransformer):
-            options = SKRendererPerOperatorOptions.get(type(any_estimator), None)
-            target_for_class = (
-                any_estimator.transformer
-                if options and options.show_estimator_class
-                else any_estimator
-            )
-        else:
-            target_for_class = any_estimator
-
-        # Render args
-        args_info = self._render_node_args_info(any_estimator)
-
-        # Render class name
-        text += render_node_class(
-            target_for_class, options=self.options, args_info=args_info
-        )
-
-        if self.flow_column_postfix:
-            text += self.flow_column_postfix
-
-        return text
-
-    def _render_node_args_info(self, node: IcoNode) -> Text:
-        if not isinstance(node, SKBaseEstimator):
-            return Text()
-
-        any_estimator = cast(AnyBaseEstimator, node)
-        options = SKRendererPerOperatorOptions.get(type(any_estimator), None)
-        if not options:
-            return Text()
-
-        if options.show_args_named is None or len(options.show_args_named) == 0:
-            return Text()
-
-        args: list[str] = []
-
-        if isinstance(any_estimator, SKTransformer):
-            estimator_target = any_estimator.transformer
-        else:
-            estimator_target = None
-
-        for name in options.show_args_named:
-            arg_value = (
-                getattr(any_estimator, name)
-                if hasattr(any_estimator, name) or not estimator_target
-                else getattr(estimator_target, name, "")
-            )
-            args.append(f"{name}={arg_value}")
-
-        return Text(", ".join(args), style=DescribeStyle.meta.value)
+        return cast(O, wrap_result_data(cast(SKData, input), x1))
 
 
 class SKTransformer(Generic[I, O], SKBaseTransformer[I, O]):
@@ -367,13 +138,13 @@ class XSeriesToDataFrameTransformer(SKTransformer[XSeries, XDataFrame]):
     pass
 
 
-@setup_renderer(RendererOperatorOptions(show_args_named=["convert_category"]))
+@setup_renderer_show_args("convert_category")
 class ColumnToStr(XSeriesTransformer):
     def __init__(self, convert_category: bool = True, name: str | None = None):
         super().__init__(ToStr(convert_category=convert_category), name=name)
 
 
-@setup_renderer(RendererOperatorOptions(show_args_named=["n_components"]))
+@setup_renderer_show_args("n_components")
 class SafeTruncatedSVD(XDataFrameTransformer):
     n_components: int
     random_state: int | None
