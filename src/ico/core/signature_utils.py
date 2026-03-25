@@ -85,8 +85,8 @@ def resolve_types_from_generic(
             break  # We expect pairs of Generic and base_class, if not - we can't resolve further.
 
         # Make pairs of generic and class hints
-        generic_args: list[Any] = get_args(generic_hint)  # pyright: ignore[reportAssignmentType]
-        cls_args: list[Any] = get_args(cls_hint)  # pyright: ignore[reportAssignmentType]
+        generic_args: tuple[Any, ...] = get_args(generic_hint)  # pyright: ignore[reportAssignmentType]
+        cls_args: tuple[Any, ...] = get_args(cls_hint)  # pyright: ignore[reportAssignmentType]
 
         assert len(generic_args) == len(
             cls_args

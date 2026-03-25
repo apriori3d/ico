@@ -1,4 +1,5 @@
 # pyright: reportGeneralTypeIssues=false
+# mypy: ignore-errors
 
 from types import NoneType
 from typing import Any, Generic

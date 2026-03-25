@@ -128,10 +128,11 @@ class IcoStream(
         # Infer from body operator's signature and wrap in Iterator
         signature = self.body.signature
         if signature.infered:
-            i_type = signature.i
-            o_type = signature.o
             return IcoSignature(
-                i=Iterator[i_type], c=None, o=Iterator[o_type], infered=True
+                i=Iterator[signature.i],  # type: ignore[name-defined]
+                c=None,
+                o=Iterator[signature.o],  # type: ignore[name-defined]
+                infered=True,
             )
 
         return signature

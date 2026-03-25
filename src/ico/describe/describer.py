@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import overload
+
 from rich.console import Console
 
 from ico.core.node import IcoNode
@@ -8,16 +10,33 @@ from ico.describe import (
     PlanRendererDefaultOptions,
     RuntimeRendererDefaultOptions,
 )
-from ico.describe.options import RendererOptions
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.runtime.options import RuntimeRendererOptions
+
+
+@overload
+def describe(
+    node: IcoNode,
+    *,
+    console: Console | None = None,
+    options: PlanRendererOptions | None = None,
+) -> None: ...
+
+
+@overload
+def describe(
+    node: IcoRuntimeNode,
+    *,
+    console: Console | None = None,
+    options: RuntimeRendererOptions | None = None,
+) -> None: ...
 
 
 def describe(
     node: IcoNode | IcoRuntimeNode,
     *,
     console: Console | None = None,
-    options: RendererOptions | None = None,
+    options: PlanRendererOptions | RuntimeRendererOptions | None = None,
 ) -> None:
     """
     Display visual representation of ICO nodes and runtime trees.
@@ -54,37 +73,63 @@ def describe(
 
     Note: Currently supports only RichText backend
     """
-    if isinstance(node, IcoNode):
-        if options and not isinstance(options, PlanRendererOptions):
+    match node, options:
+        case IcoNode(), None:
+            _render_plan(node, console, PlanRendererDefaultOptions)
+
+        case IcoNode(), PlanRendererOptions():
+            _render_plan(node, console, options)
+
+        case IcoNode(), _:
             raise ValueError(
                 "Describe of IcoNode requires options to be an instance of PlanRendererOptions class."
             )
-        options = options or PlanRendererDefaultOptions
 
-        if options.backend == "RichText":
-            from ico.describe.plan.rich_renderer.plan_renderer import (
-                PlanRenderer,
-            )
+        case IcoRuntimeNode(), None:
+            _render_runtime(node, console, RuntimeRendererDefaultOptions)
 
-            plan_renderer = PlanRenderer(console=console, options=options)
-            plan_renderer.render(node)
-        else:
-            raise ValueError("Backend is not yet supported in API.")
+        case IcoRuntimeNode(), RuntimeRendererOptions():
+            _render_runtime(node, console, options)
 
-    else:
-        if options and not isinstance(options, RuntimeRendererOptions):
+        case IcoRuntimeNode(), _:
             raise ValueError(
                 "Describe of IcoRuntimeNode requires options to be an instance of RuntimeRendererOptions class."
             )
 
-        options = options or RuntimeRendererDefaultOptions
 
-        if options.backend == "RichText":
+def _render_plan(
+    node: IcoNode,
+    console: Console | None,
+    options: PlanRendererOptions,
+) -> None:
+    """Render computation flow plan."""
+    match options.backend:
+        case "RichText":
+            from ico.describe.plan.rich_renderer.plan_renderer import (
+                PlanRenderer,
+            )
+
+            renderer = PlanRenderer(console=console, options=options)
+            renderer.render(node)
+
+        case _:
+            raise ValueError("Backend is not yet supported in API.")
+
+
+def _render_runtime(
+    node: IcoRuntimeNode,
+    console: Console | None,
+    options: RuntimeRendererOptions,
+) -> None:
+    """Render runtime tree."""
+    match options.backend:
+        case "RichText":
             from ico.describe.runtime.rich_renderer.tree_renderer import (
                 RuntimeTreeRenderer,
             )
 
-            runtime_renderer = RuntimeTreeRenderer(console=console, options=options)
-            runtime_renderer.render(node)
-        else:
+            renderer = RuntimeTreeRenderer(console=console, options=options)
+            renderer.render(node)
+
+        case _:
             raise ValueError("Backend is not yet supported in API.")
