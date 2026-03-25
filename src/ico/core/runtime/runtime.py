@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ico.core.operator import IcoOperator
+from ico.core.operator import IcoOperatorProtocol
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
@@ -157,13 +157,15 @@ class IcoRuntime(IcoRuntimeNode):
         clear separation between computation logic and runtime concerns.
     """
 
-    closure: IcoOperator[None, None]  # Complete computation flow (Source → Sink)
+    closure: IcoOperatorProtocol[
+        None, None
+    ]  # Complete computation flow (Source → Sink)
     toolbox: IcoToolBox  # Tool container for runtime monitoring
     event_listeners: list[OnForwardEventProtocol] = []  # External event listeners
 
     def __init__(
         self,
-        closure: IcoOperator[None, None],
+        closure: IcoOperatorProtocol[None, None],
         *,
         name: str | None = None,
         runtime_parent: IcoRuntimeNode | None = None,

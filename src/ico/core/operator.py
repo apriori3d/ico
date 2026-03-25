@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, Protocol, TypeVar, cast, overload, runtime_checkable
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
@@ -12,11 +12,28 @@ from ico.core.signature import IcoSignature
 
 I = TypeVar("I")  # noqa: E741
 O = TypeVar("O")  # noqa: E741
-
-
-# variables for composition
-I2 = TypeVar("I2")
 O2 = TypeVar("O2")
+
+
+@runtime_checkable
+class IcoOperatorProtocol(IcoNodeProtocol, Protocol[I, O]):
+    @property
+    def fn(self) -> Callable[[I], O]: ...
+
+    @fn.setter
+    def fn(self, value: Callable[[I], O]) -> None: ...
+
+    def __call__(self, item: I) -> O: ...
+
+    def __or__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> IcoOperatorProtocol[I, O2]: ...
+
+    def __ior__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> IcoOperatorProtocol[I, O2]: ...
+
+    def stream(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...
 
 
 # ────────────────────────────────────────────────
@@ -37,7 +54,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         fn: I → O
 
     An `IcoOperator` wraps a callable and provides:
-    • chainable transformations via `|` or `chain()`
+    • chainable transformations via `|`
     • wrapping into an `Iterable` with `.stream()`
 
     Example:
@@ -70,7 +87,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         *,
         name: str | None = None,
         parent: IcoNode | None = None,
-        children: Sequence[IcoNode] | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
     ):
         """Initialize an IcoOperator with a callable function.
 
@@ -106,25 +123,21 @@ class IcoOperator(Generic[I, O], IcoNode):
     # Compositions Protocols
     # ────────────────────────────────────────────────
 
-    def chain(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-        """Function chaining: (I → O, O → O2) == I → O2."""
+    def __or__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
+        """Pipe composition operator: a | b.
+
+        Args:
+            other: The operator to chain with this one.
+
+        Returns:
+            A new operator that applies this operator followed by the other.
+        """
         from ico.core.chain import chain
 
-        return chain(self, other)
+        return chain(cast(IcoOperatorProtocol[I, O], self), other)
 
-    def __or__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-        """Pipe composition operator: a | b == a.chain(b).
-
-        Args:
-            other: The operator to chain with this one.
-
-        Returns:
-            A new operator that applies this operator followed by the other.
-        """
-        return self.chain(other)
-
-    def __ior__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-        """In-place pipe composition operator: a |= b == a.chain(b).
+    def __ior__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
+        """In-place pipe composition operator: a |= b.
 
         Args:
             other: The operator to chain with this one.
@@ -132,9 +145,9 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             A new operator that applies this operator followed by the other.
         """
-        return self.chain(other)
+        return self | other
 
-    def stream(self) -> IcoOperator[Iterator[I], Iterator[O]]:
+    def stream(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]:
         """Apply this operator element-wise over an iterable (lazy generator).
 
         Transforms: Iterable[I] → Iterable[O]
@@ -144,7 +157,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         """
         from ico.core.stream import IcoStream
 
-        return IcoStream(self)
+        return cast(IcoOperatorProtocol[Iterator[I], Iterator[O]], IcoStream(self))
 
     # ────────────────────────────────────────────────
     # Signature interface
@@ -191,7 +204,7 @@ class IcoOperator(Generic[I, O], IcoNode):
 # ─────────────────────────────────────────────
 
 
-def operator() -> Callable[[Callable[[I], O]], IcoOperator[I, O]]:
+def operator() -> Callable[[Callable[[I], O]], IcoOperatorProtocol[I, O]]:
     """Decorator to wrap a function as an IcoOperator.
 
     Returns:
@@ -203,21 +216,23 @@ def operator() -> Callable[[Callable[[I], O]], IcoOperator[I, O]]:
         ...     return x * 2
     """
 
-    def decorator(fn: Callable[[I], O]) -> IcoOperator[I, O]:
+    def decorator(fn: Callable[[I], O]) -> IcoOperatorProtocol[I, O]:
         return wrap_operator(fn)
 
     return decorator
 
 
 @overload
-def wrap_operator(fn: IcoOperator[I, O]) -> IcoOperator[I, O]: ...
+def wrap_operator(fn: IcoOperatorProtocol[I, O]) -> IcoOperatorProtocol[I, O]: ...
 
 
 @overload
-def wrap_operator(fn: Callable[[I], O]) -> IcoOperator[I, O]: ...
+def wrap_operator(fn: Callable[[I], O]) -> IcoOperatorProtocol[I, O]: ...
 
 
-def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]:
+def wrap_operator(
+    fn: Callable[[I], O] | IcoOperatorProtocol[I, O],
+) -> IcoOperatorProtocol[I, O]:
     """
     Wrap a raw callable into an IcoOperator only when necessary.
 
@@ -233,8 +248,8 @@ def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]
     Note:
         Ensures proper type inference for both mypy and pyright.
     """
-    if isinstance(fn, IcoOperator):
+    if isinstance(fn, IcoOperatorProtocol):
         # Suppress runtime type checker warning,
         # because we know the type is correct here from static analysis.
         return fn  # pyright: ignore[reportUnknownVariableType]
-    return IcoOperator[I, O](fn=fn)
+    return cast(IcoOperatorProtocol[I, O], IcoOperator[I, O](fn=fn))

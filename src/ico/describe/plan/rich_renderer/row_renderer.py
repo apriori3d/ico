@@ -5,9 +5,9 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from ico.core.context_operator import IcoContextOperator
-from ico.core.node import IcoNode
-from ico.core.operator import IcoOperator
+from ico.core.context_operator import IcoContextOperator, IcoContextOperatorProtocol
+from ico.core.node import IcoNodeProtocol
+from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.signature_utils import format_ico_type
 from ico.describe.plan.options import (
     PlanRendererColumn,
@@ -37,7 +37,7 @@ class RowRenderer:
     flow_column_prefix: Text | None
     flow_column_postfix: Text | None
     flow_includes_node_info: bool = True
-    _column_renderer: dict[PlanRendererColumn, Callable[[IcoNode], Text]]
+    _column_renderer: dict[PlanRendererColumn, Callable[[IcoNodeProtocol], Text]]
 
     def __init__(
         self,
@@ -60,17 +60,19 @@ class RowRenderer:
         self.flow_column_postfix = flow_column_postfix
         self.flow_includes_node_info = flow_includes_node_info
 
-        self._column_renderer: dict[PlanRendererColumn, Callable[[IcoNode], Text]] = {
+        self._column_renderer: dict[
+            PlanRendererColumn, Callable[[IcoNodeProtocol], Text]
+        ] = {
             "Flow": self.render_flow_column,
             "Signature": self.render_signature_column,
             "Name": self.render_name_column,
         }
 
-    def render(self, node: IcoNode, column: PlanRendererColumn) -> Text:
+    def render(self, node: IcoNodeProtocol, column: PlanRendererColumn) -> Text:
         """Render specific column for node using registered column renderers."""
         return self._column_renderer[column](node)
 
-    def render_flow_column(self, node: IcoNode) -> Text:
+    def render_flow_column(self, node: IcoNodeProtocol) -> Text:
         """Render Flow column: icons, class name, and arguments."""
         text = self.flow_column_prefix or Text("")
 
@@ -80,11 +82,14 @@ class RowRenderer:
         args_info = self._render_node_args_info(node)
 
         if (
-            type(node) in [IcoOperator, IcoContextOperator]
+            isinstance(node, IcoOperatorProtocol | IcoContextOperatorProtocol)
             and not self.options.show_ico_operator
         ):
             return text + args_info
 
+        node = cast(
+            IcoNodeProtocol, node
+        )  # For type checker to recognize node attributes
         if self.options.show_node_icons:
             icon = match_icon(self.options.node_icons, node)
             if icon:
@@ -101,7 +106,7 @@ class RowRenderer:
 
         return text
 
-    def render_name_column(self, node: IcoNode) -> Text:
+    def render_name_column(self, node: IcoNodeProtocol) -> Text:
         """Render Name column with node name text."""
         return (
             Text(node.name or "", style=DescribeStyle.text.value)
@@ -109,7 +114,7 @@ class RowRenderer:
             else Text("")
         )
 
-    def render_signature_column(self, node: IcoNode) -> Text:
+    def render_signature_column(self, node: IcoNodeProtocol) -> Text:
         """Render Signature column with type information and arrows."""
         if not self.show_signature_column:
             return Text("")
@@ -160,12 +165,12 @@ class RowRenderer:
 
         return text
 
-    def _render_node_args_info(self, node: IcoNode) -> Text | None:
-        if type(node) is IcoOperator:
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text | None:
+        if isinstance(node, IcoOperatorProtocol):
             op_fn = cast(IcoOperator[Any, Any], node).fn
             return render_callable(op_fn, options=self.options)
 
-        if type(node) is IcoContextOperator:
+        if isinstance(node, IcoContextOperatorProtocol):
             ctx_fn = cast(IcoContextOperator[Any, Any, Any], node).fn
             return render_callable(ctx_fn, options=self.options)
 
@@ -173,19 +178,19 @@ class RowRenderer:
 
 
 class FlowTextRowRenderer(RowRenderer):
-    def render_flow_column(self, node: IcoNode) -> Text:
+    def render_flow_column(self, node: IcoNodeProtocol) -> Text:
         return self.flow_column_prefix or Text("")
 
-    def render_signature_column(self, node: IcoNode) -> Text:
+    def render_signature_column(self, node: IcoNodeProtocol) -> Text:
         return Text("")
 
-    def render_type_column(self, node: IcoNode) -> Text:
+    def render_type_column(self, node: IcoNodeProtocol) -> Text:
         return Text("")
 
-    def render_name_column(self, node: IcoNode) -> Text:
+    def render_name_column(self, node: IcoNodeProtocol) -> Text:
         return Text("")
 
-    def render_state_column(self, node: IcoNode) -> Text:
+    def render_state_column(self, node: IcoNodeProtocol) -> Text:
         return Text("")
 
 

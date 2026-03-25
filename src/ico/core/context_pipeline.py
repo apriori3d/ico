@@ -6,11 +6,12 @@ from typing import Generic, final
 from ico.core.context_operator import (
     C,
     IcoContextOperator,
+    IcoContextOperatorProtocol,
     wrap_context_operator,
 )
 from ico.core.operator import (
     I,
-    IcoOperator,
+    IcoOperatorProtocol,
     O,
     wrap_operator,
 )
@@ -76,8 +77,8 @@ class IcoContextPipeline(
 
     __slots__ = ("apply", "body")
 
-    apply: IcoContextOperator[I, C, O]
-    body: Sequence[IcoOperator[O, O]]
+    apply: IcoContextOperatorProtocol[I, C, O]
+    body: Sequence[IcoOperatorProtocol[O, O]]
 
     def __init__(
         self,

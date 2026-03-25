@@ -2,7 +2,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.core.runtime.agent import IcoAgent, IcoAgentWorker
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.printer import IcoPrinter
@@ -37,7 +37,7 @@ class RuntimeRendererOptions(RendererOptions):
     expand_agents: bool = True
     """Show internal agent/worker hierarchies"""
 
-    node_icons: dict[type[IcoNode | IcoRuntimeNode], str] = field(
+    node_icons: dict[type[IcoNodeProtocol | IcoRuntimeNode], str] = field(
         default_factory=lambda: OrderedDict(
             {
                 IcoRuntime: "🚙",

@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.core.source import IcoSource, source
 from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from ico.describe.plan.rich_renderer.row_renderer import (
@@ -21,7 +21,7 @@ from ico.describe.rich_utils import (
 class IcoSourceRender(RowRenderer):
     """Specialized renderer for IcoSource nodes with data size information."""
 
-    def _render_node_args_info(self, node: IcoNode) -> Text:
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         """Render source provider info with optional size details."""
         assert isinstance(node, IcoSource)
         source = cast(IcoSource[Any], node)

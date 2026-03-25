@@ -1,7 +1,12 @@
-from typing import Any, Generic
+from __future__ import annotations
 
-from ico.core.operator import O2, I, IcoOperator, O
+from typing import Any, Generic, TypeVar, cast
+
+from ico.core.node import IcoNode
+from ico.core.operator import O2, I, IcoOperator, IcoOperatorProtocol, O
 from ico.core.signature import IcoSignature
+
+O3 = TypeVar("O3")
 
 
 class IcoChain(
@@ -61,13 +66,13 @@ class IcoChain(
         The pipe operator | is the recommended syntax for chaining operators.
     """
 
-    _left: IcoOperator[I, O]
-    _right: IcoOperator[O, O2]
+    _left: IcoOperatorProtocol[I, O]
+    _right: IcoOperatorProtocol[O, O2]
 
     def __init__(
         self,
-        left: IcoOperator[I, O],
-        right: IcoOperator[O, O2],
+        left: IcoOperatorProtocol[I, O],
+        right: IcoOperatorProtocol[O, O2],
     ):
         """Initialize a chain from two compatible operators.
 
@@ -85,10 +90,13 @@ class IcoChain(
             fn=self._chained_fn,
             name=f"{left} | {right}",
             parent=None,
-            children=[left, right],
+            children=[cast(IcoNode, left), cast(IcoNode, right)],
         )
         self._left = left
         self._right = right
+
+    def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
+        return chain(cast(IcoOperatorProtocol[I, O2], self), other)
 
     def _chained_fn(self, item: I) -> O2:
         """Internal implementation that executes the chained operators.
@@ -139,9 +147,9 @@ class IcoChain(
 
 
 def chain(
-    left: IcoOperator[I, O],
-    right: IcoOperator[O, O2],
-) -> IcoOperator[I, O2]:
+    left: IcoOperatorProtocol[I, O],
+    right: IcoOperatorProtocol[O, O2],
+) -> IcoOperatorProtocol[I, O2]:
     """Create a chain composition of two ICO operators.
 
     Convenience function for creating IcoChain instances. This function provides
@@ -179,4 +187,4 @@ def chain(
         operator for type safety. The pipe operator | is generally preferred
         over this function for better readability: op1 | op2.
     """
-    return IcoChain(left, right)
+    return cast(IcoOperatorProtocol[I, O2], IcoChain(left, right))

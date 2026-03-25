@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from rich.text import Text
 
-from ico.core.operator import IcoOperator, operator
+from ico.core.operator import IcoOperatorProtocol, operator
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     def shift(x: float) -> float:
         return x + 0.1
 
-    def create_worker_flow() -> IcoOperator[int, float]:
+    def create_worker_flow() -> IcoOperatorProtocol[int, float]:
         return fetch_data_item | scale | shift
 
     process = MPAgent(create_worker_flow)

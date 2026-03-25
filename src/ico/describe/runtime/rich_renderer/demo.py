@@ -2,7 +2,7 @@ from collections.abc import Iterable, Iterator
 
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.batcher import IcoBatcher
-from ico.core.operator import IcoOperator, operator
+from ico.core.operator import IcoOperatorProtocol, operator
 from ico.core.pipeline import IcoPipeline
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
@@ -74,7 +74,7 @@ def collate_max(batch: Iterator[float]) -> str:
 # This demonstrates runtime progress nodes and state visualization
 
 
-def create_augment_flow() -> IcoOperator[Iterator[int], str]:
+def create_augment_flow() -> IcoOperatorProtocol[Iterator[int], str]:
     """Create flow with IcoProgress for runtime state demonstration."""
     augment = IcoPipeline(
         scale,

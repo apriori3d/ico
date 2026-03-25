@@ -7,7 +7,7 @@ from rich.table import Table
 from rich.text import Text
 
 from ico.core.node import (
-    IcoNode,
+    IcoNodeProtocol,
 )
 from ico.describe.plan.options import (
     PlanRendererOptions,
@@ -46,7 +46,7 @@ class PlanRenderer:
     _group_indents: list[Text]
     _default_renderer: RowRenderer
     _default_group_renderer: GroupRenderer
-    _selected_renderers: dict[type[IcoNode], RendererTypes]
+    _selected_renderers: dict[type[IcoNodeProtocol], RendererTypes]
 
     def __init__(
         self,
@@ -73,7 +73,7 @@ class PlanRenderer:
             table.add_column(column, no_wrap=True)
         return table
 
-    def render(self, root: IcoNode) -> None:
+    def render(self, root: IcoNodeProtocol) -> None:
         """Render complete ICO node tree to console."""
         self._table = self._create_table()
 
@@ -89,7 +89,7 @@ class PlanRenderer:
         self.console.rule(f"[bold blue]Flow plan: {root.name}", style="dim blue")
         self.console.print(self._table)
 
-    def _select_renderer(self, node: IcoNode) -> RendererTypes:
+    def _select_renderer(self, node: IcoNodeProtocol) -> RendererTypes:
         """Select appropriate renderer for node type via registry lookup."""
         renderer = self._selected_renderers.get(type(node))
         if renderer is not None:
@@ -182,7 +182,7 @@ class PlanRenderer:
     def render_row(
         self,
         row_renderer: RowRenderer,
-        node: IcoNode,
+        node: IcoNodeProtocol,
         indent: Text | None = None,
     ) -> None:
         """Render single table row with proper indentation."""

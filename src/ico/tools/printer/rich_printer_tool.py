@@ -3,7 +3,7 @@ from typing import final
 
 from rich.console import Console
 
-from ico.core.operator import IcoOperator, operator
+from ico.core.operator import IcoOperatorProtocol, operator
 from ico.core.runtime.event import (
     IcoRuntimeEvent,
 )
@@ -58,7 +58,7 @@ class RichPrinterTool(IcoTool):
         return super().on_forward_event(event)
 
 
-def create_agent_flow() -> IcoOperator[int, int]:
+def create_agent_flow() -> IcoOperatorProtocol[int, int]:
     """
     Create example flow for MPAgent with embedded printing.
 

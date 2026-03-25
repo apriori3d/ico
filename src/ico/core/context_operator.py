@@ -1,22 +1,29 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, Protocol, TypeVar, overload, runtime_checkable
 
-from ico.core.node import IcoNode
-from ico.core.operator import I as I
-from ico.core.operator import O
+from ico.core.node import IcoNode, IcoNodeProtocol
+from ico.core.operator import I
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
 # ────────────────────────────────────────────────
-
-C = TypeVar("C")
+C = TypeVar("C", contravariant=True)  # noqa: E741
+O = TypeVar("O", covariant=True)  # noqa: E741
 
 # ────────────────────────────────────────────────
 # Operator Class
 # ────────────────────────────────────────────────
+
+
+@runtime_checkable
+class IcoContextOperatorProtocol(IcoNodeProtocol, Protocol[I, C, O]):
+    @property
+    def fn(self) -> Callable[[I, C], O]: ...
+
+    def __call__(self, item: I, context: C) -> O: ...
 
 
 class IcoContextOperator(Generic[I, C, O], IcoNode):
@@ -80,7 +87,7 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
         *,
         name: str | None = None,
         parent: IcoNode | None = None,
-        children: Sequence[IcoNode] | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
     ):
         """Initialize a context operator with a callable function.
 
@@ -144,7 +151,9 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
 # ─────────────────────────────────────────────
 
 
-def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, C, C]]:
+def context_operator() -> (
+    Callable[[Callable[[I, C], C]], IcoContextOperatorProtocol[I, C, C]]
+):
     """Decorator for creating context operators that update context.
 
     This decorator is specifically designed for functions that take an item and
@@ -176,7 +185,7 @@ def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, 
         a proper ICO node that can participate in pipelines and epochs.
     """
 
-    def decorator(fn: Callable[[I, C], C]) -> IcoContextOperator[I, C, C]:
+    def decorator(fn: Callable[[I, C], C]) -> IcoContextOperatorProtocol[I, C, C]:
         return wrap_context_operator(fn)
 
     return decorator
@@ -184,17 +193,19 @@ def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, 
 
 @overload
 def wrap_context_operator(
-    fn: IcoContextOperator[I, C, O],
-) -> IcoContextOperator[I, C, O]: ...
+    fn: IcoContextOperatorProtocol[I, C, O],
+) -> IcoContextOperatorProtocol[I, C, O]: ...
 
 
 @overload
-def wrap_context_operator(fn: Callable[[I, C], O]) -> IcoContextOperator[I, C, O]: ...
+def wrap_context_operator(
+    fn: Callable[[I, C], O],
+) -> IcoContextOperatorProtocol[I, C, O]: ...
 
 
 def wrap_context_operator(
-    fn: Callable[[I, C], O] | IcoContextOperator[I, C, O],
-) -> IcoContextOperator[I, C, O]:
+    fn: Callable[[I, C], O] | IcoContextOperatorProtocol[I, C, O],
+) -> IcoContextOperatorProtocol[I, C, O]:
     """Wrap callable into IcoContextOperator only when necessary.
 
     Utility function that ensures proper wrapping of callables into context

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.core.runtime.node import IcoRuntimeNode
 
 RenderBackend = Literal["RichText",]
@@ -16,7 +16,7 @@ class RendererOptions:
     icon mappings, renderer paths, and display options.
     """
 
-    node_icons: dict[type[IcoNode | IcoRuntimeNode], str]
+    node_icons: dict[type[IcoNodeProtocol | IcoRuntimeNode], str]
     """Icon mapping for different node types"""
 
     renderers_paths: list[str]

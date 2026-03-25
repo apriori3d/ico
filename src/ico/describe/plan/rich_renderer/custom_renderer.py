@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.render_target import PlanRenderTarget
 
@@ -20,6 +20,6 @@ class CustomRenderer(ABC):
         self.options = options
 
     @abstractmethod
-    def render(self, plan: PlanRenderTarget, node: IcoNode) -> None:
+    def render(self, plan: PlanRenderTarget, node: IcoNodeProtocol) -> None:
         """Implement custom rendering logic for specialized nodes."""
         ...

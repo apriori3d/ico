@@ -9,7 +9,7 @@ from rich.text import Text
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.node import (
     HasRemoteFlow,
-    IcoNode,
+    IcoNodeProtocol,
 )
 from ico.core.tree_utils import TraversalInfo, TreeWalker
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
@@ -25,7 +25,7 @@ class PlanRenderTarget(Protocol):
     def render_row(
         self,
         row_renderer: RowRenderer,
-        node: IcoNode,
+        node: IcoNodeProtocol,
         indent: Text | None = None,
     ) -> None:
         """Render table row with optional indentation."""
@@ -52,14 +52,14 @@ class PlanTreeWalkerContext:
     group_opened: bool = False
 
 
-PlanTreeWalker: TypeAlias = TreeWalker[IcoNode, PlanTreeWalkerContext]
-PlanTraversalInfo: TypeAlias = TraversalInfo[IcoNode, PlanTreeWalkerContext]
+PlanTreeWalker: TypeAlias = TreeWalker[IcoNodeProtocol, PlanTreeWalkerContext]
+PlanTraversalInfo: TypeAlias = TraversalInfo[IcoNodeProtocol, PlanTreeWalkerContext]
 
 
 def create_plan_walker(expand_remote_flows: bool) -> PlanTreeWalker:
     """Create tree walker for ICO plan nodes with remote flow expansion."""
 
-    def _get_children(node: IcoNode) -> Sequence[IcoNode]:
+    def _get_children(node: IcoNodeProtocol) -> Sequence[IcoNodeProtocol]:
         # Flatten async stream pool to a single flow
         if isinstance(node, IcoAsyncStream) and node.pool_from_factory:
             return [node.children[0]]

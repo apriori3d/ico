@@ -6,6 +6,7 @@ from typing import Generic, final
 from ico.core.operator import (
     I,
     IcoOperator,
+    IcoOperatorProtocol,
     O,
     wrap_operator,
 )
@@ -60,7 +61,7 @@ class IcoStream(
 
     __slots__ = ("body",)
 
-    body: IcoOperator[I, O]
+    body: IcoOperatorProtocol[I, O]
 
     def __init__(
         self,

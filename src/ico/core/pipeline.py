@@ -6,6 +6,7 @@ from typing import Generic
 from ico.core.operator import (
     I,
     IcoOperator,
+    IcoOperatorProtocol,
     wrap_operator,
 )
 from ico.core.signature import IcoSignature
@@ -42,7 +43,7 @@ class IcoPipeline(
 
     __slots__ = "body"
 
-    body: Sequence[IcoOperator[I, I]]
+    body: Sequence[IcoOperatorProtocol[I, I]]
 
     def __init__(
         self,

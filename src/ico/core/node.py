@@ -4,12 +4,23 @@ from collections.abc import Callable, Iterator, Sequence
 from typing import (
     Protocol,
     TypeAlias,
+    runtime_checkable,
 )
-
-from typing_extensions import runtime_checkable
 
 from ico.core.signature import IcoSignature
 from ico.core.tree_utils import TraversalInfo, TreeWalker
+
+
+@runtime_checkable
+class IcoNodeProtocol(Protocol):
+    name: str | None
+    parent: IcoNodeProtocol | None
+    children: Sequence[IcoNodeProtocol]
+
+    @property
+    def signature(self) -> IcoSignature: ...
+
+    def describe(self) -> None: ...
 
 
 class IcoNode:
@@ -26,14 +37,14 @@ class IcoNode:
     """
 
     name: str | None
-    parent: IcoNode | None
-    children: Sequence[IcoNode]
+    parent: IcoNodeProtocol | None
+    children: Sequence[IcoNodeProtocol]
 
     def __init__(
         self,
         name: str | None = None,
-        parent: IcoNode | None = None,
-        children: Sequence[IcoNode] | None = None,
+        parent: IcoNodeProtocol | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
     ) -> None:
         """Initialize an ICO node with optional name and tree relationships.
 
@@ -109,8 +120,8 @@ class HasRemoteFlow(Protocol):
 
 
 def iterate_nodes(
-    node: IcoNode,
-) -> Iterator[IcoNode]:
+    node: IcoNodeProtocol,
+) -> Iterator[IcoNodeProtocol]:
     """Recursively yield all children operators in the flow tree."""
     yield node
     for c in node.children:
@@ -118,8 +129,8 @@ def iterate_nodes(
 
 
 def iterate_parents(
-    node: IcoNode,
-) -> Iterator[IcoNode]:
+    node: IcoNodeProtocol,
+) -> Iterator[IcoNodeProtocol]:
     """Recursively yield all parent operators in the flow tree."""
     if node.parent is None:
         return
@@ -133,8 +144,8 @@ def iterate_parents(
 # ────────────────────────────────────────────────
 
 
-FlowTreeWalker: TypeAlias = TreeWalker[IcoNode, None]
-FlowTraversalInfo: TypeAlias = TraversalInfo[IcoNode, None]
+FlowTreeWalker: TypeAlias = TreeWalker[IcoNodeProtocol, None]
+FlowTraversalInfo: TypeAlias = TraversalInfo[IcoNodeProtocol, None]
 
 
 def create_flow_walker(expand_remote_flows: bool = False) -> FlowTreeWalker:
@@ -148,7 +159,7 @@ def create_flow_walker(expand_remote_flows: bool = False) -> FlowTreeWalker:
         A configured FlowTreeWalker that can traverse ICO node hierarchies.
     """
 
-    def _get_children(node: IcoNode) -> Sequence[IcoNode]:
+    def _get_children(node: IcoNodeProtocol) -> Sequence[IcoNodeProtocol]:
         children = list(node.children)
 
         if expand_remote_flows and isinstance(node, HasRemoteFlow):

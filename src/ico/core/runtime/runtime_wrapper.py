@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from typing import Generic
 
-from ico.core.operator import I, IcoOperator, O
+from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.signature import IcoSignature
@@ -74,11 +74,11 @@ class IcoRuntimeWrapper(
         - Zero overhead when runtime features unused
     """
 
-    operator: IcoOperator[I, O]
+    operator: IcoOperatorProtocol[I, O]
 
     def __init__(
         self,
-        operator: IcoOperator[I, O],
+        operator: IcoOperatorProtocol[I, O],
         *,
         name: str | None = None,
         runtime_name: str | None = None,
@@ -89,7 +89,7 @@ class IcoRuntimeWrapper(
         Initialize wrapper with operator and runtime configuration.
 
         Args:
-            operator: IcoOperator to wrap with runtime capabilities
+            operator: IcoOperatorProtocol[I, O] to wrap with runtime capabilities
             name: Optional operator name (computation side)
             runtime_name: Optional runtime node name (runtime side)
             runtime_parent: Parent in runtime tree hierarchy
@@ -133,7 +133,7 @@ class IcoRuntimeWrapper(
 
 def wrap_runtime(
     *nodes: IcoRuntimeNode,
-) -> Callable[[IcoOperator[I, O]], IcoOperator[I, O]]:
+) -> Callable[[IcoOperatorProtocol[I, O]], IcoOperatorProtocol[I, O]]:
     """
     Decorator factory for attaching runtime nodes to operators.
 
@@ -150,16 +150,16 @@ def wrap_runtime(
         ```
     """
 
-    def decorator(operator: IcoOperator[I, O]) -> IcoOperator[I, O]:
+    def decorator(operator: IcoOperatorProtocol[I, O]) -> IcoOperatorProtocol[I, O]:
         return wrap_runtime_fn(operator, *nodes)
 
     return decorator
 
 
 def wrap_runtime_fn(
-    operator: IcoOperator[I, O],
+    operator: IcoOperatorProtocol[I, O],
     *nodes: IcoRuntimeNode,
-) -> IcoOperator[I, O]:
+) -> IcoOperatorProtocol[I, O]:
     """
     Attach runtime nodes to operators using appropriate strategy.
 

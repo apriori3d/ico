@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.core.process import IcoProcess
 from ico.core.sink import sink
 from ico.core.source import source
@@ -46,7 +46,7 @@ class IcoProcessRenderer(GroupRenderer):
 
 
 class IcoProcessNodeRender(RowRenderer):
-    def _render_node_args_info(self, node: IcoNode) -> Text:
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         assert isinstance(node, IcoProcess)
         process = cast(IcoProcess[Any], node)
         return Text(

@@ -8,8 +8,8 @@ from ico.core.async_stream import IcoAsyncStream
 from ico.core.context_operator import context_operator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
-from ico.core.node import IcoNode
-from ico.core.operator import IcoOperator, operator
+from ico.core.node import IcoNodeProtocol
+from ico.core.operator import IcoOperatorProtocol, operator
 from ico.core.process import IcoProcess
 from ico.core.source import source
 from ico.describe.plan.options import PlanRendererOptions
@@ -69,7 +69,7 @@ class IcoEpochRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
-    def render(self, plan: PlanRenderTarget, node: IcoNode) -> None:
+    def render(self, plan: PlanRenderTarget, node: IcoNodeProtocol) -> None:
         assert isinstance(node, IcoEpoch)
         epoch = cast(IcoEpoch[Any, Any], node)
 
@@ -134,7 +134,7 @@ def shift(x: float) -> float:
     return x + 0.1
 
 
-def create_worker_flow() -> IcoOperator[float, float]:
+def create_worker_flow() -> IcoOperatorProtocol[float, float]:
     return scale | shift
 
 

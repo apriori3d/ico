@@ -4,7 +4,7 @@ from typing import overload
 
 from rich.console import Console
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.describe import (
     PlanRendererDefaultOptions,
@@ -16,7 +16,7 @@ from ico.describe.runtime.options import RuntimeRendererOptions
 
 @overload
 def describe(
-    node: IcoNode,
+    node: IcoNodeProtocol,
     *,
     console: Console | None = None,
     options: PlanRendererOptions | None = None,
@@ -33,7 +33,7 @@ def describe(
 
 
 def describe(
-    node: IcoNode | IcoRuntimeNode,
+    node: IcoNodeProtocol | IcoRuntimeNode,
     *,
     console: Console | None = None,
     options: PlanRendererOptions | RuntimeRendererOptions | None = None,
@@ -74,10 +74,10 @@ def describe(
     Note: Currently supports only RichText backend
     """
     match node, options:
-        case IcoNode(), None:
+        case IcoNodeProtocol(), None:
             _render_plan(node, console, PlanRendererDefaultOptions)
 
-        case IcoNode(), PlanRendererOptions():
+        case IcoNodeProtocol(), PlanRendererOptions():
             _render_plan(node, console, options)
 
         case IcoNode(), _:
@@ -98,7 +98,7 @@ def describe(
 
 
 def _render_plan(
-    node: IcoNode,
+    node: IcoNodeProtocol,
     console: Console | None,
     options: PlanRendererOptions,
 ) -> None:

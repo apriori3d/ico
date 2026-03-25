@@ -1,17 +1,17 @@
 from collections import OrderedDict
 from collections.abc import Callable
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 
 RendererMetaTypes = type[RowRenderer | GroupRenderer | CustomRenderer]
-RendererRegistry: dict[type[IcoNode], RendererMetaTypes] = OrderedDict()
+RendererRegistry: dict[type[IcoNodeProtocol], RendererMetaTypes] = OrderedDict()
 
 
 def register_renderer(
-    node_type: type[IcoNode],
+    node_type: type[IcoNodeProtocol],
 ) -> Callable[[RendererMetaTypes], RendererMetaTypes]:
     """Decorator to register renderer class for specific node type."""
 
@@ -22,7 +22,7 @@ def register_renderer(
     return decorator
 
 
-def select_renderer(node_type: type[IcoNode]) -> RendererMetaTypes | None:
+def select_renderer(node_type: type[IcoNodeProtocol]) -> RendererMetaTypes | None:
     """Select renderer class for given node type, with fallback to default."""
     matches = [
         (registered_type, renderer_cls)
