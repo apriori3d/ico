@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Generic, Protocol, TypeVar, overload, runtime_checkable
+from typing import Any, Generic, Protocol, TypeVar, cast, overload, runtime_checkable
 
 from ico.core.node import IcoNode, IcoNodeProtocol
-from ico.core.operator import I
+from ico.core.operator import I, IContra, O
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
 # ────────────────────────────────────────────────
 C = TypeVar("C", contravariant=True)  # noqa: E741
-O = TypeVar("O", covariant=True)  # noqa: E741
+CContra = TypeVar("CContra", contravariant=True)
+OCovariant = TypeVar("OCovariant", covariant=True)  # noqa: E741
 
 # ────────────────────────────────────────────────
 # Operator Class
@@ -19,11 +20,13 @@ O = TypeVar("O", covariant=True)  # noqa: E741
 
 
 @runtime_checkable
-class IcoContextOperatorProtocol(IcoNodeProtocol, Protocol[I, C, O]):
+class IcoContextOperatorProtocol(
+    IcoNodeProtocol, Protocol[IContra, CContra, OCovariant]
+):
     @property
-    def fn(self) -> Callable[[I, C], O]: ...
+    def fn(self) -> Callable[[IContra, CContra], OCovariant]: ...
 
-    def __call__(self, item: I, context: C) -> O: ...
+    def __call__(self, item: IContra, context: CContra) -> OCovariant: ...
 
 
 class IcoContextOperator(Generic[I, C, O], IcoNode):
@@ -236,8 +239,8 @@ def wrap_context_operator(
         This function ensures type inference works correctly for both mypy and
         pyright while providing runtime safety against double-wrapping.
     """
-    if isinstance(fn, IcoContextOperator):
+    if isinstance(fn, IcoContextOperatorProtocol):
         # Suppress runtime type checker warning,
         # because we know the type is correct here from static analysis.
         return fn  # pyright: ignore[reportUnknownVariableType]
-    return IcoContextOperator[I, C, O](fn=fn)
+    return cast(IcoContextOperatorProtocol[I, C, O], IcoContextOperator[I, C, O](fn=fn))

@@ -11,29 +11,24 @@ from ico.core.signature import IcoSignature
 # ────────────────────────────────────────────────
 
 I = TypeVar("I")  # noqa: E741
+IContra = TypeVar("IContra", contravariant=True)  # noqa: E741
 O = TypeVar("O")  # noqa: E741
 O2 = TypeVar("O2")
 
 
 @runtime_checkable
-class IcoOperatorProtocol(IcoNodeProtocol, Protocol[I, O]):
-    @property
-    def fn(self) -> Callable[[I], O]: ...
-
-    @fn.setter
-    def fn(self, value: Callable[[I], O]) -> None: ...
-
-    def __call__(self, item: I) -> O: ...
+class IcoOperatorProtocol(IcoNodeProtocol, Protocol[IContra, O]):
+    def __call__(self, item: IContra) -> O: ...
 
     def __or__(
         self, other: IcoOperatorProtocol[O, O2]
-    ) -> IcoOperatorProtocol[I, O2]: ...
+    ) -> IcoOperatorProtocol[IContra, O2]: ...
 
     def __ior__(
         self, other: IcoOperatorProtocol[O, O2]
-    ) -> IcoOperatorProtocol[I, O2]: ...
+    ) -> IcoOperatorProtocol[IContra, O2]: ...
 
-    def stream(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...
+    def stream(self) -> IcoOperatorProtocol[Iterator[IContra], Iterator[O]]: ...
 
 
 # ────────────────────────────────────────────────
@@ -79,7 +74,7 @@ class IcoOperator(Generic[I, O], IcoNode):
 
     # Note:  __slots__ is not used here to allow dynamic inference of ICO-signature attributes
 
-    fn: Callable[[I], O]
+    _fn: Callable[[I], O]
 
     def __init__(
         self,
@@ -106,7 +101,7 @@ class IcoOperator(Generic[I, O], IcoNode):
             parent=parent,
             children=children,
         )
-        self.fn = fn
+        self._fn = fn
 
     def __call__(self, item: I) -> O:
         """Execute the wrapped function with the given input.
@@ -117,7 +112,12 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             The output value of type O after applying the wrapped function.
         """
-        return self.fn(item)
+        return self._fn(item)
+
+    @property
+    def fn(self) -> Callable[[I], O]:
+        """Access the wrapped callable function."""
+        return self._fn
 
     # ────────────────────────────────────────────────
     # Compositions Protocols
@@ -187,7 +187,7 @@ class IcoOperator(Generic[I, O], IcoNode):
             return IcoSignature(i=i_type, c=None, o=o_type, infered=True)
 
         # 2. Infer from callable signature
-        signature = infer_from_callable(self.fn)
+        signature = infer_from_callable(self._fn)
         if signature is not None:
             return signature
 

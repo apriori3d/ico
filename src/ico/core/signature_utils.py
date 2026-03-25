@@ -254,7 +254,7 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
         return None
 
     if isinstance(obj, IcoOperator):
-        fn = cast(Callable[[Any], Any], obj.fn)  # type: ignore
+        fn = cast(Callable[[Any], Any], obj._fn)  # type: ignore
     elif isinstance(obj, IcoContextOperator):
         fn = cast(Callable[[Any, Any], Any], obj.fn)  # type: ignore
     elif not (

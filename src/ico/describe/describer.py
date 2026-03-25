@@ -4,7 +4,7 @@ from typing import overload
 
 from rich.console import Console
 
-from ico.core.node import IcoNode, IcoNodeProtocol
+from ico.core.node import IcoNodeProtocol
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.describe import (
     PlanRendererDefaultOptions,
@@ -80,7 +80,7 @@ def describe(
         case IcoNodeProtocol(), PlanRendererOptions():
             _render_plan(node, console, options)
 
-        case IcoNode(), _:
+        case IcoNodeProtocol(), _:
             raise ValueError(
                 "Describe of IcoNode requires options to be an instance of PlanRendererOptions class."
             )
@@ -111,9 +111,6 @@ def _render_plan(
 
             renderer = PlanRenderer(console=console, options=options)
             renderer.render(node)
-
-        case _:
-            raise ValueError("Backend is not yet supported in API.")
 
 
 def _render_runtime(
