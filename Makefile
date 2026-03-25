@@ -1,6 +1,6 @@
-.PHONY: ci lint format typecheck test
+.PHONY: ci lint format typecheck pylance test
 
-ci: lint typecheck test
+ci: lint typecheck pylance test
 
 lint:
 	poetry run ruff check src/
@@ -11,6 +11,9 @@ format:
 
 typecheck:
 	poetry run mypy src/
+
+pylance:
+	poetry run pyright src/
 
 test:
 	poetry run pytest --verbose

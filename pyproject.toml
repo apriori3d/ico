@@ -73,6 +73,7 @@ ruff = "^0.6.8"
 pytest = "^8.3.3"
 pytest-xdist = "^3.6.1"
 ipykernel = "^7.2.0"
+pyright = "^1.1.404"
 
 [tool.poetry.extras]
 vision = [
