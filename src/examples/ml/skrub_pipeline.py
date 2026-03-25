@@ -4,22 +4,22 @@ import abc
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Generic, Literal, TypeVar, cast, overload
+from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast, overload
 
-import pandas as pd
+import pandas as pd  # type: ignore[import-untyped]
 import scipy.sparse as sp  # type: ignore[import-untyped]
-import sklearn
+import sklearn  # type: ignore[import-untyped]
 from rich.text import Text
-from sklearn.decomposition import TruncatedSVD
-from sklearn.feature_extraction.text import (
+from sklearn.decomposition import TruncatedSVD  # type: ignore[import-untyped]
+from sklearn.feature_extraction.text import (  # type: ignore[import-untyped]
     HashingVectorizer,
     TfidfTransformer,
     TfidfVectorizer,
 )
-from skrub._scaling_factor import (  # pyright: ignore[reportMissingTypeStubs]
-    scaling_factor,  # pyright: ignore[reportUnknownVariableType]
+from skrub._scaling_factor import (  # type: ignore[import-untyped]
+    scaling_factor,
 )
-from skrub._to_str import ToStr  # pyright: ignore[reportMissingTypeStubs]
+from skrub._to_str import ToStr  # type: ignore[import-untyped]
 
 from ico.core.node import IcoNode
 from ico.core.operator import I, IcoOperator, O
@@ -70,7 +70,7 @@ SKDataFrame = XyDataFrame | XDataFrame
 SKSeries = XySeries | XSeries
 SKData = SKDataFrame | SKSeries
 
-SKResultTypes = pd.Series | pd.DataFrame | sp.spmatrix
+SKResultTypes: TypeAlias = pd.Series | pd.DataFrame | sp.spmatrix
 
 
 @overload
@@ -113,6 +113,10 @@ def wrap_result(input: XySeries, x1: sp.spmatrix) -> XyDataFrame: ...
 def wrap_result(input: XSeries, x1: sp.spmatrix) -> XDataFrame: ...
 
 
+def wrap_result(input: SKData, x1: SKResultTypes) -> SKData:  # type: ignore[misc]
+    return _wrap_result_impl(input, x1)
+
+
 def _wrap_result_impl(input: SKData, x1: SKResultTypes) -> SKData:
     match (input, x1):
         case (XyDataFrame(y=y), sp.spmatrix() as sparse_matrix):
@@ -136,10 +140,6 @@ def _wrap_result_impl(input: SKData, x1: SKResultTypes) -> SKData:
                 "Unsupported input/result combination: "
                 f"input={type(input).__name__}, result={type(x1).__name__}"
             )
-
-
-def wrap_result(input: SKData, x1: SKResultTypes) -> SKData:
-    return _wrap_result_impl(input, x1)
 
 
 class SKBaseEstimator(Generic[I, O], IcoOperator[I, O], abc.ABC, ModeMixin):
@@ -477,7 +477,7 @@ def create_string_encoder(
 
         return to_str | tf_idf | truncated_svd
 
-    # Case 2: Adding HashingVectorizer before TfidfVectorizer
+    # Case 2: Adding HashingVectorizer before TfidfTransformer
 
     if vocabulary is not None:
         raise ValueError(
@@ -494,9 +494,9 @@ def create_string_encoder(
     )
 
     # HashingVectorizer returns sparse counts; apply IDF weighting with TfidfTransformer.
-    tf_idf = XDataFrameTransformer(TfidfTransformer())
+    tf_idf_transformer = XDataFrameTransformer(TfidfTransformer())
 
-    return to_str | hashing | tf_idf | truncated_svd | BlockNormalize()
+    return to_str | hashing | tf_idf_transformer | truncated_svd | BlockNormalize()
 
 
 if __name__ == "__main__":
