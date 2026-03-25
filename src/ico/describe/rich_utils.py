@@ -10,12 +10,12 @@ from ico.describe.rich_style import DescribeStyle
 
 
 def render_node_class(
-    node: object,
+    target: object,
     options: RendererOptions,
     args_info: Text | None = None,
 ) -> Text:
     """Render node class name with Rich styling and optional args."""
-    display_name = Text(f"{type(node).__name__}(", style=DescribeStyle.class_.value)
+    display_name = Text(f"{type(target).__name__}(", style=DescribeStyle.class_.value)
 
     if options.dim_ico_nodes:
         display_name.stylize("dim", 0, len(display_name))

@@ -72,11 +72,12 @@ class RowRenderer:
 
     def render_flow_column(self, node: IcoNode) -> Text:
         """Render Flow column: icons, class name, and arguments."""
-        args_info = self._render_node_args_info(node)
         text = self.flow_column_prefix or Text("")
 
         if not self.flow_includes_node_info:
             return text
+
+        args_info = self._render_node_args_info(node)
 
         if (
             type(node) in [IcoOperator, IcoContextOperator]
