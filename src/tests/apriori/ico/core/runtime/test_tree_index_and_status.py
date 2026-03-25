@@ -9,7 +9,7 @@ from collections import OrderedDict
 from typing import Any
 
 from ico.core.identity import IcoIdentity
-from ico.core.operator import IcoOperator
+from ico.core.operator import IcoOperatorProtocol
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.runtime import IcoRuntime
@@ -102,7 +102,7 @@ def test_flow_with_runtime() -> None:
     assert collector.collected_states == expected_states
 
 
-def _agent_flow_factory() -> IcoOperator[Any, Any]:
+def _agent_flow_factory() -> IcoOperatorProtocol[Any, Any]:
     return wrap_runtime_fn(
         IcoIdentity[Any](),
         IcoRuntimeNode(runtime_name="worker_runtime_node"),

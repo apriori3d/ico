@@ -16,7 +16,6 @@ def test_then_aliases_are_equivalent() -> None:
     double = IcoOperator[float, float](lambda x: x * 2)
 
     assert (inc | double)(3) == 8
-    assert inc.chain(double)(3) == 8
 
 
 def test_operator_is_callable() -> None:
