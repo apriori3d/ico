@@ -1,0 +1,20 @@
+import skrub
+from sklearn.decomposition import PCA
+from sklearn.dummy import DummyClassifier
+from skrub import selectors as s
+
+orders = skrub.datasets.toy_orders()
+
+X, y = skrub.X(), skrub.y()
+pred = (
+    X.skb.apply(skrub.StringEncoder(n_components=2), cols=["product"])
+    .skb.set_name("product_encoder")
+    .skb.apply(skrub.ToDatetime(), cols=["date"])
+    .skb.apply(skrub.DatetimeEncoder(add_total_seconds=False), cols=["date"])
+    .skb.apply(PCA(n_components=2), cols=s.glob("date_*"))
+    .skb.set_name("pca")
+    .skb.apply(DummyClassifier(), y=y)
+    .skb.set_name("classifier")
+)
+learner = pred.skb.make_learner()
+learner.fit({"X": orders.X, "y": orders.y})
