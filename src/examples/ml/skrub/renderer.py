@@ -6,10 +6,12 @@ from typing import Any, TypeVar, cast
 
 from rich.text import Text
 
-from examples.ml.skrub.base import SKBaseEstimator
-from examples.ml.skrub.transformer import SKTransformer
-from ico.core.node import IcoNode
-from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
+from examples.ml.skrub.base import SKBaseEstimator, SKBaseOperator
+from ico.core.node import IcoNodeProtocol
+from ico.describe.plan.rich_renderer.renderer_registry import (
+    register_renderer,
+    resolve_type,
+)
 from ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
@@ -29,7 +31,7 @@ class RendererOperatorOptions:
 AnyBaseEstimator = SKBaseEstimator[Any, Any]
 TEstimator = TypeVar("TEstimator", bound=SKBaseEstimator[Any, Any])
 
-SKRendererPerOperatorOptions = dict[type[AnyBaseEstimator], RendererOperatorOptions]()
+SKRendererPerOperatorOptions = dict[type[object], RendererOperatorOptions]()
 
 
 def setup_renderer(
@@ -68,9 +70,9 @@ def setup_renderer_show_args(
     return decorator
 
 
-@register_renderer(SKBaseEstimator)
+@register_renderer(SKBaseOperator)
 class BaseRender(RowRenderer):
-    def render_flow_column(self, node: IcoNode) -> Text:
+    def render_flow_column(self, node: IcoNodeProtocol) -> Text:
         """Render Flow column: icons, class name, and arguments."""
 
         if not isinstance(node, SKBaseEstimator):
@@ -90,8 +92,17 @@ class BaseRender(RowRenderer):
             if icon:
                 text += Text(icon)
 
-        if isinstance(any_estimator, SKTransformer):
-            options = SKRendererPerOperatorOptions.get(type(any_estimator), None)
+        from examples.ml.skrub.transformer import SKTransformer
+
+        if (
+            isinstance(any_estimator, SKTransformer)
+            and len(SKRendererPerOperatorOptions) > 0
+        ):
+            target_type = resolve_type(
+                type(any_estimator), list(SKRendererPerOperatorOptions.keys())
+            )
+            assert target_type is not None
+            options = SKRendererPerOperatorOptions.get(target_type, None)
             target_for_class = (
                 any_estimator.transformer
                 if options and options.show_estimator_class
@@ -113,7 +124,7 @@ class BaseRender(RowRenderer):
 
         return text
 
-    def _render_node_args_info(self, node: IcoNode) -> Text:
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         if not isinstance(node, SKBaseEstimator):
             return Text()
 
@@ -124,6 +135,8 @@ class BaseRender(RowRenderer):
 
         if options.show_args_named is None or len(options.show_args_named) == 0:
             return Text()
+
+        from examples.ml.skrub.transformer import SKTransformer
 
         args: list[str] = []
 

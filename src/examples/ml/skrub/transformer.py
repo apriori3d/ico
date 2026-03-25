@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import warnings
-from typing import Generic, Literal, cast
+from typing import Any, Generic, Literal, TypeVar, cast
 
 import pandas as pd  # type: ignore[import-untyped]
 import scipy.sparse as sp  # type: ignore[import-untyped]
@@ -20,6 +20,9 @@ from skrub._to_str import ToStr  # type: ignore[import-untyped]
 
 from examples.ml.skrub.base import (
     SKBaseEstimator,
+    SKOperatorProtocol,
+)
+from examples.ml.skrub.data import (
     SKData,
     SKResultTypes,
     XDataFrame,
@@ -32,7 +35,18 @@ from examples.ml.skrub.renderer import (
     setup_renderer_show_args,
     setup_renderer_show_estimator,
 )
-from ico.core.operator import I, IcoOperator, O
+
+# from ico.core.operator import I, O
+
+I = TypeVar("I", bound=SKData)  # noqa: E741
+O = TypeVar("O", bound=SKData)  # noqa: E741
+
+
+def _sparse_to_dataframe(matrix: sp.spmatrix) -> pd.DataFrame:
+    return cast(
+        pd.DataFrame,
+        pd.DataFrame.sparse.from_spmatrix(matrix),  # pyright: ignore[reportUnknownMemberType]
+    )
 
 
 class SKBaseTransformer(Generic[I, O], SKBaseEstimator[I, O], abc.ABC):
@@ -59,6 +73,7 @@ class SKBaseTransformer(Generic[I, O], SKBaseEstimator[I, O], abc.ABC):
         return cast(O, wrap_result_data(cast(SKData, input), x1))
 
 
+@setup_renderer_show_estimator()
 class SKTransformer(Generic[I, O], SKBaseTransformer[I, O]):
     transformer: sklearn.base.BaseEstimator
 
@@ -82,58 +97,51 @@ class SKTransformer(Generic[I, O], SKBaseTransformer[I, O]):
 
         self.transformer = transformer
 
+    def _get_fit_args(self, input: I) -> dict[str, Any]:
+        return {}
+
+    def _get_transform_args(self, input: I) -> dict[str, Any]:
+        return {}
+
     def _fit_transform(self, input: I) -> SKResultTypes:
-        return self._call_transformer_method("fit_transform", input)
+        args = self._get_fit_args(input)
+        return self.transformer.fit_transform(input.X, **args)  # type: ignore[misc]
 
     def _transform(self, input: I) -> SKResultTypes:
-        return self._call_transformer_method("transform", input)
-
-    def _call_transformer_method(
-        self,
-        method_name: Literal["fit_transform", "transform"],
-        input: I,
-    ) -> SKResultTypes:
-        match cast(SKData, input):
-            case XyDataFrame(X=x, y=y) | XySeries(X=x, y=y):
-                method = getattr(self.transformer, method_name)
-                return cast(SKResultTypes, method(x, y=y))  # type: ignore[misc]
-
-            case XDataFrame(X=x) | XSeries(X=x):
-                method = getattr(self.transformer, method_name)
-                return cast(SKResultTypes, method(x))  # type: ignore[misc]
-
-            case _:
-                raise TypeError(
-                    f"Unsupported transformer input type: {type(input).__name__}"
-                )
+        args = self._get_transform_args(input)
+        return self.transformer.transform(input.X, **args)  # type: ignore[misc]
 
 
-@setup_renderer_show_estimator()
-class XyDataFrameTransformer(SKTransformer[XyDataFrame, XyDataFrame]):
+class SKSupervisedTransformer(Generic[I, O], SKTransformer[I, O]):
+    def _get_fit_args(self, input: I) -> dict[str, Any]:
+        assert isinstance(input, (XyDataFrame | XySeries))
+        return {"y": input.y}
+
+    def _get_transform_args(self, input: I) -> dict[str, Any]:
+        assert isinstance(input, (XyDataFrame | XySeries))
+        return {"y": input.y}
+
+
+class XyDataFrameTransformer(SKSupervisedTransformer[XyDataFrame, XyDataFrame]):
     pass
 
 
-@setup_renderer_show_estimator()
 class XDataFrameTransformer(SKTransformer[XDataFrame, XDataFrame]):
     pass
 
 
-@setup_renderer_show_estimator()
-class XySeriesTransformer(SKTransformer[XySeries, XySeries]):
+class XySeriesTransformer(SKSupervisedTransformer[XySeries, XySeries]):
     pass
 
 
-@setup_renderer_show_estimator()
 class XSeriesTransformer(SKTransformer[XSeries, XSeries]):
     pass
 
 
-@setup_renderer_show_estimator()
-class XySeriesToDataFrameTransformer(SKTransformer[XySeries, XyDataFrame]):
+class XySeriesToDataFrameTransformer(SKSupervisedTransformer[XySeries, XyDataFrame]):
     pass
 
 
-@setup_renderer_show_estimator()
 class XSeriesToDataFrameTransformer(SKTransformer[XSeries, XDataFrame]):
     pass
 
@@ -163,6 +171,8 @@ class SafeTruncatedSVD(XDataFrameTransformer):
         self.random_state = random_state
 
     def _estimator_fn(self, input: XDataFrame) -> XDataFrame:
+        x1: SKResultTypes
+
         if (min_shape := min(input.X.shape)) > self.n_components:
             match self.mode:
                 case "fit":
@@ -186,20 +196,23 @@ class SafeTruncatedSVD(XDataFrameTransformer):
             # of dimensions of result.
             # Therefore, self.n_components_ below stores the resulting
             # number of dimensions of result.
-            x1 = input.X[:, : self.n_components].copy()  # To avoid a reference to X_out
+            x1 = cast(
+                pd.DataFrame,
+                input.X[:, : self.n_components].copy(),  # pyright: ignore[reportUnknownMemberType]  # To avoid a reference to X_out
+            )
 
         match x1:
             case sp.spmatrix() as sparse_matrix:
-                return XDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix))
+                return XDataFrame(X=_sparse_to_dataframe(sparse_matrix))
             case _:
-                return XDataFrame(X=pd.DataFrame(x1))
+                return XDataFrame(X=pd.DataFrame(cast(Any, x1)))
 
 
 class BlockNormalize(SKBaseTransformer[XDataFrame, XDataFrame]):
     scaling_factor_: float | None = None
 
     def _fit_transform(self, input: XDataFrame) -> SKResultTypes:
-        xarray = input.X.to_numpy()
+        xarray = cast(Any, input.X.to_numpy())  # pyright: ignore[reportUnknownMemberType]
         scaling_factor_ = scaling_factor(xarray)
         x1 = xarray / scaling_factor_
         self.scaling_factor_ = scaling_factor_
@@ -211,7 +224,7 @@ class BlockNormalize(SKBaseTransformer[XDataFrame, XDataFrame]):
             raise ValueError(
                 "BlockNormalize transformer has not been fitted yet. Call fit or fit_transform before transform."
             )
-        xarray = input.X.to_numpy()
+        xarray = cast(Any, input.X.to_numpy())  # pyright: ignore[reportUnknownMemberType]
         x1 = xarray / self.scaling_factor_
 
         return pd.DataFrame(x1)
@@ -225,7 +238,7 @@ def create_string_encoder(
     stop_words: list[str] | None = None,
     random_state: int | None = None,
     vocabulary: dict[str, int] | None = None,
-) -> IcoOperator[XSeries, XDataFrame]:
+) -> SKOperatorProtocol[XSeries, XDataFrame]:
     to_str = ColumnToStr()
 
     tf_idf_vectorizer = TfidfVectorizer(
@@ -246,7 +259,7 @@ def create_string_encoder(
         # because input is XSeries from to_str
         tf_idf = XSeriesToDataFrameTransformer(tf_idf_vectorizer)
 
-        return to_str | tf_idf | truncated_svd
+        return to_str | tf_idf | truncated_svd | BlockNormalize()
 
     # Case 2: Adding HashingVectorizer before TfidfTransformer
 
@@ -268,25 +281,3 @@ def create_string_encoder(
     tf_idf_transformer = XDataFrameTransformer(TfidfTransformer())
 
     return to_str | hashing | tf_idf_transformer | truncated_svd | BlockNormalize()
-
-
-if __name__ == "__main__":
-    from ico.describe import PlanRendererDefaultOptions
-
-    PlanRendererDefaultOptions.renderers_paths.insert(0, "examples.ml")
-
-    import skrub  # type: ignore[import-untyped]
-
-    orders = skrub.datasets.toy_orders()  # type: ignore[attr-defined,no-any-return]
-
-    xydata = XyDataFrame(X=orders.X, y=orders.y)  # type: ignore[arg-type]
-
-    se = create_string_encoder(n_components=2, vectorizer="tfidf")
-    se.describe()
-
-    xyseries = XySeries(X=orders.X["product"], y=orders.y)  # type: ignore[arg-type]
-    print(xyseries)
-
-    # se.fit_mode()
-    result_fit = se(xyseries)
-    print(result_fit)

@@ -1,18 +1,24 @@
 from __future__ import annotations
 
 import abc
-from dataclasses import dataclass
-from typing import Generic, Literal, TypeAlias, overload
+from typing import Generic, Literal, Protocol, overload, runtime_checkable
 
-import pandas as pd  # type: ignore[import-untyped]
-import scipy.sparse as sp  # type: ignore[import-untyped]
-
-from ico.core.operator import I, IcoOperator, O
+from ico.core.chain import O3, IcoChain
+from ico.core.operator import O2, I, IContra, IcoOperator, IcoOperatorProtocol, O
 
 SKMode = Literal["fit", "predict"]
 
 
-class ModeMixin:
+@runtime_checkable
+class SKOperatorProtocol(IcoOperatorProtocol[IContra, O], Protocol[IContra, O]):
+    mode: SKMode
+
+    def fit_mode(self) -> None: ...
+
+    def predict_mode(self) -> None: ...
+
+
+class SKModeMixin:
     mode: SKMode = "fit"
 
     def fit_mode(self) -> None:
@@ -22,111 +28,51 @@ class ModeMixin:
         self.mode = "predict"
 
 
-@dataclass(slots=True)
-class XDataFrame:
-    X: pd.DataFrame
+class SKBaseOperator(Generic[I, O], IcoOperator[I, O], SKModeMixin):
+    @overload
+    def __or__(self, other: SKOperatorProtocol[O, O2]) -> SKChain[I, O, O2]: ...
+
+    @overload
+    def __or__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[I, O2]: ...
+
+    def __or__(self, other: IcoOperatorProtocol[O, O2]) -> SKOperatorProtocol[I, O2]:
+        return SKChain(self, other)
 
 
-@dataclass(slots=True)
-class XyDataFrame(XDataFrame):
-    y: pd.Series
+class SKChain(Generic[I, O, O2], IcoChain[I, O, O2]):
+    mode: SKMode = "fit"
+
+    def fit_mode(self) -> None:
+        self.mode = "fit"
+
+        if isinstance(self._left, SKOperatorProtocol):
+            self._left.fit_mode()
+        if isinstance(self._right, SKOperatorProtocol):
+            self._right.fit_mode()
+
+    def predict_mode(self) -> None:
+        self.mode = "predict"
+
+        if isinstance(self._left, SKOperatorProtocol):
+            self._left.predict_mode()
+        if isinstance(self._right, SKOperatorProtocol):
+            self._right.predict_mode()
+
+    @overload
+    def __or__(self, other: SKOperatorProtocol[O2, O3]) -> SKChain[I, O2, O3]: ...
+
+    @overload
+    def __or__(
+        self, other: IcoOperatorProtocol[O2, O3]
+    ) -> IcoOperatorProtocol[I, O3]: ...
+
+    def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
+        return SKChain(self, other)
 
 
-@dataclass(slots=True)
-class XSeries:
-    X: pd.Series
-
-
-@dataclass(slots=True)
-class XySeries(XSeries):
-    y: pd.Series
-
-
-SKDataFrame = XyDataFrame | XDataFrame
-SKSeries = XySeries | XSeries
-SKData = SKDataFrame | SKSeries
-
-SKResultTypes: TypeAlias = pd.Series | pd.DataFrame | sp.spmatrix
-
-
-@overload
-def wrap_result(input: XyDataFrame, x1: pd.DataFrame) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XDataFrame, x1: pd.DataFrame) -> XDataFrame: ...
-
-
-@overload
-def wrap_result(input: XySeries, x1: pd.Series) -> XySeries: ...
-
-
-@overload
-def wrap_result(input: XSeries, x1: pd.Series) -> XSeries: ...
-
-
-@overload
-def wrap_result(input: XySeries, x1: pd.DataFrame) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XSeries, x1: pd.DataFrame) -> XDataFrame: ...
-
-
-@overload
-def wrap_result(input: XyDataFrame, x1: sp.spmatrix) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XDataFrame, x1: sp.spmatrix) -> XDataFrame: ...
-
-
-@overload
-def wrap_result(input: XySeries, x1: sp.spmatrix) -> XyDataFrame: ...
-
-
-@overload
-def wrap_result(input: XSeries, x1: sp.spmatrix) -> XDataFrame: ...
-
-
-def wrap_result(input: SKData, x1: SKResultTypes) -> SKData:  # type: ignore[misc]
-    return wrap_result_data(input, x1)
-
-
-def wrap_result_data(input: SKData, x1: SKResultTypes) -> SKData:
-    match (input, x1):
-        case (XyDataFrame(y=y), sp.spmatrix() as sparse_matrix):
-            return XyDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix), y=y)
-
-        case (XDataFrame(), sp.spmatrix() as sparse_matrix):
-            return XDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix))
-
-        case (XySeries(y=y), sp.spmatrix() as sparse_matrix):
-            return XyDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix), y=y)
-
-        case (XSeries(), sp.spmatrix() as sparse_matrix):
-            return XDataFrame(X=pd.DataFrame.sparse.from_spmatrix(sparse_matrix))
-
-        case (XyDataFrame(y=y), pd.DataFrame() as data_frame):
-            return XyDataFrame(X=data_frame, y=y)
-
-        case (XDataFrame(), pd.DataFrame() as data_frame):
-            return XDataFrame(X=data_frame)
-
-        case (XySeries(y=y), pd.Series() as series):
-            return XySeries(X=series, y=y)
-
-        case (XSeries(), pd.Series() as series):
-            return XSeries(X=series)
-
-        case _:
-            raise TypeError(
-                "Unsupported input/result combination: "
-                f"input={type(input).__name__}, result={type(x1).__name__}"
-            )
-
-
-class SKBaseEstimator(Generic[I, O], IcoOperator[I, O], abc.ABC, ModeMixin):
+class SKBaseEstimator(Generic[I, O], SKBaseOperator[I, O], abc.ABC):
     def __init__(
         self,
         *,
