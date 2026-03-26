@@ -1,76 +1,35 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, TypeVar, cast
+from dataclasses import replace
+from typing import Any, cast
 
 from rich.text import Text
 
-from examples.ml.skrub.base import SKBaseEstimator, SKBaseOperator
+from examples.ml.skrub.apply_to_cols import SKApplyToCols
+from examples.ml.skrub.base import SKBaseEstimator, SKOperator
+from examples.ml.skrub.data import SKSource
+from examples.ml.skrub.describe.plan.utils import SKRendererPerOperatorOptions
 from ico.core.node import IcoNodeProtocol
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
 from ico.describe.plan.rich_renderer.renderer_registry import (
     register_renderer,
-    resolve_type,
+    select_the_most_specific_type,
 )
 from ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
 from ico.describe.rich_style import DescribeStyle
 from ico.describe.rich_utils import (
+    render_callable,
     render_node_class,
 )
 from ico.describe.utils import match_icon
 
-
-@dataclass
-class RendererOperatorOptions:
-    show_estimator_class: bool = False
-    show_args_named: list[str] | None = None
-
-
 AnyBaseEstimator = SKBaseEstimator[Any, Any]
-TEstimator = TypeVar("TEstimator", bound=SKBaseEstimator[Any, Any])
-
-SKRendererPerOperatorOptions = dict[type[object], RendererOperatorOptions]()
 
 
-def setup_renderer(
-    options: RendererOperatorOptions,
-) -> Callable[[type[TEstimator]], type[TEstimator]]:
-    def decorator(
-        operator_cls: type[TEstimator],
-    ) -> type[TEstimator]:
-        SKRendererPerOperatorOptions[operator_cls] = options
-        return operator_cls
-
-    return decorator
-
-
-def setup_renderer_show_estimator() -> Callable[[type[TEstimator]], type[TEstimator]]:
-    def decorator(
-        operator_cls: type[TEstimator],
-    ) -> type[TEstimator]:
-        options = RendererOperatorOptions(show_estimator_class=True)
-        SKRendererPerOperatorOptions[operator_cls] = options
-        return operator_cls
-
-    return decorator
-
-
-def setup_renderer_show_args(
-    *show_args_named: str,
-) -> Callable[[type[TEstimator]], type[TEstimator]]:
-    def decorator(
-        operator_cls: type[TEstimator],
-    ) -> type[TEstimator]:
-        options = RendererOperatorOptions(show_args_named=list(show_args_named))
-        SKRendererPerOperatorOptions[operator_cls] = options
-        return operator_cls
-
-    return decorator
-
-
-@register_renderer(SKBaseOperator)
+@register_renderer(SKOperator)
 class BaseRender(RowRenderer):
     def render_flow_column(self, node: IcoNodeProtocol) -> Text:
         """Render Flow column: icons, class name, and arguments."""
@@ -98,7 +57,7 @@ class BaseRender(RowRenderer):
             isinstance(any_estimator, SKTransformer)
             and len(SKRendererPerOperatorOptions) > 0
         ):
-            target_type = resolve_type(
+            target_type = select_the_most_specific_type(
                 type(any_estimator), list(SKRendererPerOperatorOptions.keys())
             )
             assert target_type is not None
@@ -154,3 +113,40 @@ class BaseRender(RowRenderer):
             args.append(f"{name}={arg_value}")
 
         return Text(", ".join(args), style=DescribeStyle.meta.value)
+
+
+@register_renderer(SKSource)
+class SKSourceRender(RowRenderer):
+    """Specialized renderer for SKSource nodes with data size information."""
+
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
+        """Render source provider info with optional size details."""
+        assert isinstance(node, SKSource)
+        source = cast(SKSource[Any], node)
+
+        return render_callable(source.provider, options=self.options)
+
+
+@register_renderer(SKApplyToCols)
+class ApplyToColsRenderer(GroupRenderer):
+    def __init__(self, options: PlanRendererOptions) -> None:
+        super().__init__(
+            options=options,
+            header_renderer=RowRenderer(
+                flow_column_prefix=Text(
+                    "apply to columns", style=DescribeStyle.keyword.value
+                ),
+                flow_includes_node_info=False,
+                options=options,
+            ),
+            footer_renderer=RowRenderer(
+                flow_column_prefix=Text(
+                    "concatinate", style=DescribeStyle.keyword.value
+                ),
+                options=replace(options, signature_format="Output"),
+                show_name_column=False,
+                show_type_column=False,
+                show_state_column=False,
+                flow_includes_node_info=False,
+            ),
+        )

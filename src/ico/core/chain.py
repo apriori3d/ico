@@ -9,10 +9,7 @@ from ico.core.signature import IcoSignature
 O3 = TypeVar("O3")
 
 
-class IcoChain(
-    Generic[I, O, O2],
-    IcoOperator[I, O2],
-):
+class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
     """Sequential composition of two ICO operators: (I → O) → (O → O2) = (I → O2).
 
     IcoChain represents the fundamental composition pattern in ICO framework where

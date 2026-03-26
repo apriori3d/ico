@@ -1,6 +1,7 @@
-import skrub
 from sklearn.decomposition import PCA
 from sklearn.dummy import DummyClassifier
+
+import skrub
 from skrub import selectors as s
 
 orders = skrub.datasets.toy_orders()

@@ -29,7 +29,7 @@ def select_renderer(node_type: type[object]) -> RendererMetaTypes | None:
         for registered_type in RendererRegistry
         if registered_type in node_type.__mro__
     ]
-    target_type = resolve_type(node_type, sources)
+    target_type = select_the_most_specific_type(node_type, sources)
 
     if not target_type:
         return None
@@ -37,7 +37,7 @@ def select_renderer(node_type: type[object]) -> RendererMetaTypes | None:
     return RendererRegistry[target_type]
 
 
-def resolve_type(
+def select_the_most_specific_type(
     target: type[object], sources: list[type[object]]
 ) -> type[object] | None:
     """Resolve renderer for given node type, with fallback to default."""
@@ -53,7 +53,7 @@ def resolve_type(
         # Select more specialized class
         selected_type = (
             first_source_type
-            if issubclass(second_source_type, first_source_type)
+            if issubclass(first_source_type, second_source_type)
             else second_source_type
         )
         sources = sources[2:] + [selected_type]

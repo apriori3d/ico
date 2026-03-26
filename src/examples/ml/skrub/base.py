@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import abc
-from typing import Generic, Literal, Protocol, overload, runtime_checkable
+from typing import (
+    Generic,
+    Literal,
+    Protocol,
+    overload,
+    runtime_checkable,
+)
 
 from ico.core.chain import O3, IcoChain
 from ico.core.operator import O2, I, IContra, IcoOperator, IcoOperatorProtocol, O
+from ico.core.pipeline import IcoPipeline
 
 SKMode = Literal["fit", "predict"]
 
@@ -18,17 +25,23 @@ class SKOperatorProtocol(IcoOperatorProtocol[IContra, O], Protocol[IContra, O]):
     def predict_mode(self) -> None: ...
 
 
-class SKModeMixin:
+class SKOperator(Generic[I, O], IcoOperator[I, O]):
     mode: SKMode = "fit"
 
     def fit_mode(self) -> None:
         self.mode = "fit"
 
+        for child in self.children:
+            if isinstance(child, SKOperatorProtocol):
+                child.fit_mode()
+
     def predict_mode(self) -> None:
         self.mode = "predict"
 
+        for child in self.children:
+            if isinstance(child, SKOperatorProtocol):
+                child.predict_mode()
 
-class SKBaseOperator(Generic[I, O], IcoOperator[I, O], SKModeMixin):
     @overload
     def __or__(self, other: SKOperatorProtocol[O, O2]) -> SKChain[I, O, O2]: ...
 
@@ -72,7 +85,25 @@ class SKChain(Generic[I, O, O2], IcoChain[I, O, O2]):
         return SKChain(self, other)
 
 
-class SKBaseEstimator(Generic[I, O], SKBaseOperator[I, O], abc.ABC):
+class SKPipeline(IcoPipeline[I], Generic[I]):
+    mode: SKMode = "fit"
+
+    def fit_mode(self) -> None:
+        self.mode = "fit"
+
+        for op in self.body:
+            if isinstance(op, SKOperatorProtocol):
+                op.fit_mode()
+
+    def predict_mode(self) -> None:
+        self.mode = "predict"
+
+        for op in self.body:
+            if isinstance(op, SKOperatorProtocol):
+                op.predict_mode()
+
+
+class SKBaseEstimator(Generic[I, O], SKOperator[I, O], abc.ABC):
     def __init__(
         self,
         *,

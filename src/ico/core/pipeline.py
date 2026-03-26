@@ -12,10 +12,7 @@ from ico.core.operator import (
 from ico.core.signature import IcoSignature
 
 
-class IcoPipeline(
-    Generic[I],
-    IcoOperator[I, I],
-):
+class IcoPipeline(Generic[I], IcoOperator[I, I]):
     """Sequential pipeline of operators that transform the same type.
 
     IcoPipeline chains multiple operators of type I → I into a single composite
