@@ -7,7 +7,6 @@ from typing import (
     runtime_checkable,
 )
 
-from ico.core.signature import IcoSignature
 from ico.core.tree_utils import TraversalInfo, TreeWalker
 
 
@@ -16,9 +15,6 @@ class IcoNodeProtocol(Protocol):
     name: str | None
     parent: IcoNodeProtocol | None
     children: Sequence[IcoNodeProtocol]
-
-    @property
-    def signature(self) -> IcoSignature: ...
 
     def describe(self) -> None: ...
 
@@ -70,18 +66,6 @@ class IcoNode:
             The class name of the node.
         """
         return type(self).__name__
-
-    @property
-    def signature(self) -> IcoSignature:
-        """Get the ICO type signature for this node.
-
-        Base implementation returns an untyped signature. Subclasses should
-        override this to provide specific input/output type information.
-
-        Returns:
-            IcoSignature with None types and infered=False.
-        """
-        return IcoSignature(i=type(None), c=None, o=type[None], infered=False)
 
     # ────────────────────────────────────────────────
     # Describe utility interface

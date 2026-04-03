@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TypeVar
 
-from examples.ml.skrub.base import SKBaseEstimator
+from examples.ml.skrub.base import SKOperator
 
 
 @dataclass
@@ -13,7 +13,7 @@ class RendererOperatorOptions:
     show_args_named: list[str] | None = None
 
 
-TEstimator = TypeVar("TEstimator", bound=SKBaseEstimator[Any, Any])
+TEstimator = TypeVar("TEstimator", bound=SKOperator[Any, Any])
 
 SKRendererPerOperatorOptions = dict[type[object], RendererOperatorOptions]()
 

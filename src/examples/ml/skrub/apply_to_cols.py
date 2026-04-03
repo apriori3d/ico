@@ -12,7 +12,7 @@ from examples.ml.skrub.data import (
     XyDataFrame,
     XySeries,
     select_column,
-    wrap_result,
+    wrap_result_dataframe_x,
 )
 from ico.core.signature import IcoSignature
 
@@ -62,9 +62,9 @@ class SKApplyToCols(Generic[I], SKOperator[I, I]):
         result_df = pd.concat(transformed_frames, axis=1)  # pyright: ignore[reportUnknownMemberType]
 
         if isinstance(input, XyDataFrame):
-            return cast(I, wrap_result(input, result_df))
+            return cast(I, wrap_result_dataframe_x(input, result_df))
 
-        return cast(I, wrap_result(input, result_df))
+        return cast(I, wrap_result_dataframe_x(input, result_df))
 
     # @property
     # def signature(self) -> IcoSignature:

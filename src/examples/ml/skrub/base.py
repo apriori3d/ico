@@ -25,8 +25,18 @@ class SKOperatorProtocol(IcoOperatorProtocol[IContra, O], Protocol[IContra, O]):
     def predict_mode(self) -> None: ...
 
 
-class SKOperator(Generic[I, O], IcoOperator[I, O]):
+class SKOperator(Generic[I, O], IcoOperator[I, O], SKOperatorProtocol[I, O], abc.ABC):
     mode: SKMode = "fit"
+
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+    ) -> None:
+        super().__init__(self._estimator_fn, name=name)
+
+    @abc.abstractmethod
+    def _estimator_fn(self, input: I) -> O: ...
 
     def fit_mode(self) -> None:
         self.mode = "fit"
@@ -43,7 +53,7 @@ class SKOperator(Generic[I, O], IcoOperator[I, O]):
                 child.predict_mode()
 
     @overload
-    def __or__(self, other: SKOperatorProtocol[O, O2]) -> SKChain[I, O, O2]: ...
+    def __or__(self, other: SKOperatorProtocol[O, O2]) -> SKOperatorProtocol[I, O2]: ...
 
     @overload
     def __or__(
@@ -54,7 +64,7 @@ class SKOperator(Generic[I, O], IcoOperator[I, O]):
         return SKChain(self, other)
 
 
-class SKChain(Generic[I, O, O2], IcoChain[I, O, O2]):
+class SKChain(Generic[I, O, O2], IcoChain[I, O, O2], SKOperatorProtocol[I, O2]):
     mode: SKMode = "fit"
 
     def fit_mode(self) -> None:
@@ -74,18 +84,18 @@ class SKChain(Generic[I, O, O2], IcoChain[I, O, O2]):
             self._right.predict_mode()
 
     @overload
-    def __or__(self, other: SKOperatorProtocol[O2, O3]) -> SKChain[I, O2, O3]: ...
+    def __or__(self, other: SKOperatorProtocol[O, O2]) -> SKOperatorProtocol[I, O2]: ...
 
     @overload
     def __or__(
-        self, other: IcoOperatorProtocol[O2, O3]
-    ) -> IcoOperatorProtocol[I, O3]: ...
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[I, O2]: ...
 
     def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
         return SKChain(self, other)
 
 
-class SKPipeline(IcoPipeline[I], Generic[I]):
+class SKPipeline(IcoPipeline[I], Generic[I], SKOperatorProtocol[I, I]):
     mode: SKMode = "fit"
 
     def fit_mode(self) -> None:
@@ -101,15 +111,3 @@ class SKPipeline(IcoPipeline[I], Generic[I]):
         for op in self.body:
             if isinstance(op, SKOperatorProtocol):
                 op.predict_mode()
-
-
-class SKBaseEstimator(Generic[I, O], SKOperator[I, O], abc.ABC):
-    def __init__(
-        self,
-        *,
-        name: str | None = None,
-    ) -> None:
-        super().__init__(self._estimator_fn, name=name)
-
-    @abc.abstractmethod
-    def _estimator_fn(self, input: I) -> O: ...

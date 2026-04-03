@@ -28,6 +28,9 @@ class IcoOperatorProtocol(IcoNodeProtocol, Protocol[IContra, O]):
         self, other: IcoOperatorProtocol[O, O2]
     ) -> IcoOperatorProtocol[IContra, O2]: ...
 
+    @property
+    def signature(self) -> IcoSignature: ...
+
     def stream(self) -> IcoOperatorProtocol[Iterator[IContra], Iterator[O]]: ...
 
 
@@ -119,6 +122,14 @@ class IcoOperator(Generic[I, O], IcoNode):
         """Access the wrapped callable function."""
         return self._fn
 
+    def describe(self) -> None:
+        """Render a visual description of this operator.
+
+        This concrete override ensures Protocol stubs from mixin bases do not
+        shadow the runtime implementation inherited from IcoNode.
+        """
+        IcoNode.describe(self)
+
     # ────────────────────────────────────────────────
     # Compositions Protocols
     # ────────────────────────────────────────────────
@@ -164,7 +175,7 @@ class IcoOperator(Generic[I, O], IcoNode):
     # ────────────────────────────────────────────────
 
     @property
-    def signature(self) -> IcoSignature:
+    def signature(self) -> IcoSignature[I, None, O]:
         """Infer the ICO type signature of this operator.
 
         Attempts to determine input and output types through:

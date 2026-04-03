@@ -93,7 +93,7 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
         self._right = right
 
     def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
-        return chain(cast(IcoOperatorProtocol[I, O2], self), other)
+        return chain(self, other)
 
     def _chained_fn(self, item: I) -> O2:
         """Internal implementation that executes the chained operators.
@@ -146,7 +146,7 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
 def chain(
     left: IcoOperatorProtocol[I, O],
     right: IcoOperatorProtocol[O, O2],
-) -> IcoOperatorProtocol[I, O2]:
+) -> IcoChain[I, O, O2]:
     """Create a chain composition of two ICO operators.
 
     Convenience function for creating IcoChain instances. This function provides
@@ -184,4 +184,4 @@ def chain(
         operator for type safety. The pipe operator | is generally preferred
         over this function for better readability: op1 | op2.
     """
-    return cast(IcoOperatorProtocol[I, O2], IcoChain(left, right))
+    return IcoChain(left, right)
