@@ -6,7 +6,7 @@ from __future__ import annotations
 import inspect
 from collections import OrderedDict
 from collections.abc import Callable
-from types import FunctionType, GenericAlias
+from types import FunctionType
 from typing import (
     Any,
     Generic,
@@ -19,7 +19,7 @@ from typing import (
 
 from ico.core.context_operator import IcoContextOperator
 from ico.core.operator import IcoOperator
-from ico.core.signature import IcoSignature, SignatureParamType
+from ico.core.signature import IcoSignature, SignatureParamType, is_supported_type
 
 # ──────── Generic Type Resolution  ────────
 
@@ -145,7 +145,7 @@ def type_contain_any_typevar(
         return False
 
     if type(target_type) is TypeVar:
-        return target_type in vars
+        return target_type in vars if len(vars) > 0 else True
 
     # GenericAlias can contain nested TypeVars, so we check recursively
     return any(
@@ -218,7 +218,11 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     return_hint = hints.get("return", None)
     i, o = get_args(return_hint)
 
-    return IcoSignature(i, None, o)
+    return IcoSignature(
+        wrap_type_if_any(i),
+        None,
+        wrap_type_if_any(o),
+    )
 
 
 # ──────── Callable Signature Inference ────────
@@ -288,9 +292,9 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
         return None
 
     # 2. Generic Alias with TypeVars, like Iterator[O].
-    origins_args = get_args(i) if isinstance(i, GenericAlias) else ()
-    origins_args += get_args(c) if isinstance(c, GenericAlias) else ()
-    origins_args += get_args(o) if isinstance(o, GenericAlias) else ()
+    origins_args = get_args(i)
+    origins_args += get_args(c)
+    origins_args += get_args(o)
     if any((type(a) is TypeVar) for a in origins_args):
         return None
 
@@ -319,8 +323,16 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
             i = i or type(None)
             o = o or type(None)
 
-    if isinstance(i, SignatureParamType) and isinstance(o, SignatureParamType):
-        return IcoSignature(i, c, o)
+    if (
+        is_supported_type(i)
+        and is_supported_type(o)
+        and (c is None or is_supported_type(c))
+    ):
+        return IcoSignature(
+            i=wrap_type_if_any(i),
+            c=wrap_type_if_any(c) if c is not None else None,
+            o=wrap_type_if_any(o),
+        )
 
     return None
 
@@ -328,7 +340,7 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
 # ─── Type formatting ───
 
 
-def format_ico_type(tp: SignatureParamType) -> str:
+def format_ico_type(tp: Any) -> str:
     """Format a type object into a human-readable string for display.
 
     Converts Python type objects into clean, readable strings suitable
@@ -368,6 +380,17 @@ def format_ico_type(tp: SignatureParamType) -> str:
     name = getattr(origin, "__name__", str(origin))
     args = get_args(tp)
 
+    if isinstance(origin, type) and len(args) == 1 and args[0] is Any:
+        return "Any"
+
     if args:
         return f"{name}[{', '.join(format_ico_type(a) for a in args)}]"
     return name
+
+
+# ──────── Misc Utilities ────────
+
+
+def wrap_type_if_any(t: Any) -> Any:
+    """Utility to wrap a type in Any if it's not supported for ICO signatures."""
+    return type[Any] if t is Any else t

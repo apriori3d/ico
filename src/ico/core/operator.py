@@ -189,13 +189,19 @@ class IcoOperator(Generic[I, O], IcoNode):
         from ico.core.signature_utils import (
             infer_from_callable,
             resolve_types_from_generic,
+            wrap_type_if_any,
         )
 
         # 1. Infer from generic type parameters if available
         i_type, o_type = resolve_types_from_generic(self, IcoOperator, I, O)
 
         if i_type is not None and o_type is not None:
-            return IcoSignature(i=i_type, c=None, o=o_type, infered=True)
+            return IcoSignature(
+                i=wrap_type_if_any(i_type),
+                c=None,
+                o=wrap_type_if_any(o_type),
+                infered=True,
+            )
 
         # 2. Infer from callable signature
         signature = infer_from_callable(self._fn)
