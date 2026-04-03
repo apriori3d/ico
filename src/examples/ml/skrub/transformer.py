@@ -11,14 +11,15 @@ from examples.ml.skrub.base import (
 )
 from examples.ml.skrub.data import (
     XDataFrame,
-    XSource,
     XyDataFrame,
+    XYSource,
     wrap_result_dataframe_x,
     wrap_result_dataframe_xy,
 )
 from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_estimator,
 )
+from ico.core.identity import IcoIdentity
 from ico.core.operator import I, O
 
 
@@ -312,8 +313,12 @@ if __name__ == "__main__":
     from examples.ml.skrub.data import XDataFrame
     from examples.ml.skrub.ops import SafeTruncatedSVD
 
-    # source = XYSource(load_orders)
-    source = XSource(load_orders_xy)
+    a = IcoIdentity[Any]()
+    print(a.signature)
+
+    source = XYSource(load_orders_xy)
+    print(source.signature)
+    # source = XSource(load_orders_x)
     svd = SafeTruncatedSVD()
 
     pipeline = source | svd

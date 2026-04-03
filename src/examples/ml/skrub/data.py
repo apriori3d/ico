@@ -18,7 +18,7 @@ import scipy.sparse as sp  # type: ignore[import-untyped]
 from examples.ml.skrub.base import SKChain, SKOperatorProtocol
 from ico.core.operator import O2, IcoOperator, IcoOperatorProtocol
 from ico.core.signature import IcoSignature
-from ico.core.signature_utils import infer_from_callable
+from ico.core.signature_utils import infer_from_callable, type_contain_any_typevar
 
 TTable = TypeVar("TTable", bound=pd.DataFrame)
 TColumn = TypeVar("TColumn", bound=pd.Series)
@@ -214,15 +214,19 @@ class XYSource(
     def signature(self) -> IcoSignature:
         signature = super().signature
 
-        if not signature.infered:
-            signature = infer_from_callable(self.provider) or signature
+        # The signature for SK-family can contain generic type variables for Table, Column and Target,
+        # but would have infered == True.
+        if not (
+            type_contain_any_typevar(signature.i)
+            or type_contain_any_typevar(signature.o)
+        ):
+            return signature
 
-        signature = (
-            IcoSignature(i=type(None), c=None, o=type[Any])
-            if not signature.infered
-            else signature
-        )
-        return signature
+        provider_signature = infer_from_callable(self.provider)
+        if provider_signature:
+            return provider_signature
+
+        return IcoSignature(i=type(None), c=None, o=type[Any])
 
     @overload
     def __or__(

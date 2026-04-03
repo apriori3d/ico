@@ -5,6 +5,7 @@ from typing import Any, cast
 from rich.text import Text
 
 from examples.ml.skrub.base import SKOperator, SKOperatorProtocol
+from examples.ml.skrub.data import XSource, XYSource
 from examples.ml.skrub.describe.plan.utils import SKRendererPerOperatorOptions
 from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.rich_renderer.renderer_registry import (
@@ -16,6 +17,7 @@ from ico.describe.plan.rich_renderer.row_renderer import (
 )
 from ico.describe.rich_style import DescribeStyle
 from ico.describe.rich_utils import (
+    render_callable,
     render_node_class,
 )
 from ico.describe.utils import match_icon
@@ -111,16 +113,16 @@ class BaseRender(RowRenderer):
         return Text(", ".join(args), style=DescribeStyle.meta.value)
 
 
-# @register_renderer(SKSource)
-# class SKSourceRender(RowRenderer):
-#     """Specialized renderer for SKSource nodes with data size information."""
+@register_renderer(XSource, XYSource)
+class SKSourceRender(RowRenderer):
+    """Specialized renderer for SKSource nodes with data size information."""
 
-#     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
-#         """Render source provider info with optional size details."""
-#         assert isinstance(node, SKSource)
-#         source = cast(SKSource[Any], node)
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
+        """Render source provider info with optional size details."""
+        assert isinstance(node, XSource | XYSource)
+        source = cast(XSource[Any, Any], node)
 
-#         return render_callable(source.provider, options=self.options)
+        return render_callable(source.provider, options=self.options)
 
 
 # @register_renderer(SKApplyToCols)
