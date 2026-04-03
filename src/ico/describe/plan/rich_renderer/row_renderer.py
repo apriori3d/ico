@@ -118,6 +118,8 @@ class RowRenderer:
         """Render Signature column with type information and arrows."""
         if not self.show_signature_column:
             return Text("")
+        if not isinstance(node, IcoOperatorProtocol | IcoContextOperatorProtocol):
+            return Text("")
 
         signature = node.signature
         i = format_ico_type(signature.i) if signature.has_input else None

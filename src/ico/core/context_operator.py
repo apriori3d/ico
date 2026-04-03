@@ -28,6 +28,9 @@ class IcoContextOperatorProtocol(
 
     def __call__(self, item: IContra, context: CContra) -> OCovariant: ...
 
+    @property
+    def signature(self) -> IcoSignature: ...
+
 
 class IcoContextOperator(Generic[I, C, O], IcoNode):
     """Context-aware operator that processes items while maintaining state.

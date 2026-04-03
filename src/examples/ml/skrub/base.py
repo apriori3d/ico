@@ -84,14 +84,16 @@ class SKChain(Generic[I, O, O2], IcoChain[I, O, O2], SKOperatorProtocol[I, O2]):
             self._right.predict_mode()
 
     @overload
-    def __or__(self, other: SKOperatorProtocol[O, O2]) -> SKOperatorProtocol[I, O2]: ...
+    def __or__(
+        self, other: SKOperatorProtocol[O2, O3]
+    ) -> SKOperatorProtocol[I, O3]: ...
 
     @overload
     def __or__(
-        self, other: IcoOperatorProtocol[O, O2]
-    ) -> SKOperatorProtocol[I, O2]: ...
+        self, other: IcoOperatorProtocol[O2, O3]
+    ) -> SKOperatorProtocol[I, O3]: ...
 
-    def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
+    def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> SKOperatorProtocol[I, O3]:
         return SKChain(self, other)
 
 

@@ -145,7 +145,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         """
         from ico.core.chain import chain
 
-        return chain(cast(IcoOperatorProtocol[I, O], self), other)
+        return chain(self, other)
 
     def __ior__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
         """In-place pipe composition operator: a |= b.
@@ -175,7 +175,7 @@ class IcoOperator(Generic[I, O], IcoNode):
     # ────────────────────────────────────────────────
 
     @property
-    def signature(self) -> IcoSignature[I, None, O]:
+    def signature(self) -> IcoSignature:
         """Infer the ICO type signature of this operator.
 
         Attempts to determine input and output types through:

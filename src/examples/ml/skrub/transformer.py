@@ -3,8 +3,8 @@ from __future__ import annotations
 import abc
 from typing import Any, Generic, cast, overload
 
-import pandas as pd
-import sklearn
+import pandas as pd  # type: ignore[import-untyped]
+import sklearn  # type: ignore[import-untyped]
 
 from examples.ml.skrub.base import (
     SKOperator,
@@ -313,7 +313,7 @@ if __name__ == "__main__":
     from examples.ml.skrub.ops import SafeTruncatedSVD
 
     # source = XYSource(load_orders)
-    source = XSource(load_orders_x)
+    source = XSource(load_orders_xy)
     svd = SafeTruncatedSVD()
 
     pipeline = source | svd

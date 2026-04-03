@@ -59,18 +59,6 @@ SKDataFrameResultTypes: TypeAlias = pd.DataFrame | sp.spmatrix | np.ndarray[Any,
 SKResultTypes: TypeAlias = pd.Series | pd.DataFrame | sp.spmatrix | np.ndarray[Any, Any]
 
 
-@overload
-def wrap_result_dataframe_x(
-    input: XyDataFrame[TTable, TColumn, TTarget], x1: TTable
-) -> XyDataFrame[TTable, TColumn, TTarget]: ...
-
-
-@overload
-def wrap_result_dataframe_x(
-    input: XDataFrame[TTable, TColumn], x1: TTable
-) -> XDataFrame[TTable, TColumn]: ...
-
-
 def _is_xy_dataframe(
     input: AnyDataFrameType,
 ) -> TypeGuard[XyDataFrame[Any, Any, Any]]:
@@ -91,6 +79,18 @@ def _is_ndarray(data: Any) -> TypeGuard[np.ndarray[Any, Any]]:
 
 def _is_panda_series(data: Any) -> TypeGuard[pd.Series]:
     return isinstance(data, pd.Series)
+
+
+@overload
+def wrap_result_dataframe_x(
+    input: XyDataFrame[TTable, TColumn, TTarget], x1: TTable
+) -> XyDataFrame[TTable, TColumn, TTarget]: ...
+
+
+@overload
+def wrap_result_dataframe_x(
+    input: XDataFrame[TTable, TColumn], x1: TTable
+) -> XDataFrame[TTable, TColumn]: ...
 
 
 def wrap_result_dataframe_x(

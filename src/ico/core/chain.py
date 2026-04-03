@@ -93,7 +93,9 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
         self._right = right
 
     def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
-        return chain(self, other)
+        # mypy cannot always prove that recursive generic protocol conformance
+        # holds for IcoChain here, although it is valid at runtime.
+        return cast(IcoOperatorProtocol[I, O3], chain(self, other))
 
     def _chained_fn(self, item: I) -> O2:
         """Internal implementation that executes the chained operators.
