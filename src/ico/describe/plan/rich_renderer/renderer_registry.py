@@ -10,12 +10,13 @@ RendererRegistry: dict[type[object], RendererMetaTypes] = OrderedDict()
 
 
 def register_renderer(
-    node_type: type[object],
+    *node_types: type[object],
 ) -> Callable[[RendererMetaTypes], RendererMetaTypes]:
     """Decorator to register renderer class for specific node type."""
 
     def decorator(renderer_cls: RendererMetaTypes) -> RendererMetaTypes:
-        RendererRegistry[node_type] = renderer_cls
+        for node_type in node_types:
+            RendererRegistry[node_type] = renderer_cls
         return renderer_cls
 
     return decorator
