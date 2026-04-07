@@ -88,10 +88,6 @@ class SafeTruncatedSVD(
 
         return wrap_result_dataframe_x(input, x1)
 
-    @property
-    def signature(self) -> IcoSignature:
-        return IcoSignature(i=XDataFrame, c=None, o=XDataFrame)
-
 
 # class BlockNormalize(Generic[TTable], SKBaseTransformer[TTable, TTable]):
 #     scaling_factor_: float | None = None

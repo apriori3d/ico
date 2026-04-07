@@ -8,6 +8,7 @@ from typing import (
     TypeAlias,
     TypeGuard,
     TypeVar,
+    cast,
     overload,
 )
 
@@ -65,10 +66,6 @@ def _is_xy_dataframe(
     return isinstance(input, XyDataFrame)
 
 
-def _is_same_table_type(expected: TTable, data: Any) -> TypeGuard[TTable]:
-    return isinstance(data, type(expected))
-
-
 def _is_panda_dataframe(data: Any) -> TypeGuard[pd.DataFrame]:
     return isinstance(data, pd.DataFrame)
 
@@ -83,13 +80,13 @@ def _is_panda_series(data: Any) -> TypeGuard[pd.Series]:
 
 @overload
 def wrap_result_dataframe_x(
-    input: XyDataFrame[TTable, TColumn, TTarget], x1: TTable
-) -> XyDataFrame[TTable, TColumn, TTarget]: ...
+    input: XyDataFrame[Any, Any, Any], x1: Any
+) -> XyDataFrame[Any, Any, Any]: ...
 
 
 @overload
 def wrap_result_dataframe_x(
-    input: XDataFrame[TTable, TColumn], x1: TTable
+    input: XDataFrame[TTable, TColumn], x1: Any
 ) -> XDataFrame[TTable, TColumn]: ...
 
 
@@ -97,6 +94,45 @@ def wrap_result_dataframe_x(
     input: XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any],
     x1: Any,
 ) -> XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any]:
+    if _is_xy_dataframe(input) and (result := try_wrap_result_dataframe_xy(input, x1)):
+        return result
+
+    match input, x1:
+        case XDataFrame() as input, x1 if (
+            _is_panda_dataframe(input.X) and _is_panda_dataframe(x1)
+        ):
+            return XDataFrame[pd.DataFrame, pd.Series](X=x1)
+
+        case XDataFrame() as input, x1 if (
+            _is_panda_dataframe(input.X) and _is_ndarray(x1)
+        ):
+            return XDataFrame[pd.DataFrame, pd.Series](X=pd.DataFrame(x1))
+
+        case _:
+            raise TypeError(
+                "Unsupported input/result combination: "
+                f"input={type(input).__name__}, result={type(x1).__name__}"
+            )
+
+
+def wrap_result_dataframe_xy(
+    input: XyDataFrame[Any, Any, Any],
+    x1: Any,
+) -> XyDataFrame[Any, Any, Any]:
+    result = try_wrap_result_dataframe_xy(input, x1)
+    if result is not None:
+        return result
+
+    raise TypeError(
+        "Unsupported input/result combination: "
+        f"input={type(input).__name__}, result={type(x1).__name__}"
+    )
+
+
+def try_wrap_result_dataframe_xy(
+    input: XyDataFrame[Any, Any, Any],
+    x1: Any,
+) -> XyDataFrame[Any, Any, Any] | None:
     match input, x1:
         case input, x1 if (
             _is_xy_dataframe(input)
@@ -116,80 +152,106 @@ def wrap_result_dataframe_x(
                 X=pd.DataFrame(x1), y=input.y
             )
 
-        case XDataFrame() as input, x1 if (
-            _is_panda_dataframe(input.X) and _is_panda_dataframe(x1)
-        ):
-            return XDataFrame[pd.DataFrame, pd.Series](X=x1)
+        case _:
+            return None
 
-        case XDataFrame() as input, x1 if (
-            _is_panda_dataframe(input.X) and _is_ndarray(x1)
+
+@overload
+def select_column_x(
+    input: XyDataFrame[Any, Any, Any], name: str
+) -> XySeries[Any, Any]: ...
+
+
+@overload
+def select_column_x(input: XDataFrame[Any, Any], name: str) -> XSeries[Any]: ...
+
+
+def select_column_x(
+    input: XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any],
+    name: str,
+) -> XySeries[Any, Any] | XSeries[Any]:
+    match input:
+        case input if (
+            _is_xy_dataframe(input)
+            and _is_panda_dataframe(input.X)
+            and _is_panda_series(input.y)
+            and _is_panda_series(x1 := cast(Any, input.X[name]))
         ):
-            return XDataFrame[pd.DataFrame, pd.Series](X=pd.DataFrame(x1))
+            return XySeries[pd.Series, pd.Series](X=x1, y=input.y)
+
+        case XDataFrame() as input if (
+            _is_panda_dataframe(input.X)
+            and _is_panda_series(x1 := cast(Any, input.X[name]))
+        ):
+            return XSeries[pd.Series](X=x1)
 
         case _:
-            raise TypeError(
-                "Unsupported input/result combination: "
-                f"input={type(input).__name__}, result={type(x1).__name__}"
-            )
+            raise TypeError(f"Unsupported input type: {type(input).__name__}")
 
 
-def wrap_result_dataframe_xy(
-    input: XyDataFrame[TTable, TColumn, TTarget],
-    x1: Any,
-) -> XyDataFrame[TTable, TColumn, TTarget]:
-    match input, x1:
-        case input, x1 if _is_xy_dataframe(input) and _is_same_table_type(input.X, x1):
-            return XyDataFrame[TTable, TColumn, TTarget](X=x1, y=input.y)
+def select_column_xy(
+    input: XyDataFrame[Any, Any, Any],
+    name: str,
+) -> XySeries[Any, Any]:
+    match input:
+        case input if (
+            _is_xy_dataframe(input)
+            and _is_panda_dataframe(input.X)
+            and _is_panda_series(input.y)
+            and _is_panda_series(x1 := cast(Any, input.X[name]))
+        ):
+            return XySeries[pd.Series, pd.Series](X=x1, y=input.y)
 
         case _:
-            raise TypeError(
-                "Unsupported input/result combination: "
-                f"input={type(input).__name__}, result={type(x1).__name__}"
-            )
+            raise TypeError(f"Unsupported input type: {type(input).__name__}")
 
 
-# @overload
-# def select_column(frame: XyDataFrame, column: str) -> XySeries: ...
+class XSource(
+    Generic[TTable, TColumn],
+    IcoOperator[None, XDataFrame[TTable, TColumn]],
+):
+    provider: Callable[[], XDataFrame[TTable, TColumn]]
 
+    def __init__(
+        self,
+        provider: Callable[[], XDataFrame[TTable, TColumn]],
+        *,
+        name: str | None = None,
+    ) -> None:
+        super().__init__(self._source_fn, name=name)
+        self.provider = provider
 
-# @overload
-# def select_column(frame: XDataFrame, column: str) -> XSeries: ...
+    def _source_fn(self, _: None) -> XDataFrame[TTable, TColumn]:
+        return self.provider()
 
+    @property
+    def signature(self) -> IcoSignature:
+        signature = super().signature
 
-# def select_column(frame: XyDataFrame | XDataFrame, column: str) -> XySeries | XSeries:
-#     match frame:
-#         case XyDataFrame(y=y) as df:
-#             return XySeries(X=cast(pd.Series, cast(Any, df.X)[column]), y=y)
+        if not signature.infered:
+            signature = infer_from_callable(self.provider) or signature
 
-#         case XDataFrame() as df:
-#             return XSeries(X=cast(pd.Series, cast(Any, df.X)[column]))
+        signature = (
+            IcoSignature(i=type(None), c=None, o=type[Any])
+            if not signature.infered
+            else signature
+        )
+        return signature
 
+    @overload
+    def __or__(
+        self, other: SKOperatorProtocol[XDataFrame[TTable, TColumn], O2]
+    ) -> SKOperatorProtocol[None, O2]: ...
 
-# def sparse_to_dataframe(matrix: sp.spmatrix) -> pd.DataFrame:
-#     return cast(
-#         pd.DataFrame,
-#         pd.DataFrame.sparse.from_spmatrix(matrix),  # pyright: ignore[reportUnknownMemberType]
-#     )
+    @overload
+    def __or__(
+        self, other: IcoOperatorProtocol[XDataFrame[TTable, TColumn], O2]
+    ) -> SKOperatorProtocol[None, O2]: ...
 
-
-# def ndarray_to_dataframe(array: np.ndarray[Any, Any]) -> pd.DataFrame:
-#     return pd.DataFrame(array)
-
-
-# def is_dataframe_result(x1: SKResultTypes) -> TypeGuard[SKDataFrameResultTypes]:
-#     return isinstance(x1, pd.DataFrame | sp.spmatrix | np.ndarray)
-
-
-# def get_data_shape(data: AnyDataType) -> tuple[int, int]:
-#     match data:
-#         case XyDataFrame() as df:
-#             return df.X.shape
-#         case XDataFrame() as df:
-#             return df.X.shape
-#         case XySeries() as series:
-#             return (series.X.shape[0], 1)
-#         case XSeries() as series:
-#             return (series.X.shape[0], 1)
+    def __or__(
+        self, other: IcoOperatorProtocol[XDataFrame[TTable, TColumn], O2]
+    ) -> SKOperatorProtocol[None, O2]:
+        return SKChain(self, other)
 
 
 class XYSource(
@@ -240,54 +302,6 @@ class XYSource(
 
     def __or__(
         self, other: IcoOperatorProtocol[XyDataFrame[TTable, TColumn, TTarget], O2]
-    ) -> SKOperatorProtocol[None, O2]:
-        return SKChain(self, other)
-
-
-class XSource(
-    Generic[TTable, TColumn],
-    IcoOperator[None, XDataFrame[TTable, TColumn]],
-):
-    provider: Callable[[], XDataFrame[TTable, TColumn]]
-
-    def __init__(
-        self,
-        provider: Callable[[], XDataFrame[TTable, TColumn]],
-        *,
-        name: str | None = None,
-    ) -> None:
-        super().__init__(self._source_fn, name=name)
-        self.provider = provider
-
-    def _source_fn(self, _: None) -> XDataFrame[TTable, TColumn]:
-        return self.provider()
-
-    @property
-    def signature(self) -> IcoSignature:
-        signature = super().signature
-
-        if not signature.infered:
-            signature = infer_from_callable(self.provider) or signature
-
-        signature = (
-            IcoSignature(i=type(None), c=None, o=type[Any])
-            if not signature.infered
-            else signature
-        )
-        return signature
-
-    @overload
-    def __or__(
-        self, other: SKOperatorProtocol[XDataFrame[TTable, TColumn], O2]
-    ) -> SKOperatorProtocol[None, O2]: ...
-
-    @overload
-    def __or__(
-        self, other: IcoOperatorProtocol[XDataFrame[TTable, TColumn], O2]
-    ) -> SKOperatorProtocol[None, O2]: ...
-
-    def __or__(
-        self, other: IcoOperatorProtocol[XDataFrame[TTable, TColumn], O2]
     ) -> SKOperatorProtocol[None, O2]:
         return SKChain(self, other)
 

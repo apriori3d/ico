@@ -380,8 +380,8 @@ def format_ico_type(tp: Any) -> str:
     name = getattr(origin, "__name__", str(origin))
     args = get_args(tp)
 
-    if isinstance(origin, type) and len(args) == 1 and args[0] is Any:
-        return "Any"
+    # if isinstance(origin, type) and len(args) == 1 and args[0] is Any:
+    #    return "Any"
 
     if args:
         return f"{name}[{', '.join(format_ico_type(a) for a in args)}]"

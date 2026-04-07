@@ -11,16 +11,19 @@ from examples.ml.skrub.base import (
 )
 from examples.ml.skrub.data import (
     XDataFrame,
+    XSeries,
     XyDataFrame,
+    XySeries,
     XYSource,
+    select_column_x,
     wrap_result_dataframe_x,
     wrap_result_dataframe_xy,
 )
 from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_estimator,
 )
-from ico.core.identity import IcoIdentity
 from ico.core.operator import I, O
+from ico.core.signature import IcoSignature
 
 
 class SKBaseTransformer(Generic[I, O], SKOperator[I, O], abc.ABC):
@@ -126,163 +129,41 @@ class XyDataFrameTransformer(
         return wrap_result_dataframe_xy(input, result)
 
 
-# class XSeriesOperator(
-#     Generic[TColumn],
-#     SKOperator[XSeries[TColumn], XSeries[TColumn]],
-# ):
-#     pass
+class SKColumnExtractor(
+    SKBaseTransformer[
+        XDataFrame[Any, Any] | XyDataFrame[Any, Any, Any],
+        XSeries[Any] | XySeries[Any, Any],
+    ],
+):
+    column: str
 
+    def __init__(self, column: str, name: str | None = None) -> None:
+        super().__init__(name=name)
+        self.column = column
 
-# class XySeriesOperator(
-#     Generic[TColumn, TTarget],
-#     SKOperator[XySeries[TColumn, TTarget], XySeries[TColumn, TTarget]],
-# ):
-#     pass
+    @overload
+    def _fit_transform(
+        self, input: XyDataFrame[Any, Any, Any]
+    ) -> XySeries[Any, Any]: ...
 
+    @overload
+    def _fit_transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]: ...
 
-# class XDataFrameToSeriesOperator(
-#     Generic[TTable, TColumn],
-#     SKOperator[XDataFrame[TTable, TColumn], XSeries[TColumn]],
-# ):
-#     pass
+    def _fit_transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]:
+        return select_column_x(input, self.column)
 
+    @overload
+    def _transform(self, input: XyDataFrame[Any, Any, Any]) -> XySeries[Any, Any]: ...
 
-# class XyDataFrameToSeriesOperator(
-#     Generic[TTable, TColumn, TTarget],
-#     SKOperator[XyDataFrame[TTable, TColumn, TTarget], XySeries[TColumn, TTarget]],
-# ):
-#     pass
+    @overload
+    def _transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]: ...
 
+    def _transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]:
+        return self._fit_transform(input)
 
-# class SKTableTransformer(Generic[TDataFrame], SKTransformer[TDataFrame, TDataFrame]):
-#     pass
-
-
-# class XDataFrameColumnExtractor(
-#     Generic[TTable, TColumn],
-#     SKBaseTransformer[XDataFrame[TTable, TColumn], XSeries[TColumn]],
-# ):
-#     column: str
-
-#     def __init__(self, column: str, name: str | None = None) -> None:
-#         super().__init__(name=name)
-#         self.column = column
-
-#     def _fit_transform(self, input: XDataFrame[TTable, TColumn]) -> XSeries[TColumn]:
-#         match input.X, input.column_type:
-#             case pd.DataFrame() as df, pd.Series:
-#                 return XSeries(X=cast(TColumn, df[self.column]))
-
-#             case _:
-#                 raise ValueError(
-#                     f"Unsupported input type for XDataFrameColumnExtractor: "
-#                     f"{type(input.X).__name__} with column type {input.column_type}"
-
-
-#     def _transform(self, input: XDataFrame[TTable, TColumn]) -> XSeries[TColumn]:
-#         return self._fit_transform(input)
-
-
-# class XyDataFrameColumnExtractor(
-#     Generic[TTable, TColumn, TTarget],
-#     SKBaseTransformer[
-#         XyDataFrame[TTable, TColumn, TTarget], XySeries[TColumn, TTarget]
-#     ],
-# ):
-#     column: str
-
-#     def __init__(self, column: str, name: str | None = None) -> None:
-#         super().__init__(name=name)
-#         self.column = column
-
-#     def _fit_transform(
-#         self, input: XyDataFrame[TTable, TColumn, TTarget]
-#     ) -> XySeries[TColumn, TTarget]:
-#         match input.X, input.column_type:
-#             case pd.DataFrame() as df, pd.Series:
-#                 return XySeries(X=cast(TColumn, df[self.column]), y=input.y)
-
-#             case _:
-#                 raise ValueError(
-#                     f"Unsupported input type for XDataFrameColumnExtractor: "
-#                     f"{type(input.X).__name__} with column type {input.column_type}"
-#                 )
-
-#     def _transform(
-#         self, input: XyDataFrame[TTable, TColumn, TTarget]
-#     ) -> XySeries[TColumn, TTarget]:
-#         return self._fit_transform(input)
-
-
-# @overload
-# def extract_column(
-#     source: SKOperator[I, XyDataFrame[TTable, TColumn, TTarget]],
-#     column: str,
-# ) -> SKChain[I, XyDataFrame[TTable, TColumn, TTarget], XySeries[TColumn, TTarget]]: ...
-
-
-# @overload
-# def extract_column(
-#     source: SKOperator[I, XDataFrame[TTable, TColumn]],
-#     column: str,
-# ) -> SKChain[I, XDataFrame[TTable, TColumn], XSeries[TColumn]]: ...
-
-
-# def extract_column(
-#     source: SKOperator[I, XyDataFrame[TTable, TColumn, TTarget]]
-#     | SKOperator[I, XDataFrame[TTable, TColumn]],
-#     column: str,
-# ) -> (
-#     SKChain[I, XyDataFrame[TTable, TColumn, TTarget], XySeries[TColumn, TTarget]]
-#     | SKChain[I, XDataFrame[TTable, TColumn], XSeries[TColumn]]
-# ):
-#     if source.signature.o_type is XyDataFrame:
-#         extractor = XyDataFrameColumnExtractor[TTable, TColumn, TTarget](column=column)
-#         xy_source = cast(SKOperator[I, XyDataFrame[TTable, TColumn, TTarget]], source)
-#         return xy_source | extractor
-
-#     if source.signature.o_type is XDataFrame:
-#         extractor = XDataFrameColumnExtractor[TTable, TColumn](column=column)
-#         x_source = cast(SKOperator[I, XDataFrame[TTable, TColumn]], source)
-#         return x_source | extractor
-
-#     raise ValueError(
-#         f"Unsupported output type for column extraction: {source.signature.o_type}"
-#     )
-
-
-# class SKSupervisedTransformer(Generic[I, O], SKTransformer[I, O]):
-#     def _get_fit_args(self, input: I) -> dict[str, Any]:
-#         assert isinstance(input, (XyDataFrame | XySeries))
-#         return {"y": input.y}
-
-#     def _get_transform_args(self, input: I) -> dict[str, Any]:
-#         assert isinstance(input, (XyDataFrame | XySeries))
-#         return {"y": input.y}
-
-
-# class XyDataFrameTransformer(SKSupervisedTransformer[XyDataFrame, XyDataFrame]):
-#     pass
-
-
-# class XDataFrameTransformer(SKTransformer[XDataFrame, XDataFrame]):
-#     pass
-
-
-# class XySeriesTransformer(SKSupervisedTransformer[XySeries, XySeries]):
-#     pass
-
-
-# class XSeriesTransformer(SKTransformer[XSeries, XSeries]):
-#     pass
-
-
-# class XySeriesToDataFrameTransformer(SKSupervisedTransformer[XySeries, XyDataFrame]):
-#     pass
-
-
-# class XSeriesToDataFrameTransformer(SKTransformer[XSeries, XDataFrame]):
-#     pass
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=XDataFrame[Any, Any], c=None, o=XSeries[Any])
 
 
 def load_orders_xy() -> XyDataFrame[pd.DataFrame, pd.Series, pd.Series]:
@@ -311,17 +192,11 @@ def load_orders_x() -> XDataFrame[pd.DataFrame, pd.Series]:
 
 if __name__ == "__main__":
     from examples.ml.skrub.data import XDataFrame
-    from examples.ml.skrub.ops import SafeTruncatedSVD
-
-    a = IcoIdentity[Any]()
-    print(a.signature)
 
     source = XYSource(load_orders_xy)
-    print(source.signature)
-    # source = XSource(load_orders_x)
-    svd = SafeTruncatedSVD()
+    select_column = SKColumnExtractor("customer_id")
 
-    pipeline = source | svd
+    pipeline = source | select_column
     pipeline.describe()
 
     pipeline.fit_mode()
