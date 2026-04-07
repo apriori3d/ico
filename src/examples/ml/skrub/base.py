@@ -24,6 +24,34 @@ class SKOperatorProtocol(IcoOperatorProtocol[IContra, O], Protocol[IContra, O]):
 
     def predict_mode(self) -> None: ...
 
+    @overload
+    def __or__(
+        self, other: SKOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[IContra, O2]: ...
+
+    @overload
+    def __or__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[IContra, O2]: ...
+
+    def __or__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[IContra, O2]: ...
+
+    @overload
+    def __ior__(
+        self, other: SKOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[IContra, O2]: ...
+
+    @overload
+    def __ior__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[IContra, O2]: ...
+
+    def __ior__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[IContra, O2]: ...
+
 
 class SKOperator(Generic[I, O], IcoOperator[I, O], SKOperatorProtocol[I, O], abc.ABC):
     mode: SKMode = "fit"
@@ -63,6 +91,19 @@ class SKOperator(Generic[I, O], IcoOperator[I, O], SKOperatorProtocol[I, O], abc
     def __or__(self, other: IcoOperatorProtocol[O, O2]) -> SKOperatorProtocol[I, O2]:
         return SKChain(self, other)
 
+    @overload
+    def __ior__(
+        self, other: SKOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[I, O2]: ...
+
+    @overload
+    def __ior__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> SKOperatorProtocol[I, O2]: ...
+
+    def __ior__(self, other: IcoOperatorProtocol[O, O2]) -> SKOperatorProtocol[I, O2]:
+        return SKChain(self, other)
+
 
 class SKChain(Generic[I, O, O2], IcoChain[I, O, O2], SKOperatorProtocol[I, O2]):
     mode: SKMode = "fit"
@@ -96,6 +137,19 @@ class SKChain(Generic[I, O, O2], IcoChain[I, O, O2], SKOperatorProtocol[I, O2]):
     def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> SKOperatorProtocol[I, O3]:
         return SKChain(self, other)
 
+    @overload
+    def __ior__(
+        self, other: SKOperatorProtocol[O2, O3]
+    ) -> SKOperatorProtocol[I, O3]: ...
+
+    @overload
+    def __ior__(
+        self, other: IcoOperatorProtocol[O2, O3]
+    ) -> SKOperatorProtocol[I, O3]: ...
+
+    def __ior__(self, other: IcoOperatorProtocol[O2, O3]) -> SKOperatorProtocol[I, O3]:
+        return SKChain(self, other)
+
 
 class SKPipeline(IcoPipeline[I], Generic[I], SKOperatorProtocol[I, I]):
     mode: SKMode = "fit"
@@ -113,3 +167,21 @@ class SKPipeline(IcoPipeline[I], Generic[I], SKOperatorProtocol[I, I]):
         for op in self.body:
             if isinstance(op, SKOperatorProtocol):
                 op.predict_mode()
+
+    @overload
+    def __or__(self, other: SKOperatorProtocol[I, O]) -> SKOperatorProtocol[I, O]: ...
+
+    @overload
+    def __or__(self, other: IcoOperatorProtocol[I, O]) -> SKOperatorProtocol[I, O]: ...
+
+    def __or__(self, other: IcoOperatorProtocol[I, O]) -> SKOperatorProtocol[I, O]:
+        return SKChain(self, other)
+
+    @overload
+    def __ior__(self, other: SKOperatorProtocol[I, O]) -> SKOperatorProtocol[I, O]: ...
+
+    @overload
+    def __ior__(self, other: IcoOperatorProtocol[I, O]) -> SKOperatorProtocol[I, O]: ...
+
+    def __ior__(self, other: IcoOperatorProtocol[I, O]) -> SKOperatorProtocol[I, O]:
+        return SKChain(self, other)

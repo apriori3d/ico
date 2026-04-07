@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any, Generic, overload
+from typing import Any, overload
 
 from sklearn.decomposition import TruncatedSVD  # type: ignore[import-untyped]
 
 from examples.ml.skrub.data import (
-    TSeries,
     XDataFrame,
-    XSeries,
     XyDataFrame,
     wrap_result_dataframe_x,
 )
@@ -16,23 +14,18 @@ from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_args,
 )
 from examples.ml.skrub.transformer import (
-    SKTransformer,
     XDataFrameTransformer,
+    XSeriesTransformer,
 )
-from ico.core.signature import IcoSignature  # type: ignore[import-untyped]
 from skrub._to_str import (  # type: ignore[import-untyped]
     ToStr,
 )
 
 
 @setup_renderer_show_args("convert_category")
-class SKColumnToStr(Generic[TSeries], SKTransformer[TSeries, TSeries]):
+class SKColumnToStr(XSeriesTransformer):
     def __init__(self, convert_category: bool = True, name: str | None = None):
         super().__init__(ToStr(convert_category=convert_category), name=name)
-
-    @property
-    def signature(self) -> IcoSignature:
-        return IcoSignature(i=XSeries, c=None, o=XSeries)
 
 
 @setup_renderer_show_args("n_components")

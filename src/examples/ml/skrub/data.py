@@ -47,13 +47,17 @@ class XySeries(Generic[TColumn, TTarget], XSeries[TColumn]):
     y: TTarget
 
 
-AnyDataFrameType = XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any]
-AnySeriesType = XySeries[Any, Any] | XSeries[Any]
-AnyDataType = AnyDataFrameType | AnySeriesType
+AnyXDataFrame = XDataFrame[Any, Any]
+AnyXyDataFrame = XyDataFrame[Any, Any, Any]
+AnyDataFrame = AnyXDataFrame | AnyXyDataFrame
+AnyXSeries = XSeries[Any]
+AnyXySeries = XySeries[Any, Any]
+AnySeries = AnyXySeries | AnyXSeries
+AnyDataType = AnyDataFrame | AnySeries
 
 TData = TypeVar("TData", bound=AnyDataType)
-TDataFrame = TypeVar("TDataFrame", bound=AnyDataFrameType)
-TSeries = TypeVar("TSeries", bound=AnySeriesType)
+TDataFrame = TypeVar("TDataFrame", bound=AnyDataFrame)
+TSeries = TypeVar("TSeries", bound=AnySeries)
 
 
 SKDataFrameResultTypes: TypeAlias = pd.DataFrame | sp.spmatrix | np.ndarray[Any, Any]
@@ -61,9 +65,15 @@ SKResultTypes: TypeAlias = pd.Series | pd.DataFrame | sp.spmatrix | np.ndarray[A
 
 
 def _is_xy_dataframe(
-    input: AnyDataFrameType,
+    input: AnyDataFrame,
 ) -> TypeGuard[XyDataFrame[Any, Any, Any]]:
     return isinstance(input, XyDataFrame)
+
+
+def _is_xy_series(
+    input: AnySeries,
+) -> TypeGuard[XySeries[Any, Any]]:
+    return isinstance(input, XySeries)
 
 
 def _is_panda_dataframe(data: Any) -> TypeGuard[pd.DataFrame]:
@@ -86,15 +96,12 @@ def wrap_result_dataframe_x(
 
 @overload
 def wrap_result_dataframe_x(
-    input: XDataFrame[TTable, TColumn], x1: Any
-) -> XDataFrame[TTable, TColumn]: ...
+    input: XDataFrame[Any, Any], x1: Any
+) -> XDataFrame[Any, Any]: ...
 
 
-def wrap_result_dataframe_x(
-    input: XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any],
-    x1: Any,
-) -> XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any]:
-    if _is_xy_dataframe(input) and (result := try_wrap_result_dataframe_xy(input, x1)):
+def wrap_result_dataframe_x(input: AnyDataFrame, x1: Any) -> AnyDataFrame:
+    if result := try_wrap_result_dataframe_xy(input, x1):
         return result
 
     match input, x1:
@@ -119,8 +126,7 @@ def wrap_result_dataframe_xy(
     input: XyDataFrame[Any, Any, Any],
     x1: Any,
 ) -> XyDataFrame[Any, Any, Any]:
-    result = try_wrap_result_dataframe_xy(input, x1)
-    if result is not None:
+    if result := try_wrap_result_dataframe_xy(input, x1):
         return result
 
     raise TypeError(
@@ -130,7 +136,7 @@ def wrap_result_dataframe_xy(
 
 
 def try_wrap_result_dataframe_xy(
-    input: XyDataFrame[Any, Any, Any],
+    input: AnyDataFrame,
     x1: Any,
 ) -> XyDataFrame[Any, Any, Any] | None:
     match input, x1:
@@ -166,10 +172,7 @@ def select_column_x(
 def select_column_x(input: XDataFrame[Any, Any], name: str) -> XSeries[Any]: ...
 
 
-def select_column_x(
-    input: XyDataFrame[Any, Any, Any] | XDataFrame[Any, Any],
-    name: str,
-) -> XySeries[Any, Any] | XSeries[Any]:
+def select_column_x(input: AnyDataFrame, name: str) -> AnySeries:
     match input:
         case input if (
             _is_xy_dataframe(input)
@@ -204,6 +207,63 @@ def select_column_xy(
 
         case _:
             raise TypeError(f"Unsupported input type: {type(input).__name__}")
+
+
+@overload
+def wrap_result_series_x(input: XySeries[Any, Any], x1: Any) -> XySeries[Any, Any]: ...
+
+
+@overload
+def wrap_result_series_x(input: XSeries[Any], x1: Any) -> XSeries[Any]: ...
+
+
+def wrap_result_series_x(input: AnySeries, x1: Any) -> AnySeries:
+    if result := try_wrap_result_series_xy(input, x1):
+        return result
+
+    match input, x1:
+        case XSeries() as input, x1 if (
+            _is_panda_series(input.X) and _is_panda_series(x1)
+        ):
+            return XSeries[pd.Series](X=x1)
+
+        case XSeries() as input, x1 if (_is_panda_series(input.X) and _is_ndarray(x1)):
+            return XSeries[pd.Series](X=pd.Series(x1))
+
+        case _:
+            raise TypeError(
+                "Unsupported input/result combination: "
+                f"input={type(input).__name__}, result={type(x1).__name__}"
+            )
+
+
+def wrap_result_series_xy(
+    input: AnySeries,
+    x1: Any,
+) -> XySeries[Any, Any]:
+    if result := try_wrap_result_series_xy(input, x1):
+        return result
+
+    raise TypeError(
+        "Unsupported input/result combination: "
+        f"input={type(input).__name__}, result={type(x1).__name__}"
+    )
+
+
+def try_wrap_result_series_xy(input: AnySeries, x1: Any) -> XySeries[Any, Any] | None:
+    match input, x1:
+        case input, x1 if (
+            _is_xy_series(input) and _is_panda_series(input.X) and _is_panda_series(x1)
+        ):
+            return XySeries[pd.Series, pd.Series](X=x1, y=input.y)
+
+        case input, x1 if (
+            _is_xy_series(input) and _is_panda_series(input.X) and _is_ndarray(x1)
+        ):
+            return XySeries[pd.Series, pd.Series](X=pd.Series(x1), y=input.y)
+
+        case _:
+            return None
 
 
 class XSource(

@@ -10,14 +10,20 @@ from examples.ml.skrub.base import (
     SKOperator,
 )
 from examples.ml.skrub.data import (
+    AnyDataFrame,
+    AnySeries,
+    AnyXDataFrame,
+    AnyXSeries,
+    AnyXyDataFrame,
+    AnyXySeries,
     XDataFrame,
-    XSeries,
     XyDataFrame,
-    XySeries,
     XYSource,
     select_column_x,
     wrap_result_dataframe_x,
     wrap_result_dataframe_xy,
+    wrap_result_series_x,
+    wrap_result_series_xy,
 )
 from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_estimator,
@@ -76,63 +82,58 @@ class SKTransformer(Generic[I, O], SKBaseTransformer[I, O]):
         self.transform_args = transform_args or {}
 
 
-class XDataFrameTransformer(
-    SKTransformer[
-        XDataFrame[Any, Any] | XyDataFrame[Any, Any, Any],
-        XDataFrame[Any, Any] | XyDataFrame[Any, Any, Any],
-    ],
-):
+class XDataFrameTransformer(SKTransformer[AnyDataFrame, AnyDataFrame]):
     @overload
-    def _fit_transform(
-        self, input: XyDataFrame[Any, Any, Any]
-    ) -> XyDataFrame[Any, Any, Any]: ...
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
 
     @overload
-    def _fit_transform(self, input: XDataFrame[Any, Any]) -> XDataFrame[Any, Any]: ...
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
 
-    def _fit_transform(self, input: XDataFrame[Any, Any]) -> XDataFrame[Any, Any]:
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
         result = cast(Any, self.transformer.fit_transform(input.X, **self.fit_args))  # type: ignore[misc]
         return wrap_result_dataframe_x(input, result)
 
     @overload
-    def _transform(
-        self, input: XyDataFrame[Any, Any, Any]
-    ) -> XyDataFrame[Any, Any, Any]: ...
+    def _transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
 
     @overload
-    def _transform(self, input: XDataFrame[Any, Any]) -> XDataFrame[Any, Any]: ...
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
 
-    def _transform(self, input: XDataFrame[Any, Any]) -> XDataFrame[Any, Any]:
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
         result = cast(Any, self.transformer.transform(input.X, **self.transform_args))  # type: ignore[misc]
         return wrap_result_dataframe_x(input, result)
 
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)
+
 
 class XyDataFrameTransformer(
-    SKTransformer[XyDataFrame[Any, Any, Any], XyDataFrame[Any, Any, Any]],
+    SKTransformer[AnyXyDataFrame, AnyXyDataFrame],
 ):
-    def _fit_transform(
-        self, input: XyDataFrame[Any, Any, Any]
-    ) -> XyDataFrame[Any, Any, Any]:
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame:
         result = cast(
             Any,
             self.transformer.fit_transform(input.X, y=input.y, **self.fit_args),  # type: ignore[misc]
         )
         return wrap_result_dataframe_xy(input, result)
 
-    def _transform(
-        self, input: XyDataFrame[Any, Any, Any]
-    ) -> XyDataFrame[Any, Any, Any]:
+    def _transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame:
         result = cast(
             Any,
             self.transformer.transform(input.X, y=input.y, **self.transform_args),  # type: ignore[misc]
         )
         return wrap_result_dataframe_xy(input, result)
 
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXyDataFrame, c=None, o=AnyXyDataFrame)
+
 
 class SKColumnExtractor(
     SKBaseTransformer[
-        XDataFrame[Any, Any] | XyDataFrame[Any, Any, Any],
-        XSeries[Any] | XySeries[Any, Any],
+        AnyXDataFrame | AnyXyDataFrame,
+        AnyXSeries | AnyXySeries,
     ],
 ):
     column: str
@@ -142,28 +143,66 @@ class SKColumnExtractor(
         self.column = column
 
     @overload
-    def _fit_transform(
-        self, input: XyDataFrame[Any, Any, Any]
-    ) -> XySeries[Any, Any]: ...
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXySeries: ...
 
     @overload
-    def _fit_transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]: ...
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXSeries: ...
 
-    def _fit_transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]:
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXSeries:
         return select_column_x(input, self.column)
 
     @overload
-    def _transform(self, input: XyDataFrame[Any, Any, Any]) -> XySeries[Any, Any]: ...
+    def _transform(self, input: AnyXyDataFrame) -> AnyXySeries: ...
 
     @overload
-    def _transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]: ...
+    def _transform(self, input: AnyXDataFrame) -> AnyXSeries: ...
 
-    def _transform(self, input: XDataFrame[Any, Any]) -> XSeries[Any]:
+    def _transform(self, input: AnyXDataFrame) -> AnyXSeries:
         return self._fit_transform(input)
 
     @property
     def signature(self) -> IcoSignature:
-        return IcoSignature(i=XDataFrame[Any, Any], c=None, o=XSeries[Any])
+        return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXSeries)
+
+
+class XSeriesTransformer(SKTransformer[AnySeries, AnySeries]):
+    @overload
+    def _fit_transform(self, input: AnyXySeries) -> AnyXySeries: ...
+
+    @overload
+    def _fit_transform(self, input: AnyXSeries) -> AnyXSeries: ...
+
+    def _fit_transform(self, input: AnyXSeries) -> AnyXSeries:
+        result = cast(Any, self.transformer.fit_transform(input.X, **self.fit_args))  # type: ignore[misc]
+        return wrap_result_series_x(input, result)
+
+    @overload
+    def _transform(self, input: AnyXySeries) -> AnyXySeries: ...
+
+    @overload
+    def _transform(self, input: AnyXSeries) -> AnyXSeries: ...
+
+    def _transform(self, input: AnyXSeries) -> AnyXSeries:
+        result = cast(Any, self.transformer.transform(input.X, **self.transform_args))  # type: ignore[misc]
+        return wrap_result_series_x(input, result)
+
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXSeries, c=None, o=AnyXSeries)
+
+
+class XySeriesTransformer(SKTransformer[AnyXySeries, AnyXySeries]):
+    def _fit_transform(self, input: AnyXySeries) -> AnyXySeries:
+        result = cast(Any, self.transformer.fit_transform(input.X, **self.fit_args))  # type: ignore[misc]
+        return wrap_result_series_xy(input, result)
+
+    def _transform(self, input: AnyXySeries) -> AnyXySeries:
+        result = cast(Any, self.transformer.transform(input.X, **self.transform_args))  # type: ignore[misc]
+        return wrap_result_series_xy(input, result)
+
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXySeries, c=None, o=AnyXySeries)
 
 
 def load_orders_xy() -> XyDataFrame[pd.DataFrame, pd.Series, pd.Series]:
@@ -172,6 +211,7 @@ def load_orders_xy() -> XyDataFrame[pd.DataFrame, pd.Series, pd.Series]:
             "order_id": [1, 2, 3, 4, 5],
             "customer_id": [101, 102, 103, 104, 105],
             "amount": [250.0, 150.0, 300.0, 200.0, 100.0],
+            "is_valid": [True, True, False, True, False],
         }
     )
     y = pd.Series([1, 0, 1, 0, 1], name="target")  # Dummy target variable
@@ -185,6 +225,7 @@ def load_orders_x() -> XDataFrame[pd.DataFrame, pd.Series]:
             "order_id": [1, 2, 3, 4, 5],
             "customer_id": [101, 102, 103, 104, 105],
             "amount": [250.0, 150.0, 300.0, 200.0, 100.0],
+            "is_valid": [True, True, False, True, False],
         }
     )
     return XDataFrame(X=orders)
@@ -192,11 +233,15 @@ def load_orders_x() -> XDataFrame[pd.DataFrame, pd.Series]:
 
 if __name__ == "__main__":
     from examples.ml.skrub.data import XDataFrame
+    from skrub._to_str import (  # type: ignore[import-untyped]
+        ToStr,
+    )
 
     source = XYSource(load_orders_xy)
-    select_column = SKColumnExtractor("customer_id")
+    select_column = SKColumnExtractor("is_valid")
+    to_str = XSeriesTransformer(ToStr())
 
-    pipeline = source | select_column
+    pipeline = source | select_column | to_str
     pipeline.describe()
 
     pipeline.fit_mode()
