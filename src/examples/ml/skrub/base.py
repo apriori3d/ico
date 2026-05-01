@@ -17,7 +17,10 @@ SKMode = Literal["fit", "predict"]
 
 
 @runtime_checkable
-class SKOperatorProtocol(IcoOperatorProtocol[IContra, O], Protocol[IContra, O]):
+class SKOperatorProtocol(
+    IcoOperatorProtocol[IContra, O],
+    Protocol[IContra, O],
+):
     mode: SKMode
 
     def fit_mode(self) -> None: ...
@@ -53,8 +56,14 @@ class SKOperatorProtocol(IcoOperatorProtocol[IContra, O], Protocol[IContra, O]):
     ) -> SKOperatorProtocol[IContra, O2]: ...
 
 
-class SKOperator(Generic[I, O], IcoOperator[I, O], SKOperatorProtocol[I, O], abc.ABC):
+class SKOperator(
+    Generic[I, O],
+    IcoOperator[I, O],
+    SKOperatorProtocol[I, O],
+    abc.ABC,
+):
     mode: SKMode = "fit"
+    fitted: bool = False
 
     def __init__(
         self,
@@ -105,7 +114,11 @@ class SKOperator(Generic[I, O], IcoOperator[I, O], SKOperatorProtocol[I, O], abc
         return SKChain(self, other)
 
 
-class SKChain(Generic[I, O, O2], IcoChain[I, O, O2], SKOperatorProtocol[I, O2]):
+class SKChain(
+    Generic[I, O, O2],
+    IcoChain[I, O, O2],
+    SKOperatorProtocol[I, O2],
+):
     mode: SKMode = "fit"
 
     def fit_mode(self) -> None:
@@ -151,7 +164,11 @@ class SKChain(Generic[I, O, O2], IcoChain[I, O, O2], SKOperatorProtocol[I, O2]):
         return SKChain(self, other)
 
 
-class SKPipeline(IcoPipeline[I], Generic[I], SKOperatorProtocol[I, I]):
+class SKPipeline(
+    IcoPipeline[I],
+    Generic[I],
+    SKOperatorProtocol[I, I],
+):
     mode: SKMode = "fit"
 
     def fit_mode(self) -> None:

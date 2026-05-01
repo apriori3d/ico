@@ -5,7 +5,7 @@ from typing import Any, cast
 from rich.text import Text
 
 from examples.ml.skrub.base import SKOperator, SKOperatorProtocol
-from examples.ml.skrub.data import XSource, XYSource
+from examples.ml.skrub.data import XSource, XySource
 from examples.ml.skrub.describe.plan.utils import SKRendererPerOperatorOptions
 from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.rich_renderer.renderer_registry import (
@@ -100,26 +100,22 @@ class BaseRender(RowRenderer):
         if isinstance(any_estimator, SKTransformer):
             estimator_target = any_estimator.transformer
         else:
-            estimator_target = None
+            estimator_target = any_estimator
 
         for name in options.show_args_named:
-            arg_value = (
-                getattr(any_estimator, name)
-                if hasattr(any_estimator, name) or not estimator_target
-                else getattr(estimator_target, name, "")
-            )
+            arg_value = getattr(estimator_target, name, "")
             args.append(f"{name}={arg_value}")
 
         return Text(", ".join(args), style=DescribeStyle.meta.value)
 
 
-@register_renderer(XSource, XYSource)
+@register_renderer(XSource, XySource)
 class SKSourceRender(RowRenderer):
     """Specialized renderer for SKSource nodes with data size information."""
 
     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         """Render source provider info with optional size details."""
-        assert isinstance(node, XSource | XYSource)
+        assert isinstance(node, XSource | XySource)
         source = cast(XSource[Any, Any], node)
 
         return render_callable(source.provider, options=self.options)

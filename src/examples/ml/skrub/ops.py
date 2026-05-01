@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import warnings
-from typing import Any, overload
+from typing import Any, Literal, cast, overload
 
 from sklearn.decomposition import TruncatedSVD  # type: ignore[import-untyped]
 
+from examples.ml.skrub.base import SKOperatorProtocol
 from examples.ml.skrub.data import (
+    AnyDataFrame,
+    AnySeries,
+    AnyXDataFrame,
+    AnyXyDataFrame,
     XDataFrame,
     XyDataFrame,
     wrap_result_dataframe_x,
@@ -14,24 +19,23 @@ from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_args,
 )
 from examples.ml.skrub.transformer import (
-    XDataFrameTransformer,
-    XSeriesTransformer,
+    DataFrameTransformer,
+    SeriesToDataFrameSparseTransformer,
+    SeriesToDataFrameTransformer,
+    SeriesTransformer,
+    SKBaseTransformer,
+)
+from ico.core.signature import IcoSignature
+from skrub._scaling_factor import (  # type: ignore[import-untyped]
+    scaling_factor,  # pyright: ignore[reportUnknownVariableType]
 )
 from skrub._to_str import (  # type: ignore[import-untyped]
     ToStr,
 )
 
 
-@setup_renderer_show_args("convert_category")
-class SKColumnToStr(XSeriesTransformer):
-    def __init__(self, convert_category: bool = True, name: str | None = None):
-        super().__init__(ToStr(convert_category=convert_category), name=name)
-
-
 @setup_renderer_show_args("n_components")
-class SafeTruncatedSVD(
-    XDataFrameTransformer,
-):
+class SafeTruncatedSVD(DataFrameTransformer):
     n_components: int
     random_state: int | None
 
@@ -82,96 +86,122 @@ class SafeTruncatedSVD(
         return wrap_result_dataframe_x(input, x1)
 
 
-# class BlockNormalize(Generic[TTable], SKBaseTransformer[TTable, TTable]):
-#     scaling_factor_: float | None = None
+class BlockNormalize(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
+    scaling_factor_: float | None = None
 
-#     def _fit_transform(self, input: TTable) -> pd.DataFrame:
-#         xarray = cast(Any, input.X.to_numpy())  # pyright: ignore[reportUnknownMemberType]
-#         scaling_factor_ = scaling_factor(xarray)
-#         x1 = xarray / scaling_factor_
-#         self.scaling_factor_ = scaling_factor_
+    @overload
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
 
-#         return pd.DataFrame(x1)
+    @overload
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
 
-#     def _transform(self, input: TTable) -> pd.DataFrame:
-#         if self.scaling_factor_ is None:
-#             raise ValueError(
-#                 "BlockNormalize transformer has not been fitted yet. Call fit or fit_transform before transform."
-#             )
-#         xarray = cast(Any, input.X.to_numpy())  # pyright: ignore[reportUnknownMemberType]
-#         x1 = xarray / self.scaling_factor_
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
+        self.scaling_factor_ = cast(float, scaling_factor(input.X))
+        return self._transform(input)
 
-#         return pd.DataFrame(x1)
+    @overload
+    def _transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
 
-#     @property
-#     def signature(self) -> IcoSignature:
-#         return IcoSignature(i=XDataFrame, c=None, o=XDataFrame)
+    @overload
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
+
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
+        # TODO: figure out design for cases where fit is required
+        if self.scaling_factor_ is None:
+            raise ValueError(
+                "BlockNormalize transformer has not been fitted yet. Call fit or fit_transform before transform."
+            )
+        x1 = input.X / self.scaling_factor_
+
+        return wrap_result_dataframe_x(input, x1)
+
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)
 
 
-# class SKStringEncoder(Generic[TSeries, ODataFrame], SKOperator[TSeries, ODataFrame]):
-#     def __init__(
-#         self,
-#         n_components: int = 30,
-#         vectorizer: Literal["tfidf", "hashing"] = "tfidf",
-#         ngram_range: tuple[int, int] = (3, 4),
-#         analyzer: Literal["word", "char", "char_wb"] = "char_wb",
-#         stop_words: list[str] | None = None,
-#         random_state: int | None = None,
-#         vocabulary: dict[str, int] | None = None,
-#         name: str | None = None,
-#     ) -> None:
-#         to_str = SKColumnToStr[TSeries]()
+class AddPrefixToColumns(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
+    prefix: str
 
-#         truncated_svd = SafeTruncatedSVD[ODataFrame](
-#             n_components=n_components, random_state=random_state
-#         )
+    def __init__(self, prefix: str, name: str | None = None):
+        super().__init__(name=name)
+        self.prefix = prefix
 
-#         block_normalize = BlockNormalize[ODataFrame]()
+    @overload
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
 
-#         tf_idf_vectorizer = TfidfVectorizer(
-#             ngram_range=ngram_range,
-#             analyzer=analyzer,
-#             stop_words=stop_words,
-#             vocabulary=vocabulary,
-#         )
+    @overload
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
 
-#         if vectorizer == "tfidf":
-#             # Case 1: Using TfidfVectorizer directly as vectorizer
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
+        return self._transform(input)
 
-#             # Note: we wrap tf_idf_transformer with SKTransformer,
-#             # because input is XSeries from to_str
-#             tf_idf = SKTransformer[TSeries, ODataFrame](tf_idf_vectorizer)
+    @overload
+    def _transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
 
-#             encoder_op = to_str | tf_idf | truncated_svd | block_normalize
+    @overload
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
 
-#         else:
-#             # Case 2: Adding HashingVectorizer before TfidfTransformer
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
+        input.X = input.X.rename(columns=lambda c: f"{self.prefix}_{c}")  # pyright: ignore[reportUnknownLambdaType]
+        return input
 
-#             if vocabulary is not None:
-#                 raise ValueError(
-#                     "Custom vocabulary passed to StringEncoder, unsupported by"
-#                     "HashingVectorizer. Rerun without a 'vocabulary' parameter."
-#                 )
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)
 
-#             hashing = SKTransformer[TSeries, ODataFrame](
-#                 HashingVectorizer(
-#                     ngram_range=ngram_range,
-#                     analyzer=analyzer,
-#                     stop_words=stop_words,
-#                 )
-#             )
 
-#             # HashingVectorizer returns sparse counts; apply IDF weighting with TfidfTransformer.
-#             tf_idf_transformer = SKTransformer[ODataFrame, ODataFrame](
-#                 TfidfTransformer()
-#             )
+def create_string_encoder(
+    n_components: int = 30,
+    vectorizer: Literal["tfidf", "hashing"] = "tfidf",
+    ngram_range: tuple[int, int] = (3, 4),
+    analyzer: Literal["word", "char", "char_wb"] = "char_wb",
+    stop_words: list[str] | None = None,
+    random_state: int | None = None,
+    vocabulary: dict[str, int] | None = None,
+) -> SKOperatorProtocol[AnySeries, AnyDataFrame]:
+    from sklearn.feature_extraction.text import (  # type: ignore[import-untyped]
+        HashingVectorizer,
+        TfidfTransformer,
+        TfidfVectorizer,
+    )
 
-#             encoder_op = (
-#                 to_str | hashing | tf_idf_transformer | truncated_svd | block_normalize
-#             )
+    to_str = SeriesTransformer(ToStr())
 
-#         super().__init__(encoder_op, children=[encoder_op], name=name)
+    truncated_svd = SafeTruncatedSVD(
+        n_components=n_components, random_state=random_state
+    )
 
-#     @property
-#     def signature(self) -> IcoSignature:
-#         return IcoSignature(i=XSeries, c=None, o=XDataFrame)
+    block_normalize = BlockNormalize()
+
+    tf_idf_vectorizer = TfidfVectorizer(
+        ngram_range=ngram_range,
+        analyzer=analyzer,
+        stop_words=stop_words,
+        vocabulary=vocabulary,
+    )
+
+    # Case 1: Using TfidfVectorizer directly as vectorizer
+    if vectorizer == "tfidf":
+        column_tf_idf = SeriesToDataFrameTransformer(tf_idf_vectorizer)
+        return to_str | column_tf_idf | truncated_svd | block_normalize
+
+    # Case 2: Adding HashingVectorizer before TfidfTransformer
+    if vocabulary is not None:
+        raise ValueError(
+            "Custom vocabulary passed to StringEncoder, unsupported by"
+            "HashingVectorizer. Rerun without a 'vocabulary' parameter."
+        )
+
+    hashing = SeriesToDataFrameSparseTransformer(
+        HashingVectorizer(
+            ngram_range=ngram_range,
+            analyzer=analyzer,
+            stop_words=stop_words,
+        )
+    )
+
+    # HashingVectorizer returns sparse counts; apply IDF weighting with TfidfTransformer.
+    hash_tf_idf = DataFrameTransformer(TfidfTransformer())
+
+    return to_str | hashing | hash_tf_idf | truncated_svd | block_normalize

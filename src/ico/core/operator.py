@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import Any, Generic, Protocol, TypeVar, cast, overload, runtime_checkable
+from typing import (
+    Any,
+    Generic,
+    Protocol,
+    TypeVar,
+    cast,
+    overload,
+    runtime_checkable,
+)
 
 from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.signature import IcoSignature
