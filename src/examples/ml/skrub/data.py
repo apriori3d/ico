@@ -9,6 +9,8 @@ from typing import (
     TypeGuard,
     TypeVar,
     cast,
+    get_args,
+    get_origin,
     overload,
 )
 
@@ -58,6 +60,20 @@ AnyDataType = AnyDataFrame | AnySeries
 TData = TypeVar("TData", bound=AnyDataType)
 TDataFrame = TypeVar("TDataFrame", bound=AnyDataFrame)
 TSeries = TypeVar("TSeries", bound=AnySeries)
+
+
+def is_dataframe_output_type(output_type: Any) -> bool:
+    variants = get_args(AnyDataFrame)
+    origins = {get_origin(t) or t for t in variants}
+    candidate_origin = get_origin(output_type) or output_type
+    return output_type is AnyDataFrame or candidate_origin in origins
+
+
+def is_series_output_type(output_type: Any) -> bool:
+    variants = get_args(AnySeries)
+    origins = {get_origin(t) or t for t in variants}
+    candidate_origin = get_origin(output_type) or output_type
+    return output_type is AnySeries or candidate_origin in origins
 
 
 SKDataFrameResultTypes: TypeAlias = pd.DataFrame | sp.spmatrix | np.ndarray[Any, Any]
@@ -315,6 +331,23 @@ def try_wrap_result_series_xy(input: AnySeries, x1: Any) -> XySeries[Any, Any] |
 
         case _:
             return None
+
+
+def replace_series_column(
+    input_df: AnyDataFrame, column: AnySeries, column_name: str
+) -> AnyDataFrame:
+    input_df.X[column_name] = column.X
+    return input_df
+
+
+def replace_dataframe_column(
+    input_df: AnyDataFrame,
+    columns: AnyDataFrame,
+    column_name: str,
+) -> AnyDataFrame:
+    input_df.X = input_df.X.drop(columns=[column_name])
+    input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # pyright: ignore[reportUnknownMemberType]
+    return input_df
 
 
 class XSource(

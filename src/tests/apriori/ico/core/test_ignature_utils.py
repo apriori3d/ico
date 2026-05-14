@@ -5,7 +5,7 @@ from types import NoneType
 from typing import Any, Generic
 
 from ico.core.context_operator import C
-from ico.core.operator import I, O
+from ico.core.operator import I, IInv, O
 from ico.core.signature_utils import (
     replace_typevar,
     resolve_types_from_generic,
@@ -127,11 +127,11 @@ def test_resolve_types_from_generic_multi_class_io() -> None:
 
     # Resolved case with single generic arg defined
 
-    class OpBSingle(Generic[I], OpA[I, I]):
+    class OpBSingle(Generic[IInv], OpA[IInv, IInv]):
         pass
 
-    assert resolve_types_from_generic(OpBSingle[int](), OpA, I, O) == [int, int]
-    assert resolve_types_from_generic(OpBSingle(), OpA, I, O) == [None, None]  # pyright: ignore[reportUnknownArgumentType]
+    assert resolve_types_from_generic(OpBSingle[int](), OpA, IInv, O) == [int, int]
+    assert resolve_types_from_generic(OpBSingle(), OpA, IInv, O) == [None, None]  # pyright: ignore[reportUnknownArgumentType]
 
     # Resolved case with all generic args defined
     class OpC(OpB[str]):
@@ -162,11 +162,19 @@ def test_resolve_types_from_generic_multi_class_ico() -> None:
 
     # Resolved case with single generic arg defined
 
-    class OpBSingle(Generic[I], OpA[I, I, I]):
+    class OpBSingle(Generic[IInv], OpA[IInv, IInv, IInv]):
         pass
 
-    assert resolve_types_from_generic(OpBSingle[int](), OpA, I, C, O) == [int, int, int]
-    assert resolve_types_from_generic(OpBSingle(), OpA, I, C, O) == [None, None, None]  # pyright: ignore[reportUnknownArgumentType]
+    assert resolve_types_from_generic(OpBSingle[int](), OpA, IInv, C, O) == [
+        int,
+        int,
+        int,
+    ]
+    assert resolve_types_from_generic(OpBSingle(), OpA, IInv, C, O) == [  # pyright: ignore[reportUnknownArgumentType]
+        None,
+        None,
+        None,
+    ]  # pyright: ignore[reportUnknownArgumentType]
 
     # Resolved case with two generic args defined
     class OpC(Generic[C], OpB[C, str]):

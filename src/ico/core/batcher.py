@@ -1,12 +1,12 @@
 from collections.abc import Iterator
 from typing import Generic
 
-from ico.core.operator import I, IcoOperator
+from ico.core.operator import IcoOperator, IInv
 
 
 class IcoBatcher(
-    Generic[I],
-    IcoOperator[Iterator[I], Iterator[Iterator[I]]],
+    Generic[IInv],
+    IcoOperator[Iterator[IInv], Iterator[Iterator[IInv]]],
 ):
     """Batches stream items into fixed-size chunks for batch processing.
 
@@ -84,7 +84,7 @@ class IcoBatcher(
         self.batch_size = batch_size
         self.drop_last = drop_last
 
-    def _batch_fn(self, input: Iterator[I]) -> Iterator[Iterator[I]]:
+    def _batch_fn(self, input: Iterator[IInv]) -> Iterator[Iterator[IInv]]:
         """Internal implementation that performs the batching logic.
 
         Args:
@@ -98,7 +98,7 @@ class IcoBatcher(
             This is the function used by __call__. It accumulates items in memory
             only up to batch_size, then yields and clears the batch for efficiency.
         """
-        batch: list[I] = []
+        batch: list[IInv] = []
 
         for item in input:
             batch.append(item)

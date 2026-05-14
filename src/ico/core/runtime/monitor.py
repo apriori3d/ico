@@ -1,13 +1,13 @@
 from typing import Generic
 
 from ico.core.identity import IcoIdentity
-from ico.core.operator import I
+from ico.core.operator import IInv
 from ico.core.runtime.node import IcoRuntimeNode
 
 
 class IcoMonitor(
-    Generic[I],
-    IcoIdentity[I],
+    Generic[IInv],
+    IcoIdentity[IInv],
     IcoRuntimeNode,
 ):
     """Base runtime monitoring node for specialized monitoring implementations.
@@ -66,7 +66,7 @@ class IcoMonitor(
         IcoIdentity.__init__(self, name=name)  # pyright: ignore[reportUnknownMemberType]
         IcoRuntimeNode.__init__(self, runtime_name=name)
 
-    def __call__(self, item: I) -> I:
+    def __call__(self, item: IInv) -> IInv:
         """Process item with automatic runtime state management.
 
         Orchestrates item processing with runtime state transitions,
@@ -90,7 +90,7 @@ class IcoMonitor(
         self._after_call(item)
         return result
 
-    def _before_call(self, item: I) -> None:
+    def _before_call(self, item: IInv) -> None:
         """Pre-processing hook with automatic state transition to running.
 
         Called before each item is processed. Automatically transitions
@@ -106,7 +106,7 @@ class IcoMonitor(
         """
         self.state_model.running()
 
-    def _after_call(self, item: I) -> None:
+    def _after_call(self, item: IInv) -> None:
         """Post-processing hook with automatic state transition to ready.
 
         Called after each item is processed. Automatically transitions

@@ -4,14 +4,14 @@ from collections.abc import Callable, Sequence
 from typing import Any, Generic, Protocol, TypeVar, cast, overload, runtime_checkable
 
 from ico.core.node import IcoNode, IcoNodeProtocol
-from ico.core.operator import I, IContra, O
+from ico.core.operator import I, O
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
 # ────────────────────────────────────────────────
 C = TypeVar("C", contravariant=True)  # noqa: E741
-CContra = TypeVar("CContra", contravariant=True)
+# CContra = TypeVar("CContra", contravariant=True)
 OCovariant = TypeVar("OCovariant", covariant=True)  # noqa: E741
 
 # ────────────────────────────────────────────────
@@ -20,13 +20,11 @@ OCovariant = TypeVar("OCovariant", covariant=True)  # noqa: E741
 
 
 @runtime_checkable
-class IcoContextOperatorProtocol(
-    IcoNodeProtocol, Protocol[IContra, CContra, OCovariant]
-):
-    @property
-    def fn(self) -> Callable[[IContra, CContra], OCovariant]: ...
+class IcoContextOperatorProtocol(IcoNodeProtocol, Protocol[I, C, OCovariant]):
+    # @property
+    # def fn(self) -> Callable[[I, C], OCovariant]: ...
 
-    def __call__(self, item: IContra, context: CContra) -> OCovariant: ...
+    def __call__(self, item: I, context: C) -> OCovariant: ...
 
     @property
     def signature(self) -> IcoSignature: ...

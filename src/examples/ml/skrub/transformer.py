@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+from collections.abc import Sequence
 from typing import Any, Generic, cast, overload
 
 import pandas as pd  # type: ignore[import-untyped]
@@ -27,6 +28,7 @@ from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_args,
     setup_renderer_show_estimator,
 )
+from ico.core.node import IcoNodeProtocol
 from ico.core.operator import I, O
 from ico.core.signature import IcoSignature
 
@@ -36,8 +38,13 @@ class SKBaseTransformer(
     SKOperator[I, O],
     abc.ABC,
 ):
-    def __init__(self, *, name: str | None = None) -> None:
-        super().__init__(name=name)
+    def __init__(
+        self,
+        *,
+        name: str | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
+    ) -> None:
+        super().__init__(name=name, children=children)
 
     def _estimator_fn(self, input: I) -> O:
         match self.mode:

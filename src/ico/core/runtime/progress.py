@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, final
 
-from ico.core.operator import I
+from ico.core.operator import IInv
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.monitor import IcoMonitor
 from ico.core.tree_utils import TreePathIndex
@@ -57,7 +57,7 @@ class IcoProgressEvent(IcoRuntimeEvent):
 # ────────────────────────────────────────────────
 
 
-class IcoProgress(Generic[I], IcoMonitor[I]):
+class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
     """Progress tracking node for data flow monitoring in ICO computation.
 
     IcoProgress provides seamless progress tracking by embedding into computation
@@ -170,7 +170,7 @@ class IcoProgress(Generic[I], IcoMonitor[I]):
         IcoMonitor.__init__(self, name=name)  # pyright: ignore[reportUnknownMemberType]
         self.total = total
 
-    def _before_call(self, item: I) -> None:
+    def _before_call(self, item: IInv) -> None:
         """Process item entry with progress event generation.
 
         Overrides IcoMonitor._before_call to add progress tracking functionality

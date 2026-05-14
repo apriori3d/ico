@@ -5,7 +5,11 @@ from examples.ml.skrub.data import (
     XyDataFrame,
     XySource,
 )
-from examples.ml.skrub.ops import AddPrefixToColumns, create_string_encoder
+from examples.ml.skrub.ops import (
+    AddPrefixToColumns,
+    ApplyToColumn,
+    create_string_encoder,
+)
 from examples.ml.skrub.transformer import ColumnExtractor
 
 
@@ -39,12 +43,17 @@ def load_orders_x() -> XDataFrame[pd.DataFrame, pd.Series]:
 
 if __name__ == "__main__":
     product_encoder = create_string_encoder(n_components=2, vectorizer="hashing")
+
     product_pipeline = (
         ColumnExtractor("product") | product_encoder | AddPrefixToColumns("product")
     )
     source = XySource(load_orders_xy)
-    pipeline = source | product_pipeline
+
+    # pipeline = source | product_pipeline
+    # pipeline.describe()
+
+    pipeline = source | ApplyToColumn(product_encoder, "product")
     pipeline.describe()
 
-    result = pipeline(None)
-    print(result)
+    # result = pipeline(None)
+    # print(result)

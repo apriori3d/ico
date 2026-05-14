@@ -18,28 +18,33 @@ from ico.core.signature import IcoSignature
 # Generic type variables for ICO model
 # ────────────────────────────────────────────────
 
-I = TypeVar("I")  # noqa: E741
+I = TypeVar("I", contravariant=True)  # noqa: E741
 IContra = TypeVar("IContra", contravariant=True)  # noqa: E741
+IInv = TypeVar("IInv")  # noqa: E741
 O = TypeVar("O")  # noqa: E741
+OCov = TypeVar("OCov", covariant=True)  # noqa: E741
 O2 = TypeVar("O2")
+O2Cov = TypeVar("O2Cov", covariant=True)  # noqa: E741
 
 
 @runtime_checkable
-class IcoOperatorProtocol(IcoNodeProtocol, Protocol[IContra, O]):
-    def __call__(self, item: IContra) -> O: ...
+class IcoOperatorProtocol(IcoNodeProtocol, Protocol[I, O]):
+    def __call__(self, item: I) -> O: ...
 
     def __or__(
         self, other: IcoOperatorProtocol[O, O2]
-    ) -> IcoOperatorProtocol[IContra, O2]: ...
+    ) -> IcoOperatorProtocol[I, O2]: ...
 
     def __ior__(
         self, other: IcoOperatorProtocol[O, O2]
-    ) -> IcoOperatorProtocol[IContra, O2]: ...
+    ) -> IcoOperatorProtocol[I, O2]: ...
 
     @property
     def signature(self) -> IcoSignature: ...
 
-    def stream(self) -> IcoOperatorProtocol[Iterator[IContra], Iterator[O]]: ...
+    def stream(
+        self,
+    ) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...
 
 
 # ────────────────────────────────────────────────

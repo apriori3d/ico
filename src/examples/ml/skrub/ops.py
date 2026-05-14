@@ -5,7 +5,7 @@ from typing import Any, Literal, cast, overload
 
 from sklearn.decomposition import TruncatedSVD  # type: ignore[import-untyped]
 
-from examples.ml.skrub.base import SKOperatorProtocol
+from examples.ml.skrub.base import SKContextOperator, SKOperatorProtocol
 from examples.ml.skrub.data import (
     AnyDataFrame,
     AnySeries,
@@ -13,18 +13,24 @@ from examples.ml.skrub.data import (
     AnyXyDataFrame,
     XDataFrame,
     XyDataFrame,
+    is_dataframe_output_type,
+    is_series_output_type,
+    replace_dataframe_column,
+    replace_series_column,
     wrap_result_dataframe_x,
 )
 from examples.ml.skrub.describe.plan.utils import (
     setup_renderer_show_args,
 )
 from examples.ml.skrub.transformer import (
+    ColumnExtractor,
     DataFrameTransformer,
     SeriesToDataFrameSparseTransformer,
     SeriesToDataFrameTransformer,
     SeriesTransformer,
     SKBaseTransformer,
 )
+from ico.core.node import IcoNodeProtocol
 from ico.core.signature import IcoSignature
 from skrub._scaling_factor import (  # type: ignore[import-untyped]
     scaling_factor,  # pyright: ignore[reportUnknownVariableType]
@@ -145,6 +151,155 @@ class AddPrefixToColumns(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
     def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
         input.X = input.X.rename(columns=lambda c: f"{self.prefix}_{c}")  # pyright: ignore[reportUnknownLambdaType]
         return input
+
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)
+
+
+# @overload
+# def apply_to_column(
+#     column_flow: SKOperator[AnySeries, AnyDataFrame], column_name: str
+# ) -> SKOperator[AnyDataFrame, AnyDataFrame]: ...
+
+
+# @overload
+# def apply_to_column(
+#     column_flow: SKOperator[AnySeries, AnySeries], column_name: str
+# ) -> SKOperator[AnyDataFrame, AnyDataFrame]: ...
+
+
+# def apply_to_column(
+#     column_flow: SKOperator[AnySeries, AnySeries | AnyDataFrame],
+#     column_name: str,
+# ) -> SKOperator[AnyDataFrame, AnyDataFrame]:
+#     pass
+
+
+class ApplyToColumn(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
+    dataframe_column_flow: SKOperatorProtocol[AnyDataFrame, AnyDataFrame] | None
+    replace_dataframe_column_op: (
+        SKContextOperator[AnyDataFrame, AnyDataFrame, AnyDataFrame] | None
+    )
+    series_column_flow: SKOperatorProtocol[AnyDataFrame, AnySeries] | None
+    replace_series_column_op: (
+        SKContextOperator[AnySeries, AnyDataFrame, AnyDataFrame] | None
+    )
+    column_name: str
+
+    @overload
+    def __init__(
+        self,
+        column_flow: SKOperatorProtocol[AnySeries, AnyDataFrame],
+        column_name: str,
+        name: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        column_flow: SKOperatorProtocol[AnySeries, AnySeries],
+        column_name: str,
+        name: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        column_flow: SKOperatorProtocol[AnySeries, Any],
+        column_name: str,
+        name: str | None = None,
+    ):
+        # The column_flow can output either a Series or a DataFrame.
+        # If it outputs a DataFrame, we will add a prefix to the column names before merging to input data frame.
+        # If it outputs a Series, we will keep the same column name.
+        dataframe_column_flow: SKOperatorProtocol[AnyDataFrame, AnyDataFrame] | None
+        series_column_flow: SKOperatorProtocol[AnyDataFrame, AnySeries] | None
+
+        replace_dataframe_column_op: (
+            SKContextOperator[AnyDataFrame, AnyDataFrame, AnyDataFrame] | None
+        )
+        replace_series_column_op: (
+            SKContextOperator[AnySeries, AnyDataFrame, AnyDataFrame] | None
+        )
+
+        children: list[IcoNodeProtocol] = []
+
+        if is_dataframe_output_type(column_flow.signature.o):
+            dataframe_column_flow = (
+                ColumnExtractor(column_name)
+                | cast(SKOperatorProtocol[AnySeries, AnyDataFrame], column_flow)
+                | AddPrefixToColumns(prefix=column_name)
+            )
+            series_column_flow = None
+
+            replace_dataframe_column_op = SKContextOperator[
+                AnyDataFrame, AnyDataFrame, AnyDataFrame
+            ](lambda i, c: replace_dataframe_column(i, c, column_name))
+            replace_series_column_op = None
+
+            children += [dataframe_column_flow, replace_dataframe_column_op]
+
+        elif is_series_output_type(column_flow.signature.o):
+            dataframe_column_flow = None
+            series_column_flow = ColumnExtractor(column_name) | cast(
+                SKOperatorProtocol[AnySeries, AnySeries], column_flow
+            )
+            replace_series_column_op = SKContextOperator[
+                AnySeries, AnyDataFrame, AnyDataFrame
+            ](lambda i, c: replace_series_column(c, i, column_name))
+            replace_dataframe_column_op = None
+
+            children += [series_column_flow, replace_series_column_op]
+        else:
+            raise ValueError(
+                f"Unsupported column_flow output type: {column_flow.signature.o}. "
+                "Expected AnyDataFrame or AnySeries."
+            )
+        super().__init__(name=name, children=children)
+
+        self.dataframe_column_flow = dataframe_column_flow
+        self.replace_dataframe_column_op = replace_dataframe_column_op
+
+        self.series_column_flow = series_column_flow
+        self.replace_series_column_op = replace_series_column_op
+
+        self.column_name = column_name
+
+    @overload
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
+
+    @overload
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
+
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
+        return self._transform(input)
+
+    @overload
+    def _transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
+
+    @overload
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
+
+    def _transform(self, input: AnyXDataFrame) -> AnyXDataFrame:
+        # Process column flow with data frame output (many columns as result)
+        if (
+            self.dataframe_column_flow is not None
+            and self.replace_dataframe_column_op is not None
+        ):
+            multi_column_data = self.dataframe_column_flow(input)
+            return self.replace_dataframe_column_op(input, multi_column_data)
+
+        # Process column flow with series output (single column as result)
+        elif (
+            self.series_column_flow is not None
+            and self.replace_series_column_op is not None
+        ):
+            single_column_data = self.series_column_flow(input)
+            return self.replace_series_column_op(single_column_data, input)
+
+        raise ValueError(
+            "Invalid state in ApplyToColumn: both dataframe_column_flow and series_column_flow are None."
+        )
 
     @property
     def signature(self) -> IcoSignature:
