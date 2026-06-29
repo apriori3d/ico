@@ -106,7 +106,8 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
             The function signature determines the operator's type signature,
             which can be inferred automatically for type safety.
         """
-        super().__init__(name=name, parent=parent, children=children)
+
+        IcoNode.__init__(self, name=name, parent=parent, children=children)
         self.fn = fn
 
     def __call__(self, item: I, context: C) -> O:
