@@ -1,5 +1,6 @@
 import pandas as pd  # type: ignore[import-untyped]
 
+import skrub  # type: ignore[import-untyped]
 from examples.ml.skrub.data import (
     XDataFrame,
     XyDataFrame,
@@ -8,6 +9,11 @@ from examples.ml.skrub.data import (
 from examples.ml.skrub.ops import (
     ApplyToColumn,
     create_string_encoder,
+)
+from examples.ml.skrub.transformer import (
+    DataFrameTransformer,
+    SeriesToDataFrameTransformer,
+    SeriesTransformer,
 )
 
 
@@ -40,10 +46,30 @@ def load_orders_x() -> XDataFrame[pd.DataFrame, pd.Series]:
 
 
 if __name__ == "__main__":
+    from skrub import selectors as s  # type: ignore[import-untyped]
+
     source = XySource(load_orders_xy)
+
     product_encoder = create_string_encoder(n_components=2, vectorizer="hashing")
-    pipeline = source | ApplyToColumn(product_encoder, "product")
+    date_encoder = SeriesTransformer(skrub.ToDatetime()) | SeriesToDataFrameTransformer(
+        skrub.DatetimeEncoder(add_total_seconds=False)
+    )
+    from sklearn.decomposition import PCA  # type: ignore[import-untyped]
+
+    date_pca_encoder = DataFrameTransformer(PCA(n_components=2))
+
+    pipeline = (
+        source
+        | ApplyToColumn(product_encoder, "product")
+        | ApplyToColumn(date_encoder, "date", add_prefix_to_output_columns=False)
+        | ApplyToColumn(
+            date_pca_encoder,
+            column_name_or_pattern=s.glob("date_*"),  # type: ignore
+            output_column_prefix="date_pca",
+        )
+    )
+
     pipeline.describe()
 
     result = pipeline(None)
-    print(result)
+    print(result.X)

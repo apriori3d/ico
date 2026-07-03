@@ -21,6 +21,7 @@ from examples.ml.skrub.data import (
     XDataFrame,
     XyDataFrame,
     select_column_x,
+    select_columns_x,
     wrap_result_dataframe_x,
     wrap_result_series_x,
 )
@@ -234,7 +235,7 @@ class ColumnExtractor(
     @overload
     def _fit_transform(self, input: AnyXDataFrame) -> AnyXSeries: ...
 
-    def _fit_transform(self, input: AnyXDataFrame) -> AnyXSeries:
+    def _fit_transform(self, input: AnyXDataFrame) -> AnySeries:
         return select_column_x(input, self.column)
 
     @overload
@@ -243,9 +244,45 @@ class ColumnExtractor(
     @overload
     def _transform(self, input: AnyXDataFrame) -> AnyXSeries: ...
 
-    def _transform(self, input: AnyXDataFrame) -> AnyXSeries:
+    def _transform(self, input: AnyXDataFrame) -> AnySeries:
         return self._fit_transform(input)
 
     @property
     def signature(self) -> IcoSignature:
         return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXSeries)
+
+
+@setup_renderer_show_args("column")
+class ColumnsExtractor(
+    SKBaseTransformer[
+        AnyXDataFrame | AnyXyDataFrame,
+        AnyXDataFrame | AnyXyDataFrame,
+    ],
+):
+    columns_pattern: Any
+
+    def __init__(self, columns_pattern: Any, name: str | None = None) -> None:
+        super().__init__(name=name)
+        self.columns_pattern = columns_pattern
+
+    @overload
+    def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
+
+    @overload
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyXDataFrame: ...
+
+    def _fit_transform(self, input: AnyXDataFrame) -> AnyDataFrame:
+        return select_columns_x(input, self.columns_pattern)
+
+    @overload
+    def _transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...
+
+    @overload
+    def _transform(self, input: AnyXDataFrame) -> AnyXyDataFrame: ...
+
+    def _transform(self, input: AnyXDataFrame) -> AnyDataFrame:
+        return self._fit_transform(input)
+
+    @property
+    def signature(self) -> IcoSignature:
+        return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)

@@ -249,9 +249,8 @@ def select_column_x(input: AnyDataFrame, name: str) -> AnySeries:
         ):
             return XySeries[pd.Series, pd.Series](X=x1, y=input.y)
 
-        case XDataFrame() as input if (
-            _is_panda_dataframe(input.X)
-            and _is_panda_series(x1 := cast(Any, input.X[name]))
+        case XDataFrame() as input if _is_panda_dataframe(input.X) and _is_panda_series(
+            x1 := cast(Any, input.X[name])
         ):
             return XSeries[pd.Series](X=x1)
 
@@ -277,6 +276,40 @@ def select_column_xy(
 
 
 @overload
+def select_columns_x(
+    input: XyDataFrame[Any, Any, Any], columns_pattern: Any
+) -> XyDataFrame[Any, Any, Any]: ...
+
+
+@overload
+def select_columns_x(
+    input: XDataFrame[Any, Any], columns_pattern: Any
+) -> XDataFrame[Any, Any]: ...
+
+
+def select_columns_x(input: AnyDataFrame, columns_pattern: Any) -> AnyDataFrame:
+    from skrub import selectors as s  # type: ignore[import-untyped]
+
+    match input:
+        case input if (
+            _is_xy_dataframe(input)
+            and _is_panda_dataframe(input.X)
+            and _is_panda_series(input.y)
+            and _is_panda_dataframe(x1 := cast(Any, s.select(input.X, columns_pattern)))  # type: ignore
+        ):
+            return XyDataFrame[pd.DataFrame, pd.Series, pd.Series](X=x1, y=input.y)
+
+        case XDataFrame() as input if (
+            _is_panda_dataframe(input.X)
+            and _is_panda_dataframe(x1 := cast(Any, s.select(input.X, columns_pattern)))  # type: ignore
+        ):
+            return XDataFrame[pd.DataFrame, pd.Series](X=x1)
+
+        case _:
+            raise TypeError(f"Unsupported input type: {type(input).__name__}")
+
+
+@overload
 def wrap_result_series_x(input: XySeries[Any, Any], x1: Any) -> XySeries[Any, Any]: ...
 
 
@@ -289,12 +322,12 @@ def wrap_result_series_x(input: AnySeries, x1: Any) -> AnySeries:
         return result
 
     match input, x1:
-        case XSeries() as input, x1 if (
-            _is_panda_series(input.X) and _is_panda_series(x1)
+        case XSeries() as input, x1 if _is_panda_series(input.X) and _is_panda_series(
+            x1
         ):
             return XSeries[pd.Series](X=x1)
 
-        case XSeries() as input, x1 if (_is_panda_series(input.X) and _is_ndarray(x1)):
+        case XSeries() as input, x1 if _is_panda_series(input.X) and _is_ndarray(x1):
             return XSeries[pd.Series](X=pd.Series(x1))
 
         case _:
@@ -346,6 +379,23 @@ def replace_dataframe_column(
     column_name: str,
 ) -> AnyDataFrame:
     input_df.X = input_df.X.drop(columns=[column_name])
+    input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # pyright: ignore[reportUnknownMemberType]
+    return input_df
+
+
+def replace_dataframe_columns(
+    input_df: AnyDataFrame,
+    columns: AnyDataFrame | AnySeries,
+    column_pattern: Any,
+) -> AnyDataFrame:
+    from skrub import selectors as s  # type: ignore[import-untyped]
+
+    if not isinstance(column_pattern, s.Selector):
+        raise TypeError(
+            f"Expected a Selector for column_pattern, got {type(column_pattern).__name__}"
+        )
+    selected_columns = column_pattern.expand(input_df.X)  # type: ignore
+    input_df.X = input_df.X.drop(columns=selected_columns)
     input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # pyright: ignore[reportUnknownMemberType]
     return input_df
 

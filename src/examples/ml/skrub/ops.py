@@ -16,6 +16,7 @@ from examples.ml.skrub.data import (
     is_dataframe_output_type,
     is_series_output_type,
     replace_dataframe_column,
+    replace_dataframe_columns,
     replace_series_column,
     wrap_result_dataframe_x,
 )
@@ -24,6 +25,7 @@ from examples.ml.skrub.describe.plan.utils import (
 )
 from examples.ml.skrub.transformer import (
     ColumnExtractor,
+    ColumnsExtractor,
     DataFrameTransformer,
     SeriesToDataFrameSparseTransformer,
     SeriesToDataFrameTransformer,
@@ -32,6 +34,7 @@ from examples.ml.skrub.transformer import (
 )
 from ico.core.node import IcoNodeProtocol
 from ico.core.signature import IcoSignature
+from skrub import selectors as s  # type: ignore[import-untyped]
 from skrub._scaling_factor import (  # type: ignore[import-untyped]
     scaling_factor,  # pyright: ignore[reportUnknownVariableType]
 )
@@ -126,6 +129,7 @@ class BlockNormalize(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
         return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)
 
 
+@setup_renderer_show_args("prefix")
 class AddPrefixToColumns(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
     prefix: str
 
@@ -157,25 +161,6 @@ class AddPrefixToColumns(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
         return IcoSignature(i=AnyXDataFrame, c=None, o=AnyXDataFrame)
 
 
-# @overload
-# def apply_to_column(
-#     column_flow: SKOperator[AnySeries, AnyDataFrame], column_name: str
-# ) -> SKOperator[AnyDataFrame, AnyDataFrame]: ...
-
-
-# @overload
-# def apply_to_column(
-#     column_flow: SKOperator[AnySeries, AnySeries], column_name: str
-# ) -> SKOperator[AnyDataFrame, AnyDataFrame]: ...
-
-
-# def apply_to_column(
-#     column_flow: SKOperator[AnySeries, AnySeries | AnyDataFrame],
-#     column_name: str,
-# ) -> SKOperator[AnyDataFrame, AnyDataFrame]:
-#     pass
-
-
 class ApplyToColumn(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
     dataframe_column_flow: SKOperatorProtocol[AnyDataFrame, AnyDataFrame] | None
     replace_dataframe_column_op: (
@@ -185,13 +170,35 @@ class ApplyToColumn(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
     replace_series_column_op: (
         SKContextOperator[AnySeries, AnyDataFrame, AnyDataFrame] | None
     )
-    column_name: str
+    column_name: Any
+
+    @overload
+    def __init__(
+        self,
+        column_flow: SKOperatorProtocol[AnyDataFrame, AnyDataFrame],
+        column_name_or_pattern: s.Selector,
+        output_column_prefix: str,
+        add_prefix_to_output_columns: bool = True,
+        name: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        column_flow: SKOperatorProtocol[AnyDataFrame, AnySeries],
+        column_name_or_pattern: s.Selector,
+        output_column_prefix: str | None = None,
+        add_prefix_to_output_columns: bool = True,
+        name: str | None = None,
+    ) -> None: ...
 
     @overload
     def __init__(
         self,
         column_flow: SKOperatorProtocol[AnySeries, AnyDataFrame],
-        column_name: str,
+        column_name_or_pattern: str,
+        output_column_prefix: str | None = None,
+        add_prefix_to_output_columns: bool = True,
         name: str | None = None,
     ) -> None: ...
 
@@ -199,16 +206,29 @@ class ApplyToColumn(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
     def __init__(
         self,
         column_flow: SKOperatorProtocol[AnySeries, AnySeries],
-        column_name: str,
+        column_name_or_pattern: str,
+        output_column_prefix: str | None = None,
+        add_prefix_to_output_columns: bool = False,
         name: str | None = None,
     ) -> None: ...
 
     def __init__(
         self,
-        column_flow: SKOperatorProtocol[AnySeries, Any],
-        column_name: str,
+        column_flow: SKOperatorProtocol[Any, Any],
+        column_name_or_pattern: str | s.Selector,
+        output_column_prefix: str | None = None,
+        add_prefix_to_output_columns: bool = True,
         name: str | None = None,
     ):
+        if (
+            isinstance(column_name_or_pattern, s.Selector)
+            and add_prefix_to_output_columns
+            and output_column_prefix is None
+        ):
+            raise ValueError(
+                "When column_name_or_pattern is a Selector, output_column_prefix must be provided."
+            )
+
         # The column_flow can output either a Series or a DataFrame.
         # If it outputs a DataFrame, we will add a prefix to the column names before merging to input data frame.
         # If it outputs a Series, we will keep the same column name.
@@ -225,31 +245,68 @@ class ApplyToColumn(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
         children: list[IcoNodeProtocol] = []
 
         if is_dataframe_output_type(column_flow.signature.o):
-            dataframe_column_flow = (
-                ColumnExtractor(column_name)
-                | cast(SKOperatorProtocol[AnySeries, AnyDataFrame], column_flow)
-                | AddPrefixToColumns(prefix=column_name)
-            )
-            series_column_flow = None
+            if is_series_output_type(column_flow.signature.i):
+                assert isinstance(column_name_or_pattern, str)
+                dataframe_column_flow = ColumnExtractor(column_name_or_pattern) | cast(
+                    SKOperatorProtocol[AnySeries, AnyDataFrame], column_flow
+                )
+                if add_prefix_to_output_columns:
+                    dataframe_column_flow |= AddPrefixToColumns(
+                        prefix=column_name_or_pattern
+                    )
+                replace_dataframe_column_op = SKContextOperator[
+                    AnyDataFrame, AnyDataFrame, AnyDataFrame
+                ](lambda i, c: replace_dataframe_column(i, c, column_name_or_pattern))
 
-            replace_dataframe_column_op = SKContextOperator[
-                AnyDataFrame, AnyDataFrame, AnyDataFrame
-            ](lambda i, c: replace_dataframe_column(i, c, column_name))
+            elif is_dataframe_output_type(column_flow.signature.i):
+                dataframe_column_flow = ColumnsExtractor(column_name_or_pattern) | cast(
+                    SKOperatorProtocol[AnyDataFrame, AnyDataFrame], column_flow
+                )
+                if add_prefix_to_output_columns:
+                    assert output_column_prefix is not None
+                    dataframe_column_flow |= AddPrefixToColumns(
+                        prefix=output_column_prefix
+                    )
+                replace_dataframe_column_op = SKContextOperator[
+                    AnyDataFrame, AnyDataFrame, AnyDataFrame
+                ](lambda i, c: replace_dataframe_columns(i, c, column_name_or_pattern))
+
+            else:
+                raise ValueError(
+                    f"Unsupported column_flow input type: {column_flow.signature.i}. "
+                    "Expected AnyDataFrame or AnySeries."
+                )
+            series_column_flow = None
             replace_series_column_op = None
 
-            children += [dataframe_column_flow, replace_dataframe_column_op]
+            children += [dataframe_column_flow]
 
         elif is_series_output_type(column_flow.signature.o):
+            if is_series_output_type(column_flow.signature.i):
+                assert isinstance(column_name_or_pattern, str)
+                series_column_flow = ColumnExtractor(column_name_or_pattern) | cast(
+                    SKOperatorProtocol[AnySeries, AnySeries], column_flow
+                )
+                replace_series_column_op = SKContextOperator[
+                    AnySeries, AnyDataFrame, AnyDataFrame
+                ](lambda i, c: replace_series_column(c, i, column_name_or_pattern))
+
+            elif is_dataframe_output_type(column_flow.signature.i):
+                series_column_flow = ColumnsExtractor(column_name_or_pattern) | cast(
+                    SKOperatorProtocol[AnyDataFrame, AnySeries], column_flow
+                )
+                replace_series_column_op = SKContextOperator[
+                    AnySeries, AnyDataFrame, AnyDataFrame
+                ](lambda i, c: replace_dataframe_columns(c, i, output_column_prefix))
+            else:
+                raise ValueError(
+                    f"Unsupported column_flow input type: {column_flow.signature.i}. "
+                    "Expected AnyDataFrame or AnySeries."
+                )
             dataframe_column_flow = None
-            series_column_flow = ColumnExtractor(column_name) | cast(
-                SKOperatorProtocol[AnySeries, AnySeries], column_flow
-            )
-            replace_series_column_op = SKContextOperator[
-                AnySeries, AnyDataFrame, AnyDataFrame
-            ](lambda i, c: replace_series_column(c, i, column_name))
             replace_dataframe_column_op = None
 
-            children += [series_column_flow, replace_series_column_op]
+            children += [series_column_flow]
         else:
             raise ValueError(
                 f"Unsupported column_flow output type: {column_flow.signature.o}. "
@@ -263,7 +320,7 @@ class ApplyToColumn(SKBaseTransformer[AnyDataFrame, AnyDataFrame]):
         self.series_column_flow = series_column_flow
         self.replace_series_column_op = replace_series_column_op
 
-        self.column_name = column_name
+        self.column_name = column_name_or_pattern
 
     @overload
     def _fit_transform(self, input: AnyXyDataFrame) -> AnyXyDataFrame: ...

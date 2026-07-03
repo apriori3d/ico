@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, cast
 
 from rich.text import Text
@@ -7,7 +8,10 @@ from rich.text import Text
 from examples.ml.skrub.base import SKOperator, SKOperatorProtocol
 from examples.ml.skrub.data import XSource, XySource
 from examples.ml.skrub.describe.plan.utils import SKRendererPerOperatorOptions
+from examples.ml.skrub.ops import ApplyToColumn
 from ico.core.node import IcoNodeProtocol
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
 from ico.describe.plan.rich_renderer.renderer_registry import (
     register_renderer,
     select_the_most_specific_type,
@@ -121,26 +125,24 @@ class SKSourceRender(RowRenderer):
         return render_callable(source.provider, options=self.options)
 
 
-# @register_renderer(SKApplyToCols)
-# class ApplyToColsRenderer(GroupRenderer):
-#     def __init__(self, options: PlanRendererOptions) -> None:
-#         super().__init__(
-#             options=options,
-#             header_renderer=RowRenderer(
-#                 flow_column_prefix=Text(
-#                     "apply to columns", style=DescribeStyle.keyword.value
-#                 ),
-#                 flow_includes_node_info=False,
-#                 options=options,
-#             ),
-#             footer_renderer=RowRenderer(
-#                 flow_column_prefix=Text(
-#                     "concatinate", style=DescribeStyle.keyword.value
-#                 ),
-#                 options=replace(options, signature_format="Output"),
-#                 show_name_column=False,
-#                 show_type_column=False,
-#                 show_state_column=False,
-#                 flow_includes_node_info=False,
-#             ),
-#         )
+@register_renderer(ApplyToColumn)
+class ApplyToColsRenderer(GroupRenderer):
+    def __init__(self, options: PlanRendererOptions) -> None:
+        super().__init__(
+            options=options,
+            header_renderer=RowRenderer(
+                flow_column_prefix=Text(
+                    "apply to column", style=DescribeStyle.keyword.value
+                ),
+                flow_includes_node_info=False,
+                options=options,
+            ),
+            footer_renderer=RowRenderer(
+                flow_column_prefix=Text("replace", style=DescribeStyle.keyword.value),
+                options=replace(options, signature_format="Output"),
+                show_name_column=False,
+                show_type_column=False,
+                show_state_column=False,
+                flow_includes_node_info=False,
+            ),
+        )
