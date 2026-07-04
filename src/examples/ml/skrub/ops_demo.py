@@ -2,13 +2,16 @@ import pandas as pd  # type: ignore[import-untyped]
 
 import skrub  # type: ignore[import-untyped]
 from examples.ml.skrub.data import (
+    PandaXyDataFrame,
+    PandaXySeries,
     XDataFrame,
     XyDataFrame,
     XySource,
 )
+from examples.ml.skrub.estimator import DataFrameEstimator
 from examples.ml.skrub.ops import (
     ApplyToColumn,
-    create_string_encoder,
+    StringEncoder,
 )
 from examples.ml.skrub.transformer import (
     DataFrameTransformer,
@@ -46,30 +49,42 @@ def load_orders_x() -> XDataFrame[pd.DataFrame, pd.Series]:
 
 
 if __name__ == "__main__":
-    from skrub import selectors as s  # type: ignore[import-untyped]
+    from sklearn.decomposition import PCA  # type: ignore[import-untyped]
+    from sklearn.dummy import DummyClassifier  # type: ignore[import-untyped]
 
     source = XySource(load_orders_xy)
 
-    product_encoder = create_string_encoder(n_components=2, vectorizer="hashing")
-    date_encoder = SeriesTransformer(skrub.ToDatetime()) | SeriesToDataFrameTransformer(
+    FrameType = PandaXyDataFrame
+    SeriesType = PandaXySeries
+
+    product_encoder = StringEncoder[SeriesType, FrameType](
+        n_components=2, vectorizer="hashing"
+    )
+    s = product_encoder.signature
+
+    date_encoder = SeriesTransformer[SeriesType](
+        skrub.ToDatetime()
+    ) | SeriesToDataFrameTransformer[SeriesType, FrameType](
         skrub.DatetimeEncoder(add_total_seconds=False)
     )
-    from sklearn.decomposition import PCA  # type: ignore[import-untyped]
+    date_pca_encoder = DataFrameTransformer[FrameType](PCA(n_components=2))
 
-    date_pca_encoder = DataFrameTransformer(PCA(n_components=2))
+    estimator = DataFrameEstimator(DummyClassifier())
 
     pipeline = (
         source
-        | ApplyToColumn(product_encoder, "product")
-        | ApplyToColumn(date_encoder, "date", add_prefix_to_output_columns=False)
-        | ApplyToColumn(
-            date_pca_encoder,
-            column_name_or_pattern=s.glob("date_*"),  # type: ignore
-            output_column_prefix="date_pca",
-        )
+        | ApplyToColumn(product_encoder, "product", output_prefix="product")
+        | ApplyToColumn(date_encoder, "date")
+        | estimator
     )
 
+    # | ApplyToColumn(
+    #     date_pca_encoder,
+    #     column_name=cast(s.Selector, s.glob("date_*")),  # pyright: ignore[reportUnknownMemberType]
+    #     output_column_prefix="date_pca",
+    # )
     pipeline.describe()
+    pipeline.fit_mode()
 
-    result = pipeline(None)
-    print(result.X)
+    # result = pipeline(None)
+    # print(result.X)

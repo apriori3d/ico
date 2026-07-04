@@ -52,7 +52,11 @@ def resolve_types_from_generic(
         orig
         for c in obj.__class__.__mro__
         for orig in place_generic_first(getattr(c, "__orig_bases__", ()))
-        if issubclass(get_origin(orig) or object, base_class | Generic)
+        if (get_origin(orig) is Generic)
+        or (
+            isinstance(get_origin(orig), type)
+            and issubclass(cast(type, get_origin(orig)), base_class)
+        )
     ]
 
     # If the instance itself has a generic type hint - add it to the list to resolve.
@@ -72,17 +76,19 @@ def resolve_types_from_generic(
     )
 
     resolve_hint_order = list(reversed(resolve_hint_order))
-    resolve_generic_hints = resolve_hint_order[::2]
-    resolve_class_hints = resolve_hint_order[1::2]
 
     # Resolve given vars in generic arguments using reverse MRO as we go.
+    # We intentionally scan adjacent hints and only use valid Generic -> base_class
+    # pairs, because complex hierarchies may include extra entries (e.g. Protocol)
+    # that break strict even/odd pairing.
     for generic_hint, cls_hint in zip(
-        resolve_generic_hints, resolve_class_hints, strict=False
+        resolve_hint_order, resolve_hint_order[1:], strict=False
     ):
-        if get_origin(generic_hint) is not Generic or not issubclass(
-            get_origin(cls_hint) or object, base_class
+        cls_origin = get_origin(cls_hint)
+        if get_origin(generic_hint) is not Generic or not (
+            isinstance(cls_origin, type) and issubclass(cls_origin, base_class)
         ):
-            break  # We expect pairs of Generic and base_class, if not - we can't resolve further.
+            continue
 
         # Make pairs of generic and class hints
         generic_args: tuple[Any, ...] = get_args(generic_hint)  # pyright: ignore[reportAssignmentType]

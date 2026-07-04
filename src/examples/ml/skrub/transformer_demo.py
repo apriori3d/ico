@@ -3,15 +3,17 @@ from __future__ import annotations
 import pandas as pd  # type: ignore[import-untyped]
 
 from examples.ml.skrub.data import (
+    PandaXDataFrame,
+    PandaXSeries,
     XDataFrame,
     XyDataFrame,
     XySource,
 )
 from examples.ml.skrub.transformer import (
-    ColumnExtractor,
-    DataFrameTransformer,
-    SeriesToDataFrameTransformer,
-    SeriesTransformer,
+    XColumnExtractor,
+    XDataFrameTransformer,
+    XSeriesToDataFrameTransformer,
+    XSeriesTransformer,
 )
 
 
@@ -53,14 +55,16 @@ if __name__ == "__main__":
     )
 
     source = XySource(load_orders_xy)
+    SeriesType = PandaXSeries
+    DataFrameType = PandaXDataFrame
 
-    prepare_is_valid = ColumnExtractor("is_valid") | SeriesTransformer(ToStr())
+    prepare_is_valid = XColumnExtractor("is_valid") | XSeriesTransformer(ToStr())
 
-    prepare_date = ColumnExtractor("date") | SeriesTransformer(skrub.ToDatetime())
-    encode_date = SeriesToDataFrameTransformer(
+    prepare_date = XColumnExtractor("date") | XSeriesTransformer(skrub.ToDatetime())
+    encode_date = XSeriesToDataFrameTransformer(
         skrub.DatetimeEncoder(add_total_seconds=False)
     )
-    date_pca = DataFrameTransformer(PCA(n_components=2))
+    date_pca = XDataFrameTransformer(PCA(n_components=2))
 
     pipeline = source | prepare_date | encode_date | date_pca
     pipeline.describe()

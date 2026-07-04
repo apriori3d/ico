@@ -22,6 +22,7 @@ from examples.ml.skrub.base import SKChain, SKOperatorProtocol
 from ico.core.operator import O2, IcoOperator, IcoOperatorProtocol
 from ico.core.signature import IcoSignature
 from ico.core.signature_utils import infer_from_callable, type_contain_any_typevar
+from skrub import selectors as s  # type: ignore[import-untyped]
 
 TTable = TypeVar("TTable", bound=pd.DataFrame | sp.spmatrix)
 TColumn = TypeVar("TColumn", bound=pd.Series | sp.spmatrix)
@@ -35,7 +36,10 @@ class XDataFrame(Generic[TTable, TColumn]):
 
 
 @dataclass(slots=True)
-class XyDataFrame(Generic[TTable, TColumn, TTarget], XDataFrame[TTable, TColumn]):
+class XyDataFrame(
+    Generic[TTable, TColumn, TTarget],
+    XDataFrame[TTable, TColumn],
+):
     y: TTarget
 
 
@@ -45,9 +49,19 @@ class XSeries(Generic[TColumn]):
 
 
 @dataclass(slots=True)
-class XySeries(Generic[TColumn, TTarget], XSeries[TColumn]):
+class XySeries(
+    Generic[TColumn, TTarget],
+    XSeries[TColumn],
+):
     y: TTarget
 
+
+PandaXDataFrame = XDataFrame[pd.DataFrame, pd.Series]
+PandaXyDataFrame = XyDataFrame[pd.DataFrame, pd.Series, pd.Series]
+PandaXSeries = XSeries[pd.Series]
+PandaXySeries = XySeries[pd.Series, pd.Series]
+AnyPandaSeries = PandaXSeries | PandaXySeries
+AnyPandaDataFrame = PandaXDataFrame | PandaXyDataFrame
 
 AnyXDataFrame = XDataFrame[Any, Any]
 AnyXyDataFrame = XyDataFrame[Any, Any, Any]
@@ -57,9 +71,9 @@ AnyXySeries = XySeries[Any, Any]
 AnySeries = AnyXySeries | AnyXSeries
 AnyDataType = AnyDataFrame | AnySeries
 
+TDataFrame = TypeVar("TDataFrame", PandaXDataFrame, PandaXyDataFrame)
+TSeries = TypeVar("TSeries", PandaXSeries, PandaXySeries)
 TData = TypeVar("TData", bound=AnyDataType)
-TDataFrame = TypeVar("TDataFrame", bound=AnyDataFrame)
-TSeries = TypeVar("TSeries", bound=AnySeries)
 
 
 def is_dataframe_output_type(output_type: Any) -> bool:
@@ -229,17 +243,17 @@ def wrap_result_dataframe_xy(
             )
 
 
-@overload
-def select_column_x(
-    input: XyDataFrame[Any, Any, Any], name: str
-) -> XySeries[Any, Any]: ...
+# @overload
+# def select_column_x(
+#     input: XyDataFrame[Any, Any, Any], name: str
+# ) -> XySeries[Any, Any]: ...
 
 
-@overload
-def select_column_x(input: XDataFrame[Any, Any], name: str) -> XSeries[Any]: ...
+# @overload
+# def select_column_x(input: XDataFrame[Any, Any], name: str) -> XSeries[Any]: ...
 
 
-def select_column_x(input: AnyDataFrame, name: str) -> AnySeries:
+def select_column_x(input: AnyPandaDataFrame, name: str) -> AnyPandaSeries:
     match input:
         case input if (
             _is_xy_dataframe(input)
@@ -367,36 +381,48 @@ def try_wrap_result_series_xy(input: AnySeries, x1: Any) -> XySeries[Any, Any] |
 
 
 def replace_series_column(
-    input_df: AnyDataFrame, column: AnySeries, column_name: str
-) -> AnyDataFrame:
+    input_df: PandaXDataFrame,
+    column: PandaXSeries,
+    column_name: str,
+) -> PandaXDataFrame:
     input_df.X[column_name] = column.X
     return input_df
 
 
+@overload
 def replace_dataframe_column(
-    input_df: AnyDataFrame,
-    columns: AnyDataFrame,
+    input_df: PandaXDataFrame,
+    columns: PandaXDataFrame,
     column_name: str,
-) -> AnyDataFrame:
-    input_df.X = input_df.X.drop(columns=[column_name])
-    input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # pyright: ignore[reportUnknownMemberType]
+) -> PandaXDataFrame: ...
+
+
+@overload
+def replace_dataframe_column(
+    input_df: XyDataFrame[Any, Any, Any],
+    columns: PandaXDataFrame,
+    column_name: str,
+) -> XyDataFrame[Any, Any, Any]: ...
+
+
+def replace_dataframe_column(
+    input_df: PandaXDataFrame | XyDataFrame[Any, Any, Any],
+    columns: PandaXDataFrame,
+    column_name: str,
+) -> PandaXDataFrame | XyDataFrame[Any, Any, Any]:
+    input_df.X = input_df.X.drop(columns=[column_name])  # pyright: ignore[reportUnknownMemberType]
+    input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # type: ignore
     return input_df
 
 
 def replace_dataframe_columns(
-    input_df: AnyDataFrame,
-    columns: AnyDataFrame | AnySeries,
-    column_pattern: Any,
+    input_df: PandaXDataFrame,
+    columns: PandaXDataFrame | PandaXSeries,
+    column_pattern: s.Selector,
 ) -> AnyDataFrame:
-    from skrub import selectors as s  # type: ignore[import-untyped]
-
-    if not isinstance(column_pattern, s.Selector):
-        raise TypeError(
-            f"Expected a Selector for column_pattern, got {type(column_pattern).__name__}"
-        )
-    selected_columns = column_pattern.expand(input_df.X)  # type: ignore
-    input_df.X = input_df.X.drop(columns=selected_columns)
-    input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # pyright: ignore[reportUnknownMemberType]
+    selected_columns = cast(list[str], column_pattern.expand(input_df.X))  # pyright: ignore[reportUnknownMemberType]
+    input_df.X = input_df.X.drop(columns=selected_columns)  # pyright: ignore[reportUnknownMemberType]
+    input_df.X = pd.concat([input_df.X, columns.X], axis=1)  # type: ignore
     return input_df
 
 

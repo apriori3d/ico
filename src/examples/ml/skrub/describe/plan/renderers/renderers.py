@@ -8,6 +8,7 @@ from rich.text import Text
 from examples.ml.skrub.base import SKOperator, SKOperatorProtocol
 from examples.ml.skrub.data import XSource, XySource
 from examples.ml.skrub.describe.plan.utils import SKRendererPerOperatorOptions
+from examples.ml.skrub.estimator import SKEstimator
 from examples.ml.skrub.ops import ApplyToColumn
 from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.options import PlanRendererOptions
@@ -58,7 +59,6 @@ class BaseRender(RowRenderer):
             and len(SKRendererPerOperatorOptions) > 0
         ):
             # Select a transformer target class to show if available
-
             target_type = select_the_most_specific_type(
                 type(any_sk_operator), list(SKRendererPerOperatorOptions.keys())
             )
@@ -66,6 +66,21 @@ class BaseRender(RowRenderer):
             options = SKRendererPerOperatorOptions.get(target_type, None)
             target_for_class = (
                 any_sk_operator.transformer
+                if options and options.show_estimator_class
+                else any_sk_operator
+            )
+        elif (
+            isinstance(any_sk_operator, SKEstimator)
+            and len(SKRendererPerOperatorOptions) > 0
+        ):
+            # Select a estimator target class to show if available
+            target_type = select_the_most_specific_type(
+                type(any_sk_operator), list(SKRendererPerOperatorOptions.keys())
+            )
+            assert target_type is not None
+            options = SKRendererPerOperatorOptions.get(target_type, None)
+            target_for_class = (
+                any_sk_operator.estimator
                 if options and options.show_estimator_class
                 else any_sk_operator
             )
@@ -103,6 +118,8 @@ class BaseRender(RowRenderer):
 
         if isinstance(any_estimator, SKTransformer):
             estimator_target = any_estimator.transformer
+        elif isinstance(any_estimator, SKEstimator):
+            estimator_target = any_estimator.estimator
         else:
             estimator_target = any_estimator
 
