@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from ico.core.node import IcoNode, create_flow_walker
+from ico.core.node import IcoNodeProtocol, create_flow_walker
 from ico.core.runtime.node import (
     IcoRuntimeNode,
 )
@@ -13,14 +13,14 @@ from ico.core.runtime.node import (
 
 
 def discover_and_connect_runtime_nodes(
-    runtime_node: IcoRuntimeNode, flow: IcoNode
+    runtime_node: IcoRuntimeNode, flow: IcoNodeProtocol
 ) -> None:
     """Discover and connect all runtime hosts within the given flow."""
     for nested_runtime in _discover_runtime_subtrees(flow):
         runtime_node.add_runtime_children(nested_runtime)
 
 
-def _discover_runtime_subtrees(flow: IcoNode) -> list[IcoRuntimeNode]:
+def _discover_runtime_subtrees(flow: IcoNodeProtocol) -> list[IcoRuntimeNode]:
     """Discover all runtime hosts within the given flow."""
     roots = OrderedDict[IcoRuntimeNode, None]()
     runtime_nodes = set[IcoRuntimeNode]()

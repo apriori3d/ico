@@ -6,7 +6,7 @@ from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
-from ico.core.node import IcoNode
+from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
 from ico.core.runtime.agent import IcoAgent
@@ -73,7 +73,7 @@ class PlanRendererOptions(RendererOptions):
     )
     """Node types to flatten/unwrap for cleaner display"""
 
-    node_icons: dict[type[IcoNode | IcoRuntimeNode], str] = field(
+    node_icons: dict[type[IcoNodeProtocol | IcoRuntimeNode], str] = field(
         default_factory=lambda: {
             IcoAgent: "👷",
             IcoBatcher: "📦",

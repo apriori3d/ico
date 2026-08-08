@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from rich.text import Text
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.core.operator import operator
 from ico.core.stream import IcoStream
 from ico.describe.plan.options import PlanRendererOptions
@@ -59,7 +59,7 @@ class StreamGroupPartRenderer(RowRenderer):
             flow_includes_node_info=flow_includes_node_info,
         )
 
-    def render_signature_column(self, node: IcoNode) -> Text:
+    def render_signature_column(self, node: IcoNodeProtocol) -> Text:
         signature = super().render_signature_column(node)
         # Add dim styling to the Iterator[...] parts
         signature.stylize("dim", 0, len("Iterator["))

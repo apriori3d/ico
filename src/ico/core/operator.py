@@ -1,22 +1,50 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Sequence
-from typing import Any, Generic, TypeVar, overload
+from typing import (
+    Any,
+    Generic,
+    Protocol,
+    TypeVar,
+    cast,
+    overload,
+    runtime_checkable,
+)
 
-from ico.core.node import IcoNode
+from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
 # ────────────────────────────────────────────────
 
-I = TypeVar("I")  # noqa: E741
+I = TypeVar("I", contravariant=True)  # noqa: E741
+IContra = TypeVar("IContra", contravariant=True)  # noqa: E741
+IInv = TypeVar("IInv")  # noqa: E741
 O = TypeVar("O")  # noqa: E741
-
-
-# variables for composition
-I2 = TypeVar("I2")
+OCov = TypeVar("OCov", covariant=True)  # noqa: E741
 O2 = TypeVar("O2")
+O2Cov = TypeVar("O2Cov", covariant=True)  # noqa: E741
+
+
+@runtime_checkable
+class IcoOperatorProtocol(IcoNodeProtocol, Protocol[I, O]):
+    def __call__(self, item: I) -> O: ...
+
+    def __or__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> IcoOperatorProtocol[I, O2]: ...
+
+    def __ior__(
+        self, other: IcoOperatorProtocol[O, O2]
+    ) -> IcoOperatorProtocol[I, O2]: ...
+
+    @property
+    def signature(self) -> IcoSignature: ...
+
+    def stream(
+        self,
+    ) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]: ...
 
 
 # ────────────────────────────────────────────────
@@ -37,7 +65,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         fn: I → O
 
     An `IcoOperator` wraps a callable and provides:
-    • chainable transformations via `|` or `chain()`
+    • chainable transformations via `|`
     • wrapping into an `Iterable` with `.stream()`
 
     Example:
@@ -62,7 +90,7 @@ class IcoOperator(Generic[I, O], IcoNode):
 
     # Note:  __slots__ is not used here to allow dynamic inference of ICO-signature attributes
 
-    fn: Callable[[I], O]
+    _fn: Callable[[I], O]
 
     def __init__(
         self,
@@ -70,7 +98,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         *,
         name: str | None = None,
         parent: IcoNode | None = None,
-        children: Sequence[IcoNode] | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
     ):
         """Initialize an IcoOperator with a callable function.
 
@@ -89,7 +117,7 @@ class IcoOperator(Generic[I, O], IcoNode):
             parent=parent,
             children=children,
         )
-        self.fn = fn
+        self._fn = fn
 
     def __call__(self, item: I) -> O:
         """Execute the wrapped function with the given input.
@@ -100,20 +128,27 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             The output value of type O after applying the wrapped function.
         """
-        return self.fn(item)
+        return self._fn(item)
+
+    @property
+    def fn(self) -> Callable[[I], O]:
+        """Access the wrapped callable function."""
+        return self._fn
+
+    def describe(self) -> None:
+        """Render a visual description of this operator.
+
+        This concrete override ensures Protocol stubs from mixin bases do not
+        shadow the runtime implementation inherited from IcoNode.
+        """
+        IcoNode.describe(self)
 
     # ────────────────────────────────────────────────
     # Compositions Protocols
     # ────────────────────────────────────────────────
 
-    def chain(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-        """Function chaining: (I → O, O → O2) == I → O2."""
-        from ico.core.chain import chain
-
-        return chain(self, other)
-
-    def __or__(self, other: IcoOperator[O, O2]) -> IcoOperator[I, O2]:
-        """Pipe composition operator: a | b == a.chain(b).
+    def __or__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
+        """Pipe composition operator: a | b.
 
         Args:
             other: The operator to chain with this one.
@@ -121,9 +156,22 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             A new operator that applies this operator followed by the other.
         """
-        return self.chain(other)
+        from ico.core.chain import chain
 
-    def stream(self) -> IcoOperator[Iterator[I], Iterator[O]]:
+        return chain(self, other)
+
+    def __ior__(self, other: IcoOperatorProtocol[O, O2]) -> IcoOperatorProtocol[I, O2]:
+        """In-place pipe composition operator: a |= b.
+
+        Args:
+            other: The operator to chain with this one.
+
+        Returns:
+            A new operator that applies this operator followed by the other.
+        """
+        return self | other
+
+    def stream(self) -> IcoOperatorProtocol[Iterator[I], Iterator[O]]:
         """Apply this operator element-wise over an iterable (lazy generator).
 
         Transforms: Iterable[I] → Iterable[O]
@@ -133,7 +181,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         """
         from ico.core.stream import IcoStream
 
-        return IcoStream(self)
+        return cast(IcoOperatorProtocol[Iterator[I], Iterator[O]], IcoStream(self))
 
     # ────────────────────────────────────────────────
     # Signature interface
@@ -152,25 +200,33 @@ class IcoOperator(Generic[I, O], IcoNode):
             IcoSignature containing input, context, and output type information.
         """
         from ico.core.signature_utils import (
-            get_generic_args,
             infer_from_callable,
+            resolve_types_from_generic,
+            wrap_type_if_any,
         )
 
         # 1. Infer from generic type parameters if available
-        args = get_generic_args(self)
-        if args is not None:
-            if len(args) == 1:
-                return IcoSignature(i=args[0], c=None, o=args[0])
-            if len(args) == 2:
-                return IcoSignature(i=args[0], c=None, o=args[1])
+        i_type, o_type = resolve_types_from_generic(self, IcoOperator, I, O)
+
+        if i_type is not None and o_type is not None:
+            return IcoSignature(
+                i=wrap_type_if_any(i_type),
+                c=None,
+                o=wrap_type_if_any(o_type),
+                infered=True,
+            )
 
         # 2. Infer from callable signature
-        signature = infer_from_callable(self.fn)
+        signature = infer_from_callable(self._fn)
         if signature is not None:
             return signature
 
         # 3. Fallback to Any types
-        return IcoSignature(i=type(Any), c=None, o=type(Any), infered=False)
+        signature = signature or IcoSignature(
+            i=type(Any), c=None, o=type(Any), infered=False
+        )
+
+        return signature
 
 
 # ─────────────────────────────────────────────
@@ -178,7 +234,7 @@ class IcoOperator(Generic[I, O], IcoNode):
 # ─────────────────────────────────────────────
 
 
-def operator() -> Callable[[Callable[[I], O]], IcoOperator[I, O]]:
+def operator() -> Callable[[Callable[[I], O]], IcoOperatorProtocol[I, O]]:
     """Decorator to wrap a function as an IcoOperator.
 
     Returns:
@@ -190,21 +246,23 @@ def operator() -> Callable[[Callable[[I], O]], IcoOperator[I, O]]:
         ...     return x * 2
     """
 
-    def decorator(fn: Callable[[I], O]) -> IcoOperator[I, O]:
+    def decorator(fn: Callable[[I], O]) -> IcoOperatorProtocol[I, O]:
         return wrap_operator(fn)
 
     return decorator
 
 
 @overload
-def wrap_operator(fn: IcoOperator[I, O]) -> IcoOperator[I, O]: ...
+def wrap_operator(fn: IcoOperatorProtocol[I, O]) -> IcoOperatorProtocol[I, O]: ...
 
 
 @overload
-def wrap_operator(fn: Callable[[I], O]) -> IcoOperator[I, O]: ...
+def wrap_operator(fn: Callable[[I], O]) -> IcoOperatorProtocol[I, O]: ...
 
 
-def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]:
+def wrap_operator(
+    fn: Callable[[I], O] | IcoOperatorProtocol[I, O],
+) -> IcoOperatorProtocol[I, O]:
     """
     Wrap a raw callable into an IcoOperator only when necessary.
 
@@ -220,8 +278,8 @@ def wrap_operator(fn: Callable[[I], O] | IcoOperator[I, O]) -> IcoOperator[I, O]
     Note:
         Ensures proper type inference for both mypy and pyright.
     """
-    if isinstance(fn, IcoOperator):
+    if isinstance(fn, IcoOperatorProtocol):
         # Suppress runtime type checker warning,
         # because we know the type is correct here from static analysis.
         return fn  # pyright: ignore[reportUnknownVariableType]
-    return IcoOperator[I, O](fn=fn)
+    return cast(IcoOperatorProtocol[I, O], IcoOperator[I, O](fn=fn))

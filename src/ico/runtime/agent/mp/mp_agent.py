@@ -5,7 +5,7 @@ from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Any, Generic, final
 
-from ico.core.operator import I, IcoOperator, O
+from ico.core.operator import I, IcoOperatorProtocol, O
 from ico.core.runtime.agent import IcoAgent, IcoAgentWorker
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.event import (
@@ -175,7 +175,7 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
 
     def __init__(
         self,
-        flow_factory: Callable[[], IcoOperator[I, O]],
+        flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         *,
         name: str | None = None,
     ) -> None:
@@ -541,7 +541,7 @@ class _WorkerFactory(Generic[I, O]):
     def __init__(
         self,
         worker_channel: IcoChannel[O, I],
-        flow_factory: Callable[[], IcoOperator[I, O]],
+        flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         name: str | None,
     ) -> None:
         """Initialize worker factory with worker configuration.

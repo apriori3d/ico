@@ -6,8 +6,8 @@ from typing import Any, cast
 from rich.text import Text
 
 from ico.core.async_stream import IcoAsyncStream
-from ico.core.node import IcoNode
-from ico.core.operator import IcoOperator, operator
+from ico.core.node import IcoNodeProtocol
+from ico.core.operator import IcoOperatorProtocol, operator
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
 from ico.describe.plan.rich_renderer.node.stream import (
@@ -43,7 +43,7 @@ class IcoAsyncStreamRenderer(GroupRenderer):
 
 
 class IcoAsyncStreamHeaderRender(StreamGroupPartRenderer):
-    def _render_node_args_info(self, node: IcoNode) -> Text:
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         assert isinstance(node, IcoAsyncStream)
         astream = cast(IcoAsyncStream[Any, Any], node)
         return Text(f"pool_size={astream.pool_size}", style=DescribeStyle.meta.value)
@@ -64,7 +64,7 @@ def shift(x: float) -> float:
     return x + 0.1
 
 
-def create_worker_flow() -> IcoOperator[float, float]:
+def create_worker_flow() -> IcoOperatorProtocol[float, float]:
     return scale | shift
 
 

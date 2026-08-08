@@ -1,6 +1,8 @@
-from typing import Generic
+from typing import Generic, TypeVar
 
-from ico.core.operator import I, IcoOperator
+from ico.core.operator import IcoOperator
+
+I = TypeVar("I")  # noqa: E741
 
 
 class IcoIdentity(Generic[I], IcoOperator[I, I]):

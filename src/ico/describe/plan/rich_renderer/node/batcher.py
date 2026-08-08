@@ -6,7 +6,7 @@ from typing import Any, cast
 from rich.text import Text
 
 from ico.core.batcher import IcoBatcher
-from ico.core.node import IcoNode
+from ico.core.node import IcoNodeProtocol
 from ico.core.source import source
 from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from ico.describe.plan.rich_renderer.row_renderer import (
@@ -19,7 +19,7 @@ from ico.describe.rich_style import DescribeStyle
 class IcoBatcherRender(RowRenderer):
     """Specialized renderer for IcoBatcher nodes showing batch size."""
 
-    def _render_node_args_info(self, node: IcoNode) -> Text:
+    def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         """Render batcher configuration with batch size info."""
         assert isinstance(node, IcoBatcher)
         batcher = cast(IcoBatcher[Any], node)

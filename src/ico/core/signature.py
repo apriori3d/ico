@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import GenericAlias
+from typing import Any, get_origin
 
 # ────────────────────────────────────────────────
 # Signature descriptions
@@ -43,10 +44,19 @@ class IcoSignature:
         infered: Whether this signature was successfully inferred from code.
     """
 
-    i: SignatureParamType
-    c: SignatureParamType | None
-    o: SignatureParamType
+    i: Any
+    c: Any | None
+    o: Any
     infered: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate that the types are supported for ICO signatures."""
+        if not is_supported_type(self.i):
+            raise TypeError(f"Unsupported input type for ICO signature: {self.i}")
+        if self.c is not None and not is_supported_type(self.c):
+            raise TypeError(f"Unsupported context type for ICO signature: {self.c}")
+        if not is_supported_type(self.o):
+            raise TypeError(f"Unsupported output type for ICO signature: {self.o}")
 
     def format(self) -> str:
         """Format the signature as a human-readable type flow string.
@@ -120,3 +130,8 @@ class IcoSignature:
 
     def __repr__(self) -> str:
         return self.format()
+
+
+def is_supported_type(t: Any) -> bool:
+    """Check if a type is supported for ICO signature inference."""
+    return isinstance(t, SignatureParamType) or isinstance(get_origin(t), type)

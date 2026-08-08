@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Generic, final
+from typing import Generic, TypeVar, final
 
-from ico.core.context_operator import C
 from ico.core.operator import (
     IcoOperator,
+    IcoOperatorProtocol,
     wrap_operator,
 )
 from ico.core.signature import IcoSignature
+
+C = TypeVar("C")  # noqa: E741
 
 
 @final
@@ -48,7 +50,7 @@ class IcoProcess(
     __slots__ = ("num_iterations", "body")
 
     num_iterations: int
-    body: IcoOperator[C, C]
+    body: IcoOperatorProtocol[C, C]
 
     def __init__(
         self,

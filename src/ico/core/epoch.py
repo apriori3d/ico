@@ -1,14 +1,14 @@
 from collections.abc import Callable, Iterator
-from typing import Any, Generic
+from typing import Any, Generic, TypeVar
 
 from ico.core.context_operator import (
-    C,
-    I,
-    IcoContextOperator,
+    IcoContextOperatorProtocol,
     wrap_context_operator,
 )
-from ico.core.operator import IcoOperator, wrap_operator
+from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, wrap_operator
 from ico.core.signature import IcoSignature
+
+C = TypeVar("C")  # noqa: E741
 
 
 class IcoEpoch(
@@ -117,8 +117,8 @@ class IcoEpoch(
         making it suitable for batch processing and complete data passes.
     """
 
-    source: IcoOperator[None, Iterator[I]]
-    context_operator: IcoContextOperator[I, C, C]
+    source: IcoOperatorProtocol[None, Iterator[I]]
+    context_operator: IcoContextOperatorProtocol[I, C, C]
 
     def __init__(
         self,

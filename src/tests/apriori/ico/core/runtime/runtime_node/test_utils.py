@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ico.core.operator import IcoOperator
+from ico.core.operator import IcoOperatorProtocol
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import IcoRuntimeNode
@@ -66,7 +66,7 @@ class RecordingRuntime(IcoRuntime):
 
     def __init__(
         self,
-        closure: IcoOperator[None, None],
+        closure: IcoOperatorProtocol[None, None],
     ):
         super().__init__(
             closure=closure,

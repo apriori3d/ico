@@ -2,7 +2,7 @@ from collections.abc import Iterable, Iterator
 
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.batcher import IcoBatcher
-from ico.core.operator import IcoOperator, operator
+from ico.core.operator import IcoOperatorProtocol, operator
 from ico.core.pipeline import IcoPipeline
 from ico.core.sink import sink
 from ico.core.source import source
@@ -70,7 +70,7 @@ def collate_max(batch: Iterator[float]) -> str:
 # This demonstrates pipeline grouping and nested flow structures
 
 
-def create_augment_flow() -> IcoOperator[Iterator[int], str]:
+def create_augment_flow() -> IcoOperatorProtocol[Iterator[int], str]:
     """Create processing flow showing pipeline and stream grouping."""
     augment = IcoPipeline(
         scale,

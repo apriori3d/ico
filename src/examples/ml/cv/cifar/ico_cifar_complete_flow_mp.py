@@ -53,6 +53,7 @@ from ico import (
     RichProgressTool,
     operator,
 )
+from ico.core.operator import IcoOperatorProtocol
 
 # ─────────────────────────────────────────────────────────────────────────────────
 # DATA STRUCTURES & DATASET CLASSES
@@ -234,7 +235,7 @@ class WorkerFlowFactory:
         self.dataset = dataset
         self.delay = delay
 
-    def __call__(self) -> IcoOperator[Iterator[int], CifarBatch]:
+    def __call__(self) -> IcoOperatorProtocol[Iterator[int], CifarBatch]:
         worker_progress = IcoProgress[int](total=self.batch_size, name="Worker")
 
         @operator()

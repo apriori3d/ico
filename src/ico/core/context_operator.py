@@ -1,22 +1,33 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, Protocol, TypeVar, cast, overload, runtime_checkable
 
-from ico.core.node import IcoNode
-from ico.core.operator import I as I
-from ico.core.operator import O
+from ico.core.node import IcoNode, IcoNodeProtocol
+from ico.core.operator import I, O
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
 # Generic type variables for ICO model
 # ────────────────────────────────────────────────
-
-C = TypeVar("C")
+C = TypeVar("C", contravariant=True)  # noqa: E741
+# CContra = TypeVar("CContra", contravariant=True)
+OCovariant = TypeVar("OCovariant", covariant=True)  # noqa: E741
 
 # ────────────────────────────────────────────────
 # Operator Class
 # ────────────────────────────────────────────────
+
+
+@runtime_checkable
+class IcoContextOperatorProtocol(IcoNodeProtocol, Protocol[I, C, OCovariant]):
+    # @property
+    # def fn(self) -> Callable[[I, C], OCovariant]: ...
+
+    def __call__(self, item: I, context: C) -> OCovariant: ...
+
+    @property
+    def signature(self) -> IcoSignature: ...
 
 
 class IcoContextOperator(Generic[I, C, O], IcoNode):
@@ -80,7 +91,7 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
         *,
         name: str | None = None,
         parent: IcoNode | None = None,
-        children: Sequence[IcoNode] | None = None,
+        children: Sequence[IcoNodeProtocol] | None = None,
     ):
         """Initialize a context operator with a callable function.
 
@@ -95,7 +106,8 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
             The function signature determines the operator's type signature,
             which can be inferred automatically for type safety.
         """
-        super().__init__(name=name, parent=parent, children=children)
+
+        IcoNode.__init__(self, name=name, parent=parent, children=children)
         self.fn = fn
 
     def __call__(self, item: I, context: C) -> O:
@@ -118,14 +130,17 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
     def signature(self) -> IcoSignature:
         """Infer ICO signature of this operator."""
         from ico.core.signature_utils import (
-            get_generic_args,
             infer_from_callable,
+            resolve_types_from_generic,
         )
 
         # 1. Infer from generic type parameters if available
-        args = get_generic_args(self)
-        if args is not None and len(args) == 3:
-            return IcoSignature(i=args[0], c=args[1], o=args[2])
+        i_type, c_type, o_type = resolve_types_from_generic(
+            self, IcoContextOperator, I, C, O
+        )
+
+        if i_type is not None and c_type is not None and o_type is not None:
+            return IcoSignature(i=i_type, c=c_type, o=o_type, infered=True)
 
         # 2. Infer from callable signature
         signature = infer_from_callable(self.fn)
@@ -141,7 +156,9 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
 # ─────────────────────────────────────────────
 
 
-def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, C, C]]:
+def context_operator() -> (
+    Callable[[Callable[[I, C], C]], IcoContextOperatorProtocol[I, C, C]]
+):
     """Decorator for creating context operators that update context.
 
     This decorator is specifically designed for functions that take an item and
@@ -173,7 +190,7 @@ def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, 
         a proper ICO node that can participate in pipelines and epochs.
     """
 
-    def decorator(fn: Callable[[I, C], C]) -> IcoContextOperator[I, C, C]:
+    def decorator(fn: Callable[[I, C], C]) -> IcoContextOperatorProtocol[I, C, C]:
         return wrap_context_operator(fn)
 
     return decorator
@@ -181,17 +198,19 @@ def context_operator() -> Callable[[Callable[[I, C], C]], IcoContextOperator[I, 
 
 @overload
 def wrap_context_operator(
-    fn: IcoContextOperator[I, C, O],
-) -> IcoContextOperator[I, C, O]: ...
+    fn: IcoContextOperatorProtocol[I, C, O],
+) -> IcoContextOperatorProtocol[I, C, O]: ...
 
 
 @overload
-def wrap_context_operator(fn: Callable[[I, C], O]) -> IcoContextOperator[I, C, O]: ...
+def wrap_context_operator(
+    fn: Callable[[I, C], O],
+) -> IcoContextOperatorProtocol[I, C, O]: ...
 
 
 def wrap_context_operator(
-    fn: Callable[[I, C], O] | IcoContextOperator[I, C, O],
-) -> IcoContextOperator[I, C, O]:
+    fn: Callable[[I, C], O] | IcoContextOperatorProtocol[I, C, O],
+) -> IcoContextOperatorProtocol[I, C, O]:
     """Wrap callable into IcoContextOperator only when necessary.
 
     Utility function that ensures proper wrapping of callables into context
@@ -222,8 +241,8 @@ def wrap_context_operator(
         This function ensures type inference works correctly for both mypy and
         pyright while providing runtime safety against double-wrapping.
     """
-    if isinstance(fn, IcoContextOperator):
+    if isinstance(fn, IcoContextOperatorProtocol):
         # Suppress runtime type checker warning,
         # because we know the type is correct here from static analysis.
         return fn  # pyright: ignore[reportUnknownVariableType]
-    return IcoContextOperator[I, C, O](fn=fn)
+    return cast(IcoContextOperatorProtocol[I, C, O], IcoContextOperator[I, C, O](fn=fn))

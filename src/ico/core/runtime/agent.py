@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generic
 
-from ico.core.operator import I, IcoOperator, O
+from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.command import (
     IcoActivateCommand,
@@ -209,7 +209,7 @@ class IcoAgent(
     """
 
     channel: IcoChannel[I, O] | None
-    flow_factory: Callable[[], IcoOperator[I, O]]
+    flow_factory: Callable[[], IcoOperatorProtocol[I, O]]
     subtree_factory: Callable[[], IcoRuntimeNode]
 
     # Placeholder for worker in runtime tree (actual worker exists in separate process).
@@ -219,7 +219,7 @@ class IcoAgent(
         self,
         *,
         channel: IcoChannel[I, O] | None = None,
-        flow_factory: Callable[[], IcoOperator[I, O]],
+        flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         name: str | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
@@ -260,7 +260,7 @@ class IcoAgent(
 
     # ──────── Worker management ────────
 
-    def get_remote_flow_factory(self) -> Callable[[], IcoOperator[I, O]]:
+    def get_remote_flow_factory(self) -> Callable[[], IcoOperatorProtocol[I, O]]:
         """Get factory function for creating remote computation flow.
 
         Returns:
@@ -522,14 +522,14 @@ class IcoAgentWorker(
         unified runtime tree semantics and enabling fault-tolerant computing.
     """
 
-    flow: IcoOperator[I, O]
+    flow: IcoOperatorProtocol[I, O]
     channel: IcoChannel[O, I]
 
     def __init__(
         self,
         *,
         channel: IcoChannel[O, I],
-        flow_factory: Callable[[], IcoOperator[I, O]],
+        flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,

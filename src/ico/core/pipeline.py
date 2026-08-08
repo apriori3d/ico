@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Generic, final
+from typing import Generic
 
 from ico.core.operator import (
-    I,
     IcoOperator,
+    IcoOperatorProtocol,
+    IInv,
     wrap_operator,
 )
 from ico.core.signature import IcoSignature
 
 
-@final
-class IcoPipeline(
-    Generic[I],
-    IcoOperator[I, I],
-):
+class IcoPipeline(Generic[IInv], IcoOperator[IInv, IInv]):
     """Sequential pipeline of operators that transform the same type.
 
     IcoPipeline chains multiple operators of type I → I into a single composite
@@ -43,11 +40,11 @@ class IcoPipeline(
 
     __slots__ = "body"
 
-    body: Sequence[IcoOperator[I, I]]
+    body: Sequence[IcoOperatorProtocol[IInv, IInv]]
 
     def __init__(
         self,
-        *body: Callable[[I], I],
+        *body: Callable[[IInv], IInv],
         name: str | None = None,
     ):
         """Initialize a pipeline with a sequence of operators.
@@ -76,11 +73,11 @@ class IcoPipeline(
         )
         self.body = body_ops
 
-    def _run_streamline(self, item: I) -> I:
+    def _run_streamline(self, item: IInv) -> IInv:
         """Execute the pipeline by applying each operator sequentially.
 
         Args:
-            item: Input value of type I.
+            item: Input value of type IInv.
 
         Returns:
             The result after applying all operators in sequence.
