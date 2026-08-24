@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import types
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -169,7 +170,11 @@ class RowRenderer:
 
     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text | None:
         if isinstance(node, IcoOperatorProtocol):
-            op_fn = cast(IcoOperator[Any, Any], node).fn
+            op_fn: object = cast(IcoOperator[Any, Any], node).fn
+            # If the operator function is a method, get the underlying class instance for rendering
+            if isinstance(op_fn, types.MethodType):
+                op_fn = op_fn.__self__
+
             return render_callable(op_fn, options=self.options)
 
         if isinstance(node, IcoContextOperatorProtocol):
