@@ -170,7 +170,7 @@ class RowRenderer:
 
     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text | None:
         if isinstance(node, IcoOperatorProtocol):
-            op_fn = cast(IcoOperator[Any, Any], node).fn
+            op_fn: object = cast(IcoOperator[Any, Any], node).fn
             # If the operator function is a method, get the underlying class instance for rendering
             if isinstance(op_fn, types.MethodType):
                 op_fn = op_fn.__self__
