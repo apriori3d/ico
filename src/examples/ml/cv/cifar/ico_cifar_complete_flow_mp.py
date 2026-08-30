@@ -23,7 +23,7 @@ CIFAR-10 image classification, showcasing ICO as a superior PyTorch DataLoader r
 import random
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import final
 
@@ -106,22 +106,23 @@ class CifarTransform(ABC):
     """Base class for CIFAR-10 image transformations with probability control."""
 
     p: float
-    factor: float
+    factor_max_delta: float
 
-    def __init__(self, p: float = 1.0, factor: float = 1.0):
+    def __init__(self, p: float = 0.5, factor_max_delta: float = 1.0):
         self.p = p
-        self.factor = factor
+        self.factor_max_delta = factor_max_delta
 
     @abstractmethod
     def _image_transform(self, image: Tensor, factor: float) -> Tensor:
         raise NotImplementedError
 
     def __call__(self, item: CifarItem) -> CifarItem:
-        if torch.rand(1) >= self.p:
+        if torch.rand(1).item() >= self.p:
             return item
 
+        factor = 1 + (torch.rand(1).item() - 0.5) * 2.0 * self.factor_max_delta
         return CifarItem(
-            image=self._image_transform(item.image, self.factor), label=item.label
+            image=self._image_transform(item.image, factor), label=item.label
         )
 
 
@@ -262,10 +263,9 @@ class WorkerFlowFactory:
         # Result: Diverse augmented data across workers (different random seeds per worker)
         # Performance: No serialization overhead - transforms applied in worker memory space
         item_aug_flow = IcoPipeline(
-            IcoOperator(HorizontalFlip()),  # Independent random flip per worker
-            IcoOperator(VerticalFlip()),  # Parallel processing with other workers
-            IcoOperator(AdjustBrightness(factor=0.2)),  # Isolated worker RNG state
-            IcoOperator(AdjustContrast(factor=0.2)),  # Efficient memory usage
+            HorizontalFlip(p=0.5),
+            AdjustBrightness(p=0.2, factor_max_delta=0.2),
+            AdjustContrast(p=0.2, factor_max_delta=0.2),
         )
 
         # ─────────────────────────────────────────────────────────────────────────────────
@@ -417,8 +417,16 @@ def end_eval(context: CifarEvalContext) -> CifarTrainContext:
 
 
 # ─────────────────────────────────────────────────────────────────────────────────
-# MAIN EXECUTION PIPELINE & MULTIPROCESSING COORDINATION
+# Utilities
 # ─────────────────────────────────────────────────────────────────────────────────
+
+
+@operator()
+def shuffle_indices(indices: Iterator[int]) -> Iterator[int]:
+    indices_list = list(indices)
+    random.shuffle(indices_list)
+    yield from indices_list
+
 
 if __name__ == "__main__":
     # ─────────────────────────────────────────────────────────────────────────────────
@@ -426,12 +434,14 @@ if __name__ == "__main__":
     # ─────────────────────────────────────────────────────────────────────────────────
 
     # make it 2% of a real dataset size for speed up in demo.
-    num_epoch = 5
-    train_split_ratio = 0.02
+    num_epoch = 100
+    train_split_ratio = 0.8
     batch_size = 8
     num_workers = 4
-    val_split_ratio = 0.01
-    worker_delay = 0.1  # Simulate slow data loading in workers (e.g., from disk)
+    val_split_ratio = 1 - train_split_ratio
+    worker_delay = (
+        None  # 0.1  # Simulate slow data loading in workers (e.g., from disk)
+    )
 
     # ─────────────────────────────────────────────────────────────────────────────────
     # 🗄️ DATASET PREPARATION & SHARED MEMORY SETUP
@@ -460,26 +470,25 @@ if __name__ == "__main__":
     random.shuffle(all_indices)
 
     # Split indices into train and validation sets
-    train_split = int(dataset_size * train_split_ratio)
+    train_split_size = int(dataset_size * train_split_ratio)
 
     # ─────────────────────────────────────────────────────────────────────────────────
     # 🚀 PARALLEL DATA LOADING PIPELINE CONSTRUCTION
     # ─────────────────────────────────────────────────────────────────────────────────
 
+    def get_train_indices() -> Iterable[int]:
+        return all_indices[:train_split_size]
+
     # Create data source
-    train_source = IcoSource[int](
-        lambda: all_indices[:train_split],
-        name="CIFAR10 train indices",
-    )
+    train_source = IcoSource(get_train_indices, name="CIFAR10 train indices")
 
     # Report progress of the train data flow
     track_train_progress = IcoProgress[int](
-        total=train_split, name="Train Epoch Progress"
+        total=train_split_size, name="Train Epoch Progress"
     )
 
     # Group indices into batches for workers to process.
     batcher = IcoBatcher[int](batch_size=batch_size)
-
     # Each worker will fetch the actual data items from the dataset using the indices, apply augmentations, and collate into batches.
     # Dataset is shared in memory, so workers can access it efficiently without copying.
     # CifarBatch also will be shared in memory for efficient transfer between processes.
@@ -517,7 +526,6 @@ if __name__ == "__main__":
     # - Collects results from parallel workers as they complete
     # - Maintains load balancing between processes automatically
     workers_pool = IcoAsyncStream(create_mp_agent, pool_size=num_workers)
-
     # ─────────────────────────────────────────────────────────────────────────────────
     # 🚀 MAIN TRAINING PIPELINE WITH MULTIPROCESSING DATA LOADING
     # ─────────────────────────────────────────────────────────────────────────────────
@@ -530,7 +538,11 @@ if __name__ == "__main__":
     #    - Apply independent data augmentations per worker
     #    - Create shared memory batches for zero-copy transfer
     train_data_flow = (
-        train_source | track_train_progress.stream() | batcher | workers_pool
+        train_source
+        | shuffle_indices
+        | track_train_progress.stream()
+        | batcher
+        | workers_pool
     )
     train_data_flow.name = "Train Flow"
 
@@ -556,14 +568,16 @@ if __name__ == "__main__":
     # ──────── Validation flow -────────
 
     # Validation data flow is mutch simpler, just fetch items by indices and run through the model for evaluation.
-    val_split = int(dataset_size * val_split_ratio)
-    val_source = IcoSource[int](
-        lambda: all_indices[-val_split:], name="CIFAR10 evaluation indices"
-    )
+    val_split_size = int(dataset_size * val_split_ratio)
+
+    def get_val_indices() -> Iterable[int]:
+        return all_indices[-val_split_size:]
+
+    val_source = IcoSource[int](get_val_indices, name="CIFAR10 evaluation indices")
 
     # Report progress of the validation data flow
     track_val_progress = IcoProgress[int](
-        total=val_split, name="Validation Epoch Progress"
+        total=val_split_size, name="Validation Epoch Progress"
     )
 
     @operator()
@@ -590,7 +604,8 @@ if __name__ == "__main__":
         total=num_epoch, name="Total Progress"
     )
 
-    epoch_flow = total_progress | train_flow | val_flow
+    # epoch_flow = total_progress | train_flow | val_flow
+    epoch_flow = train_flow | val_flow
     epoch_flow.name = "Train and Validation Epoch Flow"
 
     train_process = IcoProcess(epoch_flow, num_iterations=num_epoch)
