@@ -57,7 +57,7 @@ class PlanRendererOptions(RendererOptions):
     dim_ico_nodes: bool = False
     """Dim ICO framework nodes to focus on user code"""
 
-    show_ico_operator: bool = False
+    show_ico_operator: bool = True
     """Show IcoOperator wrapper details"""
 
     show_node_icons: bool = True
