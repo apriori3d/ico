@@ -95,7 +95,11 @@ class HasRemoteFlow(Protocol):
     remote flow instances, enabling distributed computation patterns.
     """
 
-    def get_remote_flow_factory(self) -> Callable[[], IcoNode]: ...
+    def get_remote_flow_factory(self) -> Callable[[], IcoNodeProtocol]: ...
+
+    def set_remote_flow_factory(
+        self, factory: Callable[[], IcoNodeProtocol]
+    ) -> None: ...
 
 
 # ────────────────────────────────────────────────

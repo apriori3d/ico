@@ -63,8 +63,8 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
         The pipe operator | is the recommended syntax for chaining operators.
     """
 
-    _left: IcoOperatorProtocol[I, O]
-    _right: IcoOperatorProtocol[O, O2]
+    left: IcoOperatorProtocol[I, O]
+    right: IcoOperatorProtocol[O, O2]
 
     def __init__(
         self,
@@ -89,8 +89,8 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
             parent=None,
             children=[cast(IcoNode, left), cast(IcoNode, right)],
         )
-        self._left = left
-        self._right = right
+        self.left = left
+        self.right = right
 
     def __or__(self, other: IcoOperatorProtocol[O2, O3]) -> IcoOperatorProtocol[I, O3]:
         # mypy cannot always prove that recursive generic protocol conformance
@@ -110,7 +110,7 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
             This is the function used by __call__. It first applies the left
             operator to get intermediate result, then applies right operator.
         """
-        return self._right(self._left(item))
+        return self.right(self.left(item))
 
     @property
     def signature(self) -> IcoSignature:
@@ -127,8 +127,8 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
             If either operator has an uninfered signature, the chain signature
             will also be uninfered with Any types for safety.
         """
-        left = self._left.signature
-        right = self._right.signature
+        left = self.left.signature
+        right = self.right.signature
 
         if left.infered and right.infered:
             return IcoSignature(
