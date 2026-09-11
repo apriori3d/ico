@@ -3,6 +3,7 @@ from collections.abc import Iterator
 from ico.core.operator import operator
 from ico.core.runtime.runtime import IcoRuntime
 from ico.tools.profiler.injector import inject_profiler
+from ico.tools.profiler.profiler import IcoProfilerNode, IcoSetupProfilerNodeCommand
 
 
 def test_profiler_node_state() -> None:
@@ -26,6 +27,27 @@ def test_profiler_node_state() -> None:
     runtime = IcoRuntime(profiled_flow)
     runtime.activate()
     runtime.describe()
+
+    all_profiler_nodes = [
+        node for node in runtime.iterate_nodes() if isinstance(node, IcoProfilerNode)
+    ]
+    assert all(node.state.name == "Pending" for node in all_profiler_nodes)
+
+    runtime.broadcast_command(IcoSetupProfilerNodeCommand(metrics_type=["cpu_time"]))
+    runtime.describe()
+
+    all_profiler_nodes = [
+        node for node in runtime.iterate_nodes() if isinstance(node, IcoProfilerNode)
+    ]
+    assert all(node.state.name == "Ready" for node in all_profiler_nodes)
+
+    runtime.deactivate()
+    runtime.describe()
+
+    all_profiler_nodes = [
+        node for node in runtime.iterate_nodes() if isinstance(node, IcoProfilerNode)
+    ]
+    assert all(node.state.name == "Idle" for node in all_profiler_nodes)
 
 
 if __name__ == "__main__":

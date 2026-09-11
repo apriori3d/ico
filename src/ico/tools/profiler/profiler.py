@@ -115,7 +115,11 @@ class IcoProfilerNode(IcoRuntimeNode):
         state_model: BaseStateModel | None = None,
     ) -> None:
         IcoRuntimeNode.__init__(
-            self, runtime_name, runtime_parent, runtime_children, state_model
+            self,
+            runtime_name,
+            runtime_parent,
+            runtime_children,
+            state_model or ProfileNodeStateModel(),
         )
 
     def on_command(self, command: IcoRuntimeCommand) -> None:
