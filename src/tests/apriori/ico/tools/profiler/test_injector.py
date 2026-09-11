@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from typing import Any, cast
 
 from ico.core.chain import IcoChain
@@ -76,14 +77,14 @@ def _flow_factory() -> IcoOperatorProtocol[str, str]:
 
 def test_mp_agent_factory_injection() -> None:
     @operator()
-    def _test_data_provider(_: None) -> str:
+    def test_data_provider(_: None) -> str:
         return "test"
 
     @operator()
-    def _check_result(result: str) -> None:
+    def check_result(result: str) -> None:
         assert result == "testab"
 
-    flow = _test_data_provider | MPAgent(_flow_factory) | _check_result
+    flow = test_data_provider | MPAgent(_flow_factory) | check_result
     flow.name = "Original flow"
     flow.describe()
 
@@ -91,7 +92,7 @@ def test_mp_agent_factory_injection() -> None:
     runtime.activate().run().deactivate()
 
     # a flow can only have single runtime in a lifecycle, so we need to recreate it for the profiled version
-    flow = _test_data_provider | MPAgent(_flow_factory) | _check_result
+    flow = test_data_provider | MPAgent(_flow_factory) | check_result
     profiled_flow = inject_profiler(flow)
     profiled_flow.name = "Profiled flow"
     profiled_flow.describe()
@@ -100,6 +101,29 @@ def test_mp_agent_factory_injection() -> None:
 
     runtime = IcoRuntime(profiled_flow)
     runtime.activate().run().deactivate()
+
+
+def test_stream_injection() -> None:
+    @operator()
+    def test_data_provider(_: None) -> Iterator[str]:
+        yield "test1"
+        yield "test2"
+
+    @operator()
+    def check_result(result: Iterator[str]) -> None:
+        assert list(result) == ["test1a", "test2a"]
+
+    @operator()
+    def add_a(s: str) -> str:
+        return s + "a"
+
+    flow = test_data_provider | add_a.stream() | check_result
+    flow.describe()
+    flow(None)
+
+    profiled_flow = inject_profiler(flow)
+    profiled_flow.describe()
+    profiled_flow(None)
 
 
 if __name__ == "__main__":

@@ -7,7 +7,12 @@ from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.node import HasRemoteFlow, IcoNodeProtocol
 from ico.core.operator import IcoOperatorProtocol
 from ico.core.pipeline import IcoPipeline
-from ico.tools.profiler.nodes import IcoContextOperatorProfiler, IcoOperatorProfiler
+from ico.core.stream import IcoStream
+from ico.tools.profiler.nodes import (
+    IcoContextOperatorProfiler,
+    IcoOperatorProfiler,
+    IcoStreamProfiler,
+)
 
 
 class IcoProfiledRemoteFlowFactory:
@@ -55,6 +60,9 @@ def inject_profiler(
         apply = inject_profiler(op.apply)
         body = [inject_profiler(child) for child in op.body]
         return IcoContextPipeline[Any, Any, Any](apply, *body)
+
+    if isinstance(op, IcoStream):
+        return IcoStreamProfiler(cast(IcoStream[Any, Any], op), name=f"Profiler({op})")
 
     if isinstance(op, HasRemoteFlow):
         op.set_remote_flow_factory(IcoProfiledRemoteFlowFactory(op))

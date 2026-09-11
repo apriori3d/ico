@@ -211,8 +211,6 @@ class MPAgent(Generic[I, O], IcoAgent[I, O]):
             • **Runtime Discovery**: Runtime tree can discover channel relationships
             • **Configuration Completion**: All agent configuration available immediately
         """
-        # printer = IcoPrinter()
-
         IcoAgent.__init__(  # pyright: ignore[reportUnknownMemberType]
             self,
             channel=None,
