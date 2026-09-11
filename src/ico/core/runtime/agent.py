@@ -269,6 +269,17 @@ class IcoAgent(
         """
         return self.flow_factory
 
+    def set_remote_flow_factory(
+        self, factory: Callable[[], IcoOperatorProtocol[I, O]]
+    ) -> None:
+        """Set factory function for creating remote computation flow.
+
+        Args:
+            factory: Factory function that creates the computation flow to be
+                     executed in the remote worker process.
+        """
+        self.flow_factory = factory
+
     @abstractmethod
     def get_remote_runtime_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
         """Create factory function for remote worker runtime node.

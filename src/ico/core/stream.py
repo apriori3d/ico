@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from typing import Generic, final
+from typing import Generic
 
 from ico.core.operator import (
     I,
@@ -13,7 +13,6 @@ from ico.core.operator import (
 from ico.core.signature import IcoSignature
 
 
-@final
 class IcoStream(
     Generic[I, O],
     IcoOperator[Iterator[I], Iterator[O]],
@@ -59,8 +58,6 @@ class IcoStream(
         as the output iterator is consumed, not when the stream is created.
     """
 
-    __slots__ = ("body",)
-
     body: IcoOperatorProtocol[I, O]
 
     def __init__(
@@ -82,7 +79,8 @@ class IcoStream(
         """
         body_op = wrap_operator(body)
 
-        super().__init__(
+        IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
+            self,
             fn=self._stream_fn,
             name=name,
             children=[body_op],
