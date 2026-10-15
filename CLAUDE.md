@@ -58,9 +58,10 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 11. [ ] Resources in specs (see `docs/design/spec.md`): `resources`
     section, `@register` kind `resource`, `ResourceRef[T]`, `{"$res": name}`
     in params, lazy open, scopes `run` and `process`.
-12. [ ] Registered contexts: `IcoStateful` protocol, `context` of
-    `IcoContextPipeline` in specs, `init` from a snapshot, runtime
-    `checkpoint` policy. Validate on the full CIFAR training flow.
+12. [ ] Registered contexts: register kind `context`, `IcoStateful`
+    protocol, registered context factory operators with an `init`
+    snapshot param, core `checkpoint` node. Validate on the full CIFAR
+    training flow (see `docs/design/spec.md`, "Validation").
 13. [ ] Artifact handles (URI + content hash) for checkpoints and large
     outputs.
 14. [ ] `live` / `pinned` modes for non-deterministic sources.

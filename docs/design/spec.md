@@ -90,13 +90,30 @@ class IcoStateful(Protocol):
     def load_state_dict(self, state: dict[str, Any]) -> None: ...
 ```
 
+In ICO a context is not a field of a node: it is a value that flows through
+the main chain. In the CIFAR example `create_train_context` produces a
+`CifarTrainContext`, `IcoProcess` passes it through every epoch,
+`IcoContextPipeline` / `IcoContextOperator` update it per batch inside an
+`IcoEpoch`, and `start_eval` / `end_eval` wrap it into a nested
+`CifarEvalContext` and back. So "a context in a spec" means:
+
+- the context class is registered (kind `context`) and implements
+  `IcoStateful`;
+- the operator that creates it becomes a registered parametric operator,
+  e.g. `cifar.train_context` with params `arch`, `lr` and an optional
+  `init` snapshot handle; it is the only place where the context is built;
+- the nodes that move it (`IcoProcess`, `IcoEpoch`, `IcoContextPipeline`,
+  `IcoContextOperator`) are serialized as structure (roadmap item 10);
+- per-batch functions (`train_step`, `calculate_accuracy`, logging) become
+  registered operators whose signatures name the context type.
+
 ```json
-{"type": "context_pipeline",
- "context": {"ref": "cifar.train_context@1",
-             "params": {"arch": "resnet18", "lr": 0.1, "dataset": {"$res": "train_ds"}},
-             "init": "ckpt://runs/abc/epoch_3"},
- "checkpoint": {"every": 1, "keep": "best:acc"},
- "children": ["..."]}
+{"type": "seq", "children": [
+  {"type": "op", "ref": "cifar.train_context@1",
+   "params": {"arch": "resnet18", "lr": 0.001, "init": "ckpt://runs/abc/epoch_3"}},
+  {"type": "process", "params": {"num_iterations": 10}, "children": ["..."]},
+  {"type": "op", "ref": "cifar.finalize@1"}
+]}
 ```
 
 - The context is registered as a whole, not as separate model / optimizer /
@@ -107,14 +124,28 @@ class IcoStateful(Protocol):
   resume breaks early stopping and best-model selection.
 - A checkpoint is a snapshot of a context, not a separate concept. Resume is
   `init` pointing at a snapshot.
-- Snapshots are taken by the runtime according to the `checkpoint` policy,
-  never by operators.
+- Snapshots are written by a core `checkpoint` node (params `every`,
+  `keep`, e.g. `"best:acc"`) that calls `state_dict()` and stores an
+  artifact. Domain operators never implement saving themselves; the
+  example's `save_checkpoint_step` is replaced by it.
 - A context references resources but does not own them.
 - A context never travels to an `MPAgent` worker. `build()` rejects a spec
   where a node that needs a context ends up inside a worker.
+- Nested contexts (`CifarEvalContext` holding the train context) are
+  allowed; only the outermost context that crosses an iteration boundary of
+  `IcoProcess` is snapshotted.
 - Operators depend on structural protocols (`HasModel`, `HasOptimizer`,
   `HasEpoch`), not on a concrete context class, so `evaluate` works with any
   context that has a model.
+
+### Validation: the full CIFAR training flow
+
+The design is validated when the complete CIFAR flow of
+`ico_cifar_complete_flow_mp.py` (data loader with `MPAgent` workers,
+training and validation epochs, `IcoProcess` over epochs) is exported to a
+spec, rebuilt with `build()` in a fresh process, and trains with the same
+behavior; resuming from a snapshot continues from the saved epoch and
+step. The original example stays unchanged.
 
 ### Artifacts and handles
 
