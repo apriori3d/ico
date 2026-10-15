@@ -206,6 +206,19 @@ poetry shell
 pip install git+https://github.com/apriori3d/ico.git
 ```
 
+Optional extras:
+
+| Extra      | Installs                     | Needed for                         |
+| ---------- | ---------------------------- | ---------------------------------- |
+| `yaml`     | `ruamel.yaml`                | YAML pipeline specs (`ico.spec`)   |
+| `notebook` | `ipywidgets`                 | Rich widgets in Jupyter            |
+| `examples` | `skrub`, `pydot`, `graphviz` | Running the skrub examples         |
+| `vision`   | `torch`, `torchvision`, ...  | CIFAR-10 examples                  |
+
+```
+pip install "ico[yaml,notebook] @ git+https://github.com/apriori3d/ico.git"
+```
+
 ## 📈 Future Development
 
 ### 🔮 Planned Features
