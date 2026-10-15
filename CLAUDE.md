@@ -55,3 +55,15 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 10. [ ] `build(spec)` for context nodes: `IcoEpoch`, `IcoContextPipeline`
     and `IcoContextOperator`, so that training flows (not only data
     loaders) can be rebuilt from a spec.
+11. [ ] Resources in specs (see `docs/design/spec.md`): `resources`
+    section, `@register` kind `resource`, `ResourceRef[T]`, `{"$res": name}`
+    in params, lazy open, scopes `run` and `process`.
+12. [ ] Registered contexts: `IcoStateful` protocol, `context` of
+    `IcoContextPipeline` in specs, `init` from a snapshot, runtime
+    `checkpoint` policy. Validate on the full CIFAR training flow.
+13. [ ] Artifact handles (URI + content hash) for checkpoints and large
+    outputs.
+14. [ ] `live` / `pinned` modes for non-deterministic sources.
+15. [ ] Shared resources across workers: `IcoShareable` (`export` /
+    `attach`), scope `shared` owned by `build()`, memmap handles in the
+    artifact store `~/.ico/artifacts/<hash>/`. First case: CIFAR dataset.
