@@ -369,15 +369,28 @@ def serialize_async_stream(
         # Explicit pool: workers share one input queue (load balancing,
         # not broadcast), so every worker is listed.
         workers = tuple(ctx.walk(w) for w in node.pool)
+    params: dict[str, JsonValue] = {
+        "pool_size": node.pool_size,
+        "ordered": node.ordered,
+        "factory": node.pool_from_factory,
+    }
+    # Error handling is only exported when it differs from the defaults,
+    # so specs of existing flows are unchanged.
+    if node.on_error != "raise":
+        params["on_error"] = node.on_error
+    retry = node.retry
+    if retry.max_retries > 0:
+        params["retry"] = {
+            "max_retries": retry.max_retries,
+            "delay": retry.delay,
+            "backoff": retry.backoff,
+            "retry_on": [f"{t.__module__}:{t.__qualname__}" for t in retry.retry_on],
+        }
     return NodeSpec(
         kind="async_stream",
         name=node.name,
         sig=node_signature(node),
-        params={
-            "pool_size": node.pool_size,
-            "ordered": node.ordered,
-            "factory": node.pool_from_factory,
-        },
+        params=params,
         children=workers,
     )
 

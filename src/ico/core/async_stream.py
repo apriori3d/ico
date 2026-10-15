@@ -9,13 +9,95 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass
-from typing import Any, Generic, TypeAlias, TypeVar, final, overload
+from typing import Any, Generic, Literal, TypeAlias, TypeVar, final, overload
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.operator import I, IcoOperator, O
 from ico.core.signature import IcoSignature
 
 T = TypeVar("T")
+
+OnError: TypeAlias = Literal["raise", "skip", "collect"]
+
+
+# ─── Error handling policies ───
+
+
+@dataclass(frozen=True, slots=True)
+class RetryPolicy:
+    """How a worker retries a failed item before ``on_error`` applies.
+
+    The failed item is retried by the same worker, so ordering is preserved.
+    The delay before retry ``k`` (1-based) is ``delay * backoff ** (k - 1)``.
+
+    Attributes:
+        max_retries: Extra attempts after the first one (0 disables retries).
+        delay: Seconds to wait before the first retry.
+        backoff: Multiplier applied to the delay after every retry.
+        retry_on: Exception types that are retried; others fail immediately.
+
+    Note:
+        Retrying happens on the same worker. If a multiprocessing worker
+        died, retries on it are likely to fail as well.
+    """
+
+    max_retries: int = 0
+    delay: float = 0.0
+    backoff: float = 1.0
+    retry_on: tuple[type[Exception], ...] = (Exception,)
+
+    def __post_init__(self) -> None:
+        if self.max_retries < 0:
+            raise ValueError(
+                f"max_retries must be non-negative, got {self.max_retries}."
+            )
+        if self.delay < 0:
+            raise ValueError(f"delay must be non-negative, got {self.delay}.")
+        if self.backoff <= 0:
+            raise ValueError(f"backoff must be positive, got {self.backoff}.")
+
+    def delay_before(self, retry: int) -> float:
+        """Delay in seconds before the given retry (1-based)."""
+        return self.delay * self.backoff ** (retry - 1)
+
+
+@dataclass(frozen=True, slots=True)
+class ItemError:
+    """A stream item that failed after all attempts.
+
+    Attributes:
+        index: Position of the item in the input stream.
+        item: The input item.
+        error: The last exception raised for the item.
+        attempts: Number of attempts made (1 + retries).
+    """
+
+    index: int
+    item: Any
+    error: Exception
+    attempts: int
+
+    def __str__(self) -> str:
+        return f"[{self.index}] {type(self.error).__name__}: {self.error}"
+
+
+class IcoStreamErrors(RuntimeError):
+    """Raised at the end of a stream with ``on_error="collect"``.
+
+    Raised after every successful result was emitted.
+
+    Attributes:
+        errors: Failed items, ordered by input index.
+    """
+
+    _SHOWN = 5
+
+    def __init__(self, errors: list[ItemError]) -> None:
+        shown = "; ".join(str(e) for e in errors[: self._SHOWN])
+        more = len(errors) - self._SHOWN
+        suffix = f"; and {more} more" if more > 0 else ""
+        super().__init__(f"{len(errors)} stream item(s) failed: {shown}{suffix}")
+        self.errors = errors
 
 
 @final
@@ -95,7 +177,7 @@ class IcoAsyncStream(
         for true multiprocessing or other process-based parallelism approaches.
     """
 
-    __slots__ = ("pool", "ordered")
+    __slots__ = ("pool", "ordered", "on_error", "retry")
 
     pool: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
     pool_from_factory: bool
@@ -103,6 +185,8 @@ class IcoAsyncStream(
     ordered: bool
     has_factory: bool
     pool_size: int
+    on_error: OnError
+    retry: RetryPolicy
 
     @overload
     def __init__(
@@ -110,6 +194,8 @@ class IcoAsyncStream(
         pool: Sequence[IcoOperator[I, O] | IcoAsyncOperator[I, O]],
         *,
         ordered: bool = False,
+        on_error: OnError = "raise",
+        retry: int | RetryPolicy | None = None,
         name: str | None = None,
     ) -> None: ...
 
@@ -120,6 +206,8 @@ class IcoAsyncStream(
         *,
         pool_size: int | None = None,
         ordered: bool = False,
+        on_error: OnError = "raise",
+        retry: int | RetryPolicy | None = None,
         name: str | None = None,
     ) -> None: ...
 
@@ -130,6 +218,8 @@ class IcoAsyncStream(
         *,
         pool_size: int | None = None,
         ordered: bool = False,
+        on_error: OnError = "raise",
+        retry: int | RetryPolicy | None = None,
         name: str | None = None,
     ) -> None:
         """Initialize async stream with worker pool or factory.
@@ -142,15 +232,33 @@ class IcoAsyncStream(
                       Ignored when pool is a sequence (uses sequence length).
             ordered: If True, results are yielded in the same order as input items.
                     If False, results are yielded as soon as workers complete.
+            on_error: What to do with an item that failed after all retries:
+                    ``"raise"`` (default) re-raises its error immediately (at the
+                    item's position when ordered); ``"skip"`` drops it;
+                    ``"collect"`` drops it and, after all results were emitted,
+                    raises :class:`IcoStreamErrors` listing every failed item.
+            retry: Retries per failed item: a number of retries or a
+                    :class:`RetryPolicy`. Defaults to no retries.
             name: Optional name for this stream (useful for debugging/visualization).
 
         Raises:
-            ValueError: If pool is a factory but pool_size is not specified.
+            ValueError: If pool is a factory but pool_size is not specified,
+                or if on_error / retry are invalid.
 
         Note:
             Factory-based pools allow for fresh worker instances, which can be
             useful for stateful operators, memory management, or process isolation.
         """
+        if on_error not in ("raise", "skip", "collect"):
+            raise ValueError(
+                f"on_error must be 'raise', 'skip' or 'collect', got {on_error!r}."
+            )
+        retry_policy = (
+            retry
+            if isinstance(retry, RetryPolicy)
+            else RetryPolicy(max_retries=retry or 0)
+        )
+
         if callable(pool):
             if pool_size is None:
                 raise ValueError(
@@ -167,6 +275,8 @@ class IcoAsyncStream(
         self.pool = list(worker_pool)
         self.ordered = ordered
         self.pool_size = pool_size
+        self.on_error = on_error
+        self.retry = retry_policy
 
     # ─── Signature API ───
 
@@ -270,6 +380,7 @@ class IcoAsyncStream(
             source_error: Exception | None = None
             next_index = 0
             ordering_buffer: dict[int, O | _Failed] = {}
+            errors: list[ItemError] = []
 
             while total is None or received < total:
                 message = await results_queue.get()
@@ -283,22 +394,32 @@ class IcoAsyncStream(
                 index, outcome = message
 
                 if not self.ordered:
-                    yield _unwrap(outcome)
+                    if not isinstance(outcome, _Failed):
+                        yield outcome
+                    else:
+                        self._handle_failure(index, outcome, errors)
                     continue
 
                 ordering_buffer[index] = outcome
                 while next_index in ordering_buffer:
                     ready = ordering_buffer.pop(next_index)
+                    if not isinstance(ready, _Failed):
+                        yield ready
+                    else:
+                        self._handle_failure(next_index, ready, errors)
                     next_index += 1
-                    yield _unwrap(ready)
                 if len(ordering_buffer) < self.pool_size:
                     ordering_buffer_ready.set()
                 else:
                     ordering_buffer_ready.clear()
 
             completed = True
+            # An input iterator error takes precedence over collected item
+            # errors: the stream itself is incomplete.
             if source_error is not None:
                 raise source_error
+            if errors:
+                raise IcoStreamErrors(sorted(errors, key=lambda e: e.index))
         finally:
             if completed:
                 # ─── Graceful shutdown ───
@@ -310,6 +431,17 @@ class IcoAsyncStream(
                 for w in executors:
                     w.cancel()
                 await asyncio.gather(scheduler, *executors, return_exceptions=True)
+
+    def _handle_failure(
+        self, index: int, failure: _Failed, errors: list[ItemError]
+    ) -> None:
+        """Apply the on_error policy to a failed item (raise, skip or collect)."""
+        if self.on_error == "raise":
+            raise failure.error
+        if self.on_error == "collect":
+            errors.append(
+                ItemError(index, failure.item, failure.error, failure.attempts)
+            )
 
     # ─── Scheduler coroutine ───
 
@@ -351,8 +483,9 @@ class IcoAsyncStream(
     ) -> None:
         """Worker coroutine: process items until the termination signal.
 
-        Every item produces exactly one outcome, and ``task_done()`` is called
-        once per ``get()``, including the termination signal.
+        Every item produces exactly one outcome (after retries), and
+        ``task_done()`` is called once per ``get()``, including the
+        termination signal.
         """
         while True:
             task = await in_queue.get()
@@ -360,13 +493,30 @@ class IcoAsyncStream(
                 if task is None:
                     return
                 index, item = task
-                try:
-                    outcome: O | _Failed = await self._call_async(operator, item)
-                except Exception as e:
-                    outcome = _Failed(e)
+                outcome = await self._call_with_retry(operator, item)
                 await out_queue.put((index, outcome))
             finally:
                 in_queue.task_done()
+
+    async def _call_with_retry(
+        self,
+        operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
+        item: I,
+    ) -> O | _Failed:
+        """Call the operator, retrying failures according to the retry policy."""
+        policy = self.retry
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                return await self._call_async(operator, item)
+            except Exception as e:
+                retry = attempt  # number of the retry that would follow
+                if retry > policy.max_retries or not isinstance(e, policy.retry_on):
+                    return _Failed(e, item, attempt)
+                delay = policy.delay_before(retry)
+                if delay > 0:
+                    await asyncio.sleep(delay)
 
     # ─── Async operator execution ───
 
@@ -391,6 +541,8 @@ class _Failed:
     """A failed item outcome (kept distinct from results that are exceptions)."""
 
     error: Exception
+    item: Any
+    attempts: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -402,12 +554,6 @@ class _End:
 
 
 _Message: TypeAlias = tuple[int, T | _Failed] | _End
-
-
-def _unwrap(outcome: T | _Failed) -> T:
-    if isinstance(outcome, _Failed):
-        raise outcome.error
-    return outcome
 
 
 # ─── Utility: bridge async → sync iterator ───

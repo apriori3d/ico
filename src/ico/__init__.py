@@ -1,6 +1,11 @@
 # core
 from ico.core.async_operator import IcoAsyncOperator
-from ico.core.async_stream import IcoAsyncStream
+from ico.core.async_stream import (
+    IcoAsyncStream,
+    IcoStreamErrors,
+    ItemError,
+    RetryPolicy,
+)
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator, context_operator
@@ -55,6 +60,9 @@ __all__ = [
     "HasRemoteFlow",
     "IcoAsyncOperator",
     "IcoAsyncStream",
+    "IcoStreamErrors",
+    "ItemError",
+    "RetryPolicy",
     "IcoBatcher",
     "IcoChain",
     "IcoContextOperator",

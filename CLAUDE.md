@@ -32,7 +32,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 4. [x] `fork` combinator with overloads for 2–6 branches; output is a tuple.
 5. [x] `route`, `partition`, `filter` combinators (filter factory is `keep`).
 6. [x] `until` predicate and `max_iterations` for `IcoProcess`.
-7. [ ] `on_error` policy (`raise` / `skip` / `collect`) and `retry` for
+7. [x] `on_error` policy (`raise` / `skip` / `collect`) and `retry` for
        `IcoAsyncStream`; fix `in_queue.task_done()` called once per worker
        instead of once per item.
 8. [ ] `@register` decorator and operator registry with signature search.
