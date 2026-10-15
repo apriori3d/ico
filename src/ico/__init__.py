@@ -48,6 +48,9 @@ from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.rich_style import DescribeStyle
 from ico.describe.runtime.options import RuntimeRendererOptions
 
+# registry
+from ico.registry import IcoRegistry, register
+
 # runtime
 from ico.runtime.agent.mp.mp_agent import MPAgent
 
@@ -109,6 +112,9 @@ __all__ = [
     "wrap_runtime",
     # runtime
     "MPAgent",
+    # registry
+    "IcoRegistry",
+    "register",
     # tools
     "RichPrinterTool",
     "RichProgressTool",

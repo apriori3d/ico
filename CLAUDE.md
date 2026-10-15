@@ -35,4 +35,17 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 7. [x] `on_error` policy (`raise` / `skip` / `collect`) and `retry` for
        `IcoAsyncStream`; fix `in_queue.task_done()` called once per worker
        instead of once per item.
-8. [ ] `@register` decorator and operator registry with signature search.
+8. [ ] Operator registry:
+   - `@register(name, version, tags=..., caps=...)` attaches metadata to an
+     operator; description comes from the docstring, signature from
+     `.signature`. Status: `draft` / `verified` / `stable` (default `draft`).
+   - `IcoRegistry` stores entries keyed by `name@version` and returns
+     compact cards (name, version, sig, description, tags, caps, status).
+   - Search by input type, output type, tags and text. Type matching:
+     exact match or subclass for plain classes; generics match by origin
+     and args (no variance yet).
+   - `build(spec)` resolves `name@version` refs through the registry and
+     rebuilds the flow; round trip `to_spec → build → to_spec` must be stable.
+   - Out of scope: MCP server, acceptance gate, PR flow, entry points.
+9. [ ] `find_path(from_type, to_type)`: shortest operator chains between
+   types over the registry type graph.

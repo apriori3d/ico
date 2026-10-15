@@ -229,7 +229,7 @@ def narrowest_type(types_: Sequence[Any]) -> Any | None:
     Returns:
         The narrowest type, or ``None`` if none is compatible with all others.
     """
-    known = [t for t in types_ if not _is_any(t)]
+    known = [t for t in types_ if not is_any_type(t)]
     if not known:
         return types_[0] if types_ else None
 
@@ -301,7 +301,7 @@ def is_assignable(src: Any, dst: Any) -> bool | None:
         >>> is_assignable(str, int)  # False
         >>> is_assignable(Any, int)  # True
     """
-    if _is_any(src) or _is_any(dst) or dst is object:
+    if is_any_type(src) or is_any_type(dst) or dst is object:
         return True
 
     if isinstance(src, TypeVar) or isinstance(dst, TypeVar):
@@ -371,8 +371,11 @@ def _tuple_args_assignable(
     return _all(is_assignable(s, d) for s, d in zip(src_args, dst_args, strict=True))
 
 
-def _is_any(t: Any) -> bool:
-    # Signatures encode Any as `Any`, `type(Any)` or `type[Any]`.
+def is_any_type(t: Any) -> bool:
+    """Whether a signature type means ``Any``.
+
+    Signatures encode Any as ``Any``, ``type(Any)`` or ``type[Any]``.
+    """
     return t is Any or t is type(Any) or t == type[Any]
 
 
