@@ -277,15 +277,17 @@ class SpecFactory:
     worker: NodeSpec
     targets: tuple[_Target, ...]
 
-    def __call__(self) -> AnyOp:
+    # Annotated with the untyped node protocol on purpose: agents infer their
+    # signature from the factory's return annotation, and an operator type
+    # here would claim "Any → Any" as inferred. build() parametrizes the
+    # agent from probe_signature() instead.
+    def __call__(self) -> IcoNodeProtocol:
         by_ref = {t.meta.ref: t for t in self.targets}
-        return cast(
-            AnyOp, BuildContext(by_ref.__getitem__, fresh=True).build(self.worker)
-        )
+        return BuildContext(by_ref.__getitem__, fresh=True).build(self.worker)
 
     def probe_signature(self) -> IcoSignature:
         """Signature of the worker flow, from one probe worker."""
-        return self().signature
+        return cast(AnyOp, self()).signature
 
 
 def build(
@@ -573,5 +575,12 @@ def build_agent(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     # as it was from the original factory's return annotation.
     signature = factory.probe_signature()
     if signature.infered:
-        return MPAgent[signature.i, signature.o](factory, name=spec.name)  # type: ignore[name-defined]
-    return MPAgent[Any, Any](factory, name=spec.name)
+        return MPAgent[signature.i, signature.o](  # type: ignore[name-defined]
+            cast(Callable[[], AnyOp], factory), name=spec.name
+        )
+    # Unparametrized, like the original agent: MPAgent[Any, Any] would report
+    # an inferred "Any → Any" signature and break the round trip.
+    agent: MPAgent[Any, Any] = MPAgent(
+        cast(Callable[[], AnyOp], factory), name=spec.name
+    )
+    return agent

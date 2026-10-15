@@ -9,6 +9,7 @@ import pytest
 from ico.core.async_stream import IcoAsyncStream, RetryPolicy
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
+from ico.core.runtime.progress import IcoProgress
 from ico.core.source import IcoSource
 from ico.registry import IcoRegistry, register
 from ico.runtime.agent.mp.mp_agent import MPAgent
@@ -154,6 +155,22 @@ def test_rebuilt_agent_runs_in_another_process() -> None:
         assert pid != os.getpid()
     finally:
         active.deactivate()
+
+
+def make_untyped_worker() -> IcoOperator[int, int]:
+    # An unparametrized progress node makes the worker signature uninferred.
+    progress: IcoProgress[int] = IcoProgress(total=3)
+    return cast(IcoOperator[int, int], progress | inc)
+
+
+def test_agent_with_uninferred_worker_roundtrip() -> None:
+    # No return annotation on the factory: the agent signature is uninferred.
+    agent = MPAgent(lambda: make_untyped_worker())  # pyright: ignore[reportUnknownLambdaType]
+    assert not agent.signature.infered
+
+    node = roundtrip(agent)
+    assert isinstance(node, MPAgent)
+    assert not cast(MPAgent[int, int], node).signature.infered
 
 
 def test_agent_spec_has_no_factory_ref() -> None:
