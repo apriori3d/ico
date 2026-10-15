@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import types
 from collections import OrderedDict
 from collections.abc import Callable
 from types import FunctionType
@@ -11,6 +12,7 @@ from typing import (
     Any,
     Generic,
     TypeVar,
+    Union,
     cast,
     get_args,
     get_origin,
@@ -378,10 +380,16 @@ def format_ico_type(tp: Any) -> str:
     if tp is type(None):
         return "()"
 
-    origin = get_origin(tp)
+    origin: object = get_origin(tp)
 
     if origin is None:
         return getattr(tp, "__name__", str(tp))
+
+    if origin is Union or origin is types.UnionType:
+        # Inside a union "None" reads better than the "()" used for no value.
+        return " | ".join(
+            "None" if a is type(None) else format_ico_type(a) for a in get_args(tp)
+        )
 
     name = getattr(origin, "__name__", str(origin))
     args = get_args(tp)

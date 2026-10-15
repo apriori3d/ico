@@ -6,12 +6,15 @@ from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator, context_operator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.filter import IcoFilter, keep
 from ico.core.fork import IcoFork, fork
 from ico.core.identity import IcoIdentity
 from ico.core.node import HasRemoteFlow, IcoNode
 from ico.core.operator import IcoOperator, operator
+from ico.core.partition import IcoPartition, partition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
+from ico.core.route import IcoRoute, IcoRouteError, route
 
 # core/runtime
 from ico.core.runtime.exceptions import IcoRuntimeError
@@ -58,6 +61,8 @@ __all__ = [
     "context_operator",
     "IcoContextPipeline",
     "IcoEpoch",
+    "IcoFilter",
+    "keep",
     "IcoFork",
     "fork",
     "IcoIdentity",
@@ -65,7 +70,12 @@ __all__ = [
     "IcoOperator",
     "operator",
     "IcoPipeline",
+    "IcoPartition",
+    "partition",
     "IcoProcess",
+    "IcoRoute",
+    "IcoRouteError",
+    "route",
     "IcoSignature",
     "IcoSignatureError",
     "SignatureIssue",

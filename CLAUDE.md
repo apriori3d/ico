@@ -30,7 +30,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
        JSON only.
 3. [x] Optional runtime signature check for `IcoChain` (strict mode).
 4. [x] `fork` combinator with overloads for 2–6 branches; output is a tuple.
-5. [ ] `route`, `partition`, `filter` combinators.
+5. [x] `route`, `partition`, `filter` combinators (filter factory is `keep`).
 6. [ ] `until` predicate and `max_iterations` for `IcoProcess`.
 7. [ ] `on_error` policy (`raise` / `skip` / `collect`) and `retry` for
        `IcoAsyncStream`; fix `in_queue.task_done()` called once per worker

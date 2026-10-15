@@ -70,13 +70,13 @@ class IcoFork(Generic[I, O], IcoOperator[I, O]):
 
         from ico.core.signature_check import (
             IcoSignatureError,
-            check_fork_branches,
+            check_branch_inputs,
             is_strict,
         )
 
         fork_name = name or "fork"
         if strict if strict is not None else is_strict():
-            issue = check_fork_branches(branch_ops, fork_name)
+            issue = check_branch_inputs(branch_ops, fork_name)
             if issue is not None:
                 raise IcoSignatureError(issue)
 

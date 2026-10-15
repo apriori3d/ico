@@ -14,7 +14,8 @@ The check is opt-in:
     ...     flow = parse | score  # raises IcoSignatureError on mismatch
 
 or per node with ``chain(a, b, strict=True)`` / ``fork(..., strict=True)``
-(fork branches must accept a common input type). :func:`validate_signatures`
+(fork branches, and a route's key and branches, must accept a common
+input type). :func:`validate_signatures`
 reports every issue in an already built flow without raising.
 
 Compatibility is checked conservatively: anything that cannot be decided
@@ -75,16 +76,16 @@ class SignatureIssue:
     Attributes:
         kind: ``"mismatch"`` (error) when the output type of ``left`` is not
             assignable to the input type of the chained ``right``;
-            ``"conflict"`` (error) when two fork branches ``left`` and
-            ``right`` accept input types with no common type;
+            ``"conflict"`` (error) when two branches ``left`` and ``right``
+            of a fork or route accept input types with no common type;
             ``"uninferred"`` (warning) when a signature could not be
             inferred, so the link was not checked.
-        left: Name of the upstream node (or the first fork branch).
-        right: Name of the downstream node (or the second fork branch).
+        left: Name of the upstream node (or the first conflicting branch).
+        right: Name of the downstream node (or the second conflicting branch).
         output: Output type of ``left``; for a conflict, its input type
             (``None`` when uninferred).
         input: Input type of ``right`` (``None`` when uninferred).
-        node: Name of the fork for a conflict, ``None`` otherwise.
+        node: Name of the fork or route for a conflict, ``None`` otherwise.
     """
 
     kind: IssueKind
@@ -104,7 +105,7 @@ class SignatureIssue:
 
         if self.kind == "conflict":
             return (
-                f"fork '{self.node}': inputs {format_ico_type(self.output)} "
+                f"branches of '{self.node}': inputs {format_ico_type(self.output)} "
                 f"of '{self.left}' and {format_ico_type(self.input)} "
                 f"of '{self.right}' have no common type"
             )
@@ -158,10 +159,12 @@ def check_link(left: IcoNodeProtocol, right: IcoNodeProtocol) -> SignatureIssue 
     return None
 
 
-def check_fork_branches(
-    branches: Sequence[IcoNodeProtocol], fork_name: str
+def check_branch_inputs(
+    branches: Sequence[IcoNodeProtocol], node_name: str
 ) -> SignatureIssue | None:
-    """Check that fork branches accept a common input type.
+    """Check that branches fed with the same item accept a common input type.
+
+    Used for fork branches and for a route's key function and branches.
 
     Branches with uninferred signatures are skipped. Two unrelated classes
     are treated as conflicting even though a common subclass might exist.
@@ -181,7 +184,7 @@ def check_fork_branches(
                 and is_assignable(b_sig.i, a_sig.i) is False
             ):
                 return SignatureIssue(
-                    "conflict", _label(a), _label(b), a_sig.i, b_sig.i, fork_name
+                    "conflict", _label(a), _label(b), a_sig.i, b_sig.i, node_name
                 )
     return None
 
@@ -194,6 +197,7 @@ def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
     """
     from ico.core.chain import IcoChain
     from ico.core.fork import IcoFork
+    from ico.core.route import IcoRoute
 
     issues: list[SignatureIssue] = []
     for node in iterate_nodes(flow):
@@ -201,8 +205,8 @@ def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
         if isinstance(node, IcoChain):
             left, right = node.children
             issue = check_link(left, right)
-        elif isinstance(node, IcoFork):
-            issue = check_fork_branches(node.children, node.name or "fork")
+        elif isinstance(node, IcoFork | IcoRoute):
+            issue = check_branch_inputs(node.children, node.name or "")
         if issue is not None:
             issues.append(issue)
     return issues

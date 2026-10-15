@@ -17,12 +17,15 @@ from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.filter import IcoFilter
 from ico.core.fork import IcoFork
 from ico.core.identity import IcoIdentity
 from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.operator import IcoOperator
+from ico.core.partition import IcoPartition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
+from ico.core.route import IcoRoute
 from ico.core.runtime.agent import IcoAgent
 from ico.core.runtime.monitor import IcoMonitor
 from ico.core.runtime.progress import IcoProgress
@@ -31,7 +34,7 @@ from ico.core.signature import IcoSignature
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
-from ico.spec.model import NodeSpec, SpecError
+from ico.spec.model import JsonValue, NodeSpec, SpecError
 from ico.spec.registry import SpecContext, spec_serializer
 
 # ────────────────────────────────────────────────
@@ -275,6 +278,54 @@ def serialize_fork(node: IcoFork[object, object], ctx: SpecContext) -> NodeSpec:
         sig=node_signature(node),
         children=tuple(ctx.walk(branch) for branch in node.branches),
     )
+
+
+@spec_serializer(IcoFilter)
+def serialize_filter(node: IcoFilter[object], ctx: SpecContext) -> NodeSpec:
+    return NodeSpec(
+        kind="filter",
+        name=node.name,
+        sig=node_signature(node),
+        children=(ctx.walk(node.predicate),),
+    )
+
+
+@spec_serializer(IcoPartition)
+def serialize_partition(node: IcoPartition[object], ctx: SpecContext) -> NodeSpec:
+    return NodeSpec(
+        kind="partition",
+        name=node.name,
+        sig=node_signature(node),
+        children=(ctx.walk(node.predicate),),
+    )
+
+
+@spec_serializer(IcoRoute)
+def serialize_route(
+    node: IcoRoute[object, object, object], ctx: SpecContext
+) -> NodeSpec:
+    # children: [key, *branches (in key order), default?]
+    keys = [_route_key(key, node, ctx) for key in node.routes]
+    return NodeSpec(
+        kind="route",
+        name=node.name,
+        sig=node_signature(node),
+        params={"keys": keys, "default": node.default is not None},
+        children=tuple(ctx.walk(child) for child in node.children),
+    )
+
+
+def _route_key(
+    key: object, node: IcoRoute[object, object, object], ctx: SpecContext
+) -> JsonValue:
+    if key is None or isinstance(key, str | int | float | bool):
+        return key
+    if ctx.strict:
+        raise SpecError(
+            f"Route key {key!r} in '{node.name}' is not a JSON scalar "
+            "(str, int, float, bool or None) and cannot be exported."
+        )
+    return repr(key)
 
 
 @spec_serializer(IcoContextPipeline)

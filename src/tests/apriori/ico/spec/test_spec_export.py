@@ -10,10 +10,13 @@ from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator
 from ico.core.epoch import IcoEpoch
+from ico.core.filter import keep
 from ico.core.fork import fork
 from ico.core.node import IcoNode
 from ico.core.operator import IcoOperator, IcoOperatorProtocol, operator
+from ico.core.partition import partition
 from ico.core.process import IcoProcess
+from ico.core.route import route
 from ico.core.runtime.progress import IcoProgress
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
@@ -142,6 +145,49 @@ def test_fork_branches_in_order() -> None:
     assert fork_spec.name == "split"
     assert fork_spec.sig == "int → tuple[int, str]"
     assert [c.ref for c in fork_spec.children] == [f"{MOD}:double", f"{MOD}:to_str"]
+
+
+def is_even(x: int) -> bool:
+    return x % 2 == 0
+
+
+def parity(x: int) -> str:
+    return "even" if x % 2 == 0 else "odd"
+
+
+def test_filter_and_partition() -> None:
+    filter_spec = to_spec(keep(is_even), strict=True).root
+    assert filter_spec.kind == "filter"
+    assert filter_spec.sig == "Iterator[int] → Iterator[int]"
+    assert [c.ref for c in filter_spec.children] == [f"{MOD}:is_even"]
+
+    partition_spec = to_spec(partition(is_even), strict=True).root
+    assert partition_spec.kind == "partition"
+    assert [c.ref for c in partition_spec.children] == [f"{MOD}:is_even"]
+
+
+def test_route_keys_and_children() -> None:
+    flow = route(parity, {"even": double, "odd": inc}, default=inc, name="by_parity")
+    root = to_spec(flow, strict=True).root
+
+    assert root.kind == "route"
+    assert root.name == "by_parity"
+    assert root.sig == "int → int"
+    assert root.params == {"keys": ["even", "odd"], "default": True}
+    assert [c.ref for c in root.children] == [
+        f"{MOD}:parity",
+        f"{MOD}:double",
+        f"{MOD}:inc",
+        f"{MOD}:inc",
+    ]
+
+
+def test_route_non_json_key() -> None:
+    flow = route(parity, {("even",): double})  # type: ignore[dict-item]
+
+    assert to_spec(flow).root.params["keys"] == ["('even',)"]
+    with pytest.raises(SpecError, match="not a JSON scalar"):
+        to_spec(flow, strict=True)
 
 
 def test_right_nested_chain_is_flattened() -> None:

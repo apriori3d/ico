@@ -168,7 +168,7 @@ def test_strict_fork_rejects_conflicting_inputs() -> None:
     assert issue.is_error
     assert (issue.left, issue.right, issue.node) == ("to_str", "str_len", "bad")
     assert str(exc_info.value) == (
-        "fork 'bad': inputs int of 'to_str' and str of 'str_len' have no common type"
+        "branches of 'bad': inputs int of 'to_str' and str of 'str_len' have no common type"
     )
 
 
