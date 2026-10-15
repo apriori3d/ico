@@ -295,14 +295,19 @@ class IcoAsyncStream(
             All workers in the pool should have compatible signatures. The first
             worker's signature is used as the template for the entire stream.
         """
+        # Explicit parametrization (IcoAsyncStream[I, O]) already resolves to
+        # Iterator[I] → Iterator[O] through the IcoOperator base.
         signature = super().signature
+        if signature.infered:
+            return signature
 
-        # If signature is undefined, infer from body operator
-        if not signature.infered:
-            signature = self.pool[0].signature
+        # Otherwise wrap the first worker's item signature.
+        worker = self.pool[0].signature
+        if not worker.infered:
+            return worker
 
-        i_type: Any = signature.i
-        o_type: Any = signature.o
+        i_type: Any = worker.i
+        o_type: Any = worker.o
         return IcoSignature(
             i=Iterator[i_type],
             c=None,
