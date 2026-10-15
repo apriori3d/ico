@@ -1,10 +1,21 @@
+from __future__ import annotations
+
 import asyncio
-from collections.abc import AsyncIterator, Callable, Iterator, Sequence
-from typing import Any, Generic, TypeVar, final, overload
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Callable,
+    Iterator,
+    Sequence,
+)
+from dataclasses import dataclass
+from typing import Any, Generic, TypeAlias, TypeVar, final, overload
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.operator import I, IcoOperator, O
 from ico.core.signature import IcoSignature
+
+T = TypeVar("T")
 
 
 @final
@@ -84,14 +95,7 @@ class IcoAsyncStream(
         for true multiprocessing or other process-based parallelism approaches.
     """
 
-    __slots__ = (
-        "pool",
-        "ordered",
-        "_num_executors",
-        "_has_job",
-        "_next_index",
-        "_ordering_buffer",
-    )
+    __slots__ = ("pool", "ordered")
 
     pool: list[IcoOperator[I, O] | IcoAsyncOperator[I, O]]
     pool_from_factory: bool
@@ -99,12 +103,6 @@ class IcoAsyncStream(
     ordered: bool
     has_factory: bool
     pool_size: int
-
-    # ─── Async iterator state ───
-
-    _has_job: bool  # An indicator whether input_stream produced any items
-    _next_index: int  # Handle ordered result emission
-    _ordering_buffer: dict[int, O | Exception]
 
     @overload
     def __init__(
@@ -170,11 +168,6 @@ class IcoAsyncStream(
         self.ordered = ordered
         self.pool_size = pool_size
 
-        # Async iterator state
-        self._has_job = False
-        self._next_index = 0
-        self._ordering_buffer: dict[int, O | Exception] = {}
-
     # ─── Signature API ───
 
     @property
@@ -206,21 +199,6 @@ class IcoAsyncStream(
             o=Iterator[o_type],
         )
 
-    # ─── Async iterator state management ───
-
-    def _reset_iterator_state(self) -> None:
-        """Reset per-iteration state for stream reuse.
-
-        Clears internal state variables that track iteration progress and ordering.
-        This is important when the same stream instance is used multiple times.
-
-        Note:
-            Called automatically before each stream execution to ensure clean state.
-        """
-        self._has_job = False
-        self._next_index = 0
-        self._ordering_buffer.clear()
-
     # ─── Synchronous entrypoint ───
 
     def _run_stream(self, input_stream: Iterator[I]) -> Iterator[O]:
@@ -243,11 +221,17 @@ class IcoAsyncStream(
     async def _run_stream_async(self, input_stream: Iterator[I]) -> AsyncIterator[O]:
         """Internal async implementation driving producer, workers, and output emission.
 
-        Coordinates the complete async processing lifecycle:
-        1. Producer fills input queue with items from input_stream
-        2. Worker pool consumes from input queue and processes items concurrently
-        3. Results are collected in output queue and yielded as they become available
-        4. Graceful shutdown ensures all workers complete and resources are cleaned up
+        Flow:
+            1. The scheduler feeds ``(index, item)`` pairs into the input queue
+               and finally reports how many items it scheduled (``_End``).
+            2. Workers turn every item into exactly one outcome on the results
+               queue: a value or a ``_Failed`` wrapper.
+            3. This coroutine emits outcomes (reordered if ``ordered``) and
+               stops once it has received as many outcomes as items were
+               scheduled.
+
+        All per-run state is local, so a stream instance can be run several
+        times, including concurrently.
 
         Args:
             input_stream: Iterator of input items to be processed.
@@ -256,101 +240,76 @@ class IcoAsyncStream(
             O: Processed results, either in input order (if ordered=True) or
                as soon as workers complete (if ordered=False).
 
-        Note:
-            Handles empty input streams with fast-exit optimization and ensures
-            proper resource cleanup even if processing is interrupted.
+        Raises:
+            Exception: The first item error, or an error raised by the input
+                iterator once all items scheduled before it were emitted.
         """
-        self._reset_iterator_state()
-
         # Max concurrency = number of operators
         input_queue = asyncio.Queue[tuple[int, I] | None](maxsize=self.pool_size)
-        results_queue = asyncio.Queue[tuple[int, O | Exception]](maxsize=self.pool_size)
+        results_queue = asyncio.Queue[_Message[O]](maxsize=self.pool_size)
 
-        # Create one worker task per operator
+        # Backpressure for ordered mode: pause scheduling while the ordering
+        # buffer is full.
+        ordering_buffer_ready = asyncio.Event()
+        ordering_buffer_ready.set()
+
         executors = [
             asyncio.create_task(self._execute_operator(op, input_queue, results_queue))
             for op in self.pool
         ]
-
-        # Set indicator results buffer size is below max_concurrency
-        ordering_buffer_ready = asyncio.Event()
-        ordering_buffer_ready.set()  # initially allow producing
-
-        scheduler_active = asyncio.Event()
-        scheduler_active.clear()
-
-        producer_task = asyncio.create_task(
+        scheduler = asyncio.create_task(
             self._schedule_items(
-                input_stream, input_queue, scheduler_active, ordering_buffer_ready
+                input_stream, input_queue, results_queue, ordering_buffer_ready
             )
         )
 
+        completed = False
         try:
-            # Wait for producer to finish pushing items and termination signals.
-            # Corner case: if the input stream is empty, out_queue will stay empty.
-            await scheduler_active.wait()
+            received = 0
+            total: int | None = None
+            source_error: Exception | None = None
+            next_index = 0
+            ordering_buffer: dict[int, O | _Failed] = {}
 
-            # ─── Fast-exit ───
-            # If no jobs were produced, exit immediately (no worker output expected).
-            if not self._has_job:
-                return
+            while total is None or received < total:
+                message = await results_queue.get()
+                results_queue.task_done()
 
-            # ─── Main result loop ───
-            async for output_item in self._produce_output_async(
-                results_queue, ordering_buffer_ready
-            ):
-                yield output_item
-                # Update flag: continue while at least one worker is still active
-                self._has_job = not all(w.done() for w in executors)
+                if isinstance(message, _End):
+                    total, source_error = message.count, message.error
+                    continue
 
+                received += 1
+                index, outcome = message
+
+                if not self.ordered:
+                    yield _unwrap(outcome)
+                    continue
+
+                ordering_buffer[index] = outcome
+                while next_index in ordering_buffer:
+                    ready = ordering_buffer.pop(next_index)
+                    next_index += 1
+                    yield _unwrap(ready)
+                if len(ordering_buffer) < self.pool_size:
+                    ordering_buffer_ready.set()
+                else:
+                    ordering_buffer_ready.clear()
+
+            completed = True
+            if source_error is not None:
+                raise source_error
         finally:
-            # ─── Graceful shutdown ───
-            producer_task.cancel()
-            for w in executors:
-                w.cancel()
-            await asyncio.gather(*executors, return_exceptions=True)
-
-    # ─── Producer coroutine ───
-
-    async def _produce_output_async(
-        self,
-        results_queue: asyncio.Queue[tuple[int, O | Exception]],
-        ordering_buffer_ready: asyncio.Event,
-    ) -> AsyncIterator[O]:
-        """
-        Pulls results from results_queue and yields them downstream.
-        Maintains result ordering if required.
-        Backpressure (results_buffer_ready) is toggled based on buffer size.
-        """
-        while not results_queue.empty() or self._has_job:
-            # Wait for next available result
-            i, result = await results_queue.get()
-            results_queue.task_done()
-
-            if self.ordered:
-                # Store result by index
-                self._ordering_buffer[i] = result
-
-                # Yield all ready results in order
-                while self._next_index in self._ordering_buffer:
-                    result = self._ordering_buffer.pop(self._next_index)
-
-                    # update results buffer flag
-                    if len(self._ordering_buffer) < self.pool_size:
-                        ordering_buffer_ready.set()
-                    else:
-                        ordering_buffer_ready.clear()
-
-                    # Yield output item or raise exception
-                    if isinstance(result, Exception):
-                        raise result
-                    yield result
-                    self._next_index += 1
+            if completed:
+                # ─── Graceful shutdown ───
+                # All items are done; workers exit on their termination signal.
+                await asyncio.gather(scheduler, *executors, return_exceptions=True)
             else:
-                # Yield result immediately
-                if isinstance(result, Exception):
-                    raise result
-                yield result
+                # ─── Early exit: error or consumer stopped iterating ───
+                scheduler.cancel()
+                for w in executors:
+                    w.cancel()
+                await asyncio.gather(scheduler, *executors, return_exceptions=True)
 
     # ─── Scheduler coroutine ───
 
@@ -358,18 +317,27 @@ class IcoAsyncStream(
         self,
         input_stream: Iterator[I],
         in_queue: asyncio.Queue[tuple[int, I] | None],
-        scheduler_active: asyncio.Event,
-        results_buffer_ready: asyncio.Event,
+        out_queue: asyncio.Queue[_Message[O]],
+        ordering_buffer_ready: asyncio.Event,
     ) -> None:
-        scheduler_active.set()
+        """Feed items to workers, then report the item count and stop workers.
 
-        for i, item in enumerate(input_stream):
-            await results_buffer_ready.wait()
-            self._has_job = True
-            # Put item with its index for ordered processing
-            await in_queue.put((i, item))
+        An exception raised by the input iterator is not an item error: it is
+        reported with the count and re-raised by the consumer.
+        """
+        count = 0
+        error: Exception | None = None
+        try:
+            for item in input_stream:
+                await ordering_buffer_ready.wait()
+                await in_queue.put((count, item))
+                count += 1
+        except Exception as e:
+            error = e
 
-        # Send termination signals for all executors
+        await out_queue.put(_End(count, error))
+
+        # Termination signal for every executor
         for _ in range(self.pool_size):
             await in_queue.put(None)
 
@@ -379,29 +347,26 @@ class IcoAsyncStream(
         self,
         operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
         in_queue: asyncio.Queue[tuple[int, I] | None],
-        out_queue: asyncio.Queue[tuple[int, O | Exception]],
+        out_queue: asyncio.Queue[_Message[O]],
     ) -> None:
-        """
-        Worker coroutine that continuously pulls items from in_queue,
-        executes its operator, and pushes results to out_queue.
-        """
-        try:
-            while True:
-                task = await in_queue.get()
-                if task is None:
-                    break
-                i, item = task
-                try:
-                    result = await self._call_async(operator, item)
-                    await out_queue.put((i, result))
-                except Exception as e:
-                    await out_queue.put((i, e))
+        """Worker coroutine: process items until the termination signal.
 
-        except asyncio.CancelledError:
-            # Normal cancellation during shutdown
-            pass
-        finally:
-            in_queue.task_done()
+        Every item produces exactly one outcome, and ``task_done()`` is called
+        once per ``get()``, including the termination signal.
+        """
+        while True:
+            task = await in_queue.get()
+            try:
+                if task is None:
+                    return
+                index, item = task
+                try:
+                    outcome: O | _Failed = await self._call_async(operator, item)
+                except Exception as e:
+                    outcome = _Failed(e)
+                await out_queue.put((index, outcome))
+            finally:
+                in_queue.task_done()
 
     # ─── Async operator execution ───
 
@@ -415,13 +380,37 @@ class IcoAsyncStream(
             result = await operator(item)
         else:
             result = await asyncio.to_thread(operator, item)
-
         return result
 
 
-# ─── Utility: bridge async → sync iterator ───
+# ─── Internal messages ───
 
-T = TypeVar("T")
+
+@dataclass(frozen=True, slots=True)
+class _Failed:
+    """A failed item outcome (kept distinct from results that are exceptions)."""
+
+    error: Exception
+
+
+@dataclass(frozen=True, slots=True)
+class _End:
+    """Scheduler report: number of scheduled items and an input iterator error."""
+
+    count: int
+    error: Exception | None
+
+
+_Message: TypeAlias = tuple[int, T | _Failed] | _End
+
+
+def _unwrap(outcome: T | _Failed) -> T:
+    if isinstance(outcome, _Failed):
+        raise outcome.error
+    return outcome
+
+
+# ─── Utility: bridge async → sync iterator ───
 
 
 def async_to_sync_iter(async_iter: AsyncIterator[T]) -> Iterator[T]:
@@ -442,6 +431,12 @@ def async_to_sync_iter(async_iter: AsyncIterator[T]) -> Iterator[T]:
             except StopAsyncIteration:
                 break
     finally:
+        # Close the generator explicitly: it was first iterated outside the
+        # running loop, so shutdown_asyncgens() does not track it. Without
+        # this, an early-closed stream would run its cleanup (cancelling
+        # workers) only at garbage collection, after the loop is closed.
+        if isinstance(async_iter, AsyncGenerator):
+            loop.run_until_complete(async_iter.aclose())
         loop.run_until_complete(loop.shutdown_asyncgens())
         asyncio.set_event_loop(None)  # Explicitly detach the closed loop
         loop.close()
