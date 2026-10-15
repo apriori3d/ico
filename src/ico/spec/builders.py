@@ -308,8 +308,7 @@ def build(
         SpecError: On unknown operators, signature drift between the spec
             and the registry, unregistered leaves, invalid params, registered
             instances inside factory-made workers, or kinds that cannot be
-            built yet (epoch, context operators, runtime wrappers, monitors,
-            progress).
+            built yet (epoch, context operators, runtime wrappers, monitors).
 
     Example:
         >>> flow = build(from_json(text))
@@ -366,7 +365,10 @@ def _children(spec: NodeSpec, count: int | None = None, *, at_least: int = 0) ->
 def build_seq(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, at_least=2)
     steps = [ctx.op(child) for child in spec.children]
-    return cast(IcoNodeProtocol, reduce(chain, steps))
+    node = cast(IcoNodeProtocol, reduce(chain, steps))
+    if spec.name is not None:
+        node.name = spec.name
+    return node
 
 
 @spec_builder("stream")
@@ -454,6 +456,16 @@ def build_batcher(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
         drop_last=_param(spec, "drop_last", bool),
         name=spec.name,
     )
+    return node
+
+
+@spec_builder("progress")
+def build_progress(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    from ico.core.runtime.progress import IcoProgress
+
+    _children(spec, 0)
+    # Not parametrized, like batcher and identity: specs carry no Python types.
+    node: IcoProgress[Any] = IcoProgress(total=_number(spec, "total"), name=spec.name)
     return node
 
 

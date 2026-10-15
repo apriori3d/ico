@@ -393,7 +393,8 @@ def format_ico_type(tp: Any) -> str:
         - Union types → "T1 | T2 | ..."
         - Generic containers like Iterator, list
     """
-    if tp is type(Any):
+    # Signatures encode Any as type(Any) or type[Any] (e.g. the IcoChain fallback).
+    if tp is type(Any) or tp is Any or tp == type[Any]:
         return "Any"
 
     if tp is type(None):

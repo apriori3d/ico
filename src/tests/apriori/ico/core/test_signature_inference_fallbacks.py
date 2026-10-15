@@ -8,7 +8,11 @@ import pytest
 from ico.core.batcher import IcoBatcher
 from ico.core.operator import IcoOperator
 from ico.core.signature_check import validate_signatures
-from ico.core.signature_utils import infer_from_callable, infer_from_flow_factory
+from ico.core.signature_utils import (
+    format_ico_type,
+    infer_from_callable,
+    infer_from_flow_factory,
+)
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 
@@ -81,3 +85,27 @@ def test_typed_flow_factory_is_inferred() -> None:
     signature = infer_from_flow_factory(factory)
     assert signature is not None
     assert signature.format() == "int → str"
+
+
+# ─── Formatting ───
+
+
+def test_format_any_encodings() -> None:
+    assert format_ico_type(Any) == "Any"
+    assert format_ico_type(type(Any)) == "Any"
+    assert format_ico_type(type[Any]) == "Any"
+
+
+def test_chain_fallback_signature_formats_as_any() -> None:
+    untyped: IcoOperator[Any, Any] = IcoOperator(identity_untyped)
+    signature = (untyped | IcoOperator(to_str_typed)).signature
+    assert not signature.infered
+    assert signature.format() == "Any → Any"
+
+
+def identity_untyped(x: Any) -> Any:
+    return x
+
+
+def to_str_typed(x: int) -> str:
+    return str(x)

@@ -13,6 +13,7 @@ from ico.core.partition import partition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
 from ico.core.route import route
+from ico.core.runtime.progress import IcoProgress
 from ico.core.stream import IcoStream
 from ico.registry import IcoRegistry, register
 from ico.spec import (
@@ -69,6 +70,7 @@ def parity(x: int) -> str:
 BATCHER: IcoBatcher[Any] = IcoBatcher(4, drop_last=True)
 SMALL_BATCHER: IcoBatcher[Any] = IcoBatcher(2)
 NOOP: IcoIdentity[Any] = IcoIdentity(name="noop")
+PROGRESS: IcoProgress[Any] = IcoProgress(total=10, name="items")
 
 
 def roundtrip(flow: IcoNodeProtocol) -> tuple[PipelineSpec, IcoNodeProtocol]:
@@ -133,10 +135,21 @@ def test_build_returns_registered_instances() -> None:
         pytest.param(partition(is_even, name="split"), id="partition"),
         pytest.param(BATCHER, id="batcher"),
         pytest.param(NOOP, id="identity"),
+        pytest.param(PROGRESS, id="progress"),
     ],
 )
 def test_roundtrip(flow: IcoNodeProtocol) -> None:
     roundtrip(flow)
+
+
+def test_seq_keeps_chain_name() -> None:
+    flow = inc | double | to_str
+    flow.name = "pipeline"
+    spec, rebuilt = roundtrip(flow)
+
+    assert spec.root.name == "pipeline"
+    assert rebuilt.name == "pipeline"
+    assert to_spec(inc | double).root.name is None  # default "a | b" is not exported
 
 
 def test_roundtrip_nested_combination() -> None:
@@ -194,7 +207,7 @@ def test_unregistered_leaf_is_not_imported() -> None:
         build(spec_of(importable), REGISTRY)
 
 
-@pytest.mark.parametrize("kind", ["epoch", "monitor", "progress", "node"])
+@pytest.mark.parametrize("kind", ["epoch", "context_pipeline", "monitor", "node"])
 def test_unsupported_kinds(kind: str) -> None:
     with pytest.raises(SpecError, match=f"kind '{kind}' yet"):
         build(spec_of(NodeSpec(kind=kind)), REGISTRY)

@@ -52,3 +52,6 @@ spec export in `src/ico/spec`, tests in `src/tests`.
    - Out of scope: MCP server, acceptance gate, PR flow, entry points.
 9. [ ] `find_path(from_type, to_type)`: shortest operator chains between
    types over the registry type graph.
+10. [ ] `build(spec)` for context nodes: `IcoEpoch`, `IcoContextPipeline`
+    and `IcoContextOperator`, so that training flows (not only data
+    loaders) can be rebuilt from a spec.

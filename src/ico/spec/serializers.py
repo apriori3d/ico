@@ -233,9 +233,13 @@ def serialize_batcher(node: IcoBatcher[object], ctx: SpecContext) -> NodeSpec:
 def serialize_chain(
     node: IcoChain[object, object, object], ctx: SpecContext
 ) -> NodeSpec:
-    # Nested binary chains (a | b) | c are flattened into one sequence.
+    # Nested binary chains (a | b) | c are flattened into one sequence; the
+    # names of flattened inner chains are dropped, the outer name is kept.
+    left, right = node.children
+    auto_name = f"{left} | {right}"  # IcoChain's default name
     return NodeSpec(
         kind="seq",
+        name=node.name if node.name != auto_name else None,
         sig=node_signature(node),
         children=tuple(ctx.walk(step) for step in _flatten_chain(node)),
     )
