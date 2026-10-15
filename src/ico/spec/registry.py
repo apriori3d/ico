@@ -65,8 +65,27 @@ class SpecContext:
         self.strict = strict
 
     def walk(self, node: IcoNodeProtocol) -> NodeSpec:
-        """Serialize a child node with the registered serializer."""
+        """Serialize a node: registered operators by reference, others by type."""
+        registered = registered_spec(node)
+        if registered is not None:
+            return registered
         return find_serializer(node)(node, self)
+
+
+def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
+    """Opaque spec of an operator registered in an operator registry.
+
+    Registered nodes, including whole flows registered as one operator, are
+    exported as ``kind="op"`` with an ``op="name@version"`` reference and no
+    children: the registry entry is the source of truth for their contents.
+    """
+    from ico.registry.registry import get_meta
+    from ico.spec.serializers import node_signature
+
+    meta = get_meta(node)
+    if meta is None:
+        return None
+    return NodeSpec(kind="op", name=node.name, sig=node_signature(node), op=meta.ref)
 
 
 def to_spec(node: IcoNodeProtocol, *, strict: bool = False) -> PipelineSpec:

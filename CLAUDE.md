@@ -35,7 +35,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 7. [x] `on_error` policy (`raise` / `skip` / `collect`) and `retry` for
        `IcoAsyncStream`; fix `in_queue.task_done()` called once per worker
        instead of once per item.
-8. [ ] Operator registry:
+8. [x] Operator registry:
    - `@register(name, version, tags=..., caps=...)` attaches metadata to an
      operator; description comes from the docstring, signature from
      `.signature`. Status: `draft` / `verified` / `stable` (default `draft`).

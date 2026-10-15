@@ -32,6 +32,9 @@ class NodeSpec:
         sig: Formatted ICO signature, e.g. ``"int → str"``.
         ref: Importable reference ``"module:qualname"`` for leaf callables,
             or ``None`` for structural nodes and anonymous callables.
+        op: Registry reference ``"name@version"`` for registered operators.
+            Such a node is opaque: its children are not exported and
+            :func:`ico.spec.build` resolves it through the registry.
         params: Kind-specific parameters (JSON-compatible values only).
         children: Child specs, ordered as defined by ``kind``.
     """
@@ -40,6 +43,7 @@ class NodeSpec:
     name: str | None = None
     sig: str | None = None
     ref: str | None = None
+    op: str | None = None
     params: dict[str, JsonValue] = field(default_factory=dict[str, JsonValue])
     children: tuple[NodeSpec, ...] = ()
 
@@ -52,6 +56,8 @@ class NodeSpec:
             out["sig"] = self.sig
         if self.ref is not None:
             out["ref"] = self.ref
+        if self.op is not None:
+            out["op"] = self.op
         if self.params:
             out["params"] = dict(self.params)
         if self.children:
@@ -83,6 +89,7 @@ class NodeSpec:
             name=_opt_str(data, "name"),
             sig=_opt_str(data, "sig"),
             ref=_opt_str(data, "ref"),
+            op=_opt_str(data, "op"),
             params=dict(params),
             children=tuple(children),
         )

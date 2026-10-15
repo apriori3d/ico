@@ -90,11 +90,24 @@ def _is_own_method(fn: object, node: object) -> bool:
 def _flatten_chain(node: IcoChain[object, object, object]) -> list[IcoNodeProtocol]:
     steps: list[IcoNodeProtocol] = []
     for child in node.children:
-        if isinstance(child, IcoChain):
-            steps.extend(_flatten_chain(cast(IcoChain[object, object, object], child)))
+        sub = _unregistered_chain(child)
+        if sub is not None:
+            steps.extend(_flatten_chain(sub))
         else:
             steps.append(child)
     return steps
+
+
+def _unregistered_chain(
+    node: IcoNodeProtocol,
+) -> IcoChain[object, object, object] | None:
+    """The node as a chain to flatten; a registered chain is one opaque step."""
+    from ico.registry.registry import get_meta
+
+    if not isinstance(node, IcoChain):
+        return None
+    sub = cast(IcoChain[object, object, object], node)
+    return sub if get_meta(sub) is None else None
 
 
 # ────────────────────────────────────────────────
