@@ -70,11 +70,8 @@ class IcoPartition(
     @property
     def signature(self) -> IcoSignature:
         """Infer from the predicate input: Iterator[I] → tuple[list[I], list[I]]."""
-        from ico.core.signature_utils import type_contain_any_typevar
-
-        # Generic resolution may leave an unbound TypeVar (e.g. Iterator[IInv]).
         signature = super().signature
-        if signature.infered and not type_contain_any_typevar(signature.i):
+        if signature.infered:
             return signature
 
         predicate = self.predicate.signature

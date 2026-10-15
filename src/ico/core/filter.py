@@ -60,11 +60,8 @@ class IcoFilter(Generic[IInv], IcoOperator[Iterator[IInv], Iterator[IInv]]):
     @property
     def signature(self) -> IcoSignature:
         """Infer the signature from the predicate input: Iterator[I] → Iterator[I]."""
-        from ico.core.signature_utils import type_contain_any_typevar
-
-        # Generic resolution may leave an unbound TypeVar (e.g. Iterator[IInv]).
         signature = super().signature
-        if signature.infered and not type_contain_any_typevar(signature.i):
+        if signature.infered:
             return signature
 
         predicate = self.predicate.signature

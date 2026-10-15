@@ -106,9 +106,12 @@ def resolve_types_from_generic(
                 var_cls = replace_typevar(var_cls, generic_arg, cls_arg)
             resolving_vars[var] = var_cls
 
-    # Return resolved types for the requested vars, or None if they couldn't be resolved to concrete types.
+    # Return resolved types for the requested vars, or None if they couldn't be
+    # resolved to concrete types. Any TypeVar left counts as unresolved, not only
+    # the requested ones: subclasses may use their own TypeVars, e.g.
+    # IcoBatcher[IInv] -> IcoOperator[Iterator[IInv], ...].
     return [
-        t if type(t) is not TypeVar and not type_contain_any_typevar(t, *vars) else None
+        t if type(t) is not TypeVar and not type_contain_any_typevar(t) else None
         for t in resolving_vars.values()
     ]
 
@@ -197,6 +200,10 @@ def replace_typevar(
 
 # ──────── Flow Factory Signature Inference ────────
 
+# Errors raised by inspect.signature / get_type_hints for callables that
+# cannot be introspected.
+_INTROSPECTION_ERRORS = (ValueError, TypeError, NameError)
+
 
 def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     """Infer ICO signature from a flow factory function's return type.
@@ -222,9 +229,16 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     if type(fn) is not FunctionType:  # type: ignore[comparison-overlap]
         fn = fn.__call__
 
-    hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
-    return_hint = hints.get("return", None)
-    i, o = get_args(return_hint)
+    try:
+        hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
+    except _INTROSPECTION_ERRORS:
+        return None
+
+    # Expect an annotated operator return type such as IcoOperator[I, O].
+    args = get_args(hints.get("return", None))
+    if len(args) != 2:
+        return None
+    i, o = args
 
     return IcoSignature(
         wrap_type_if_any(i),
@@ -277,8 +291,13 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
     else:
         fn = obj
 
-    sig = inspect.signature(fn)
-    hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
+    try:
+        sig = inspect.signature(fn)
+        hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
+    except _INTROSPECTION_ERRORS:
+        # E.g. builtins without signature metadata (print) or unresolvable
+        # forward references: the signature is simply not inferred.
+        return None
 
     params = list(sig.parameters.values())
 
