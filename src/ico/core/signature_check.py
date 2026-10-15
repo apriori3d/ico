@@ -13,7 +13,8 @@ The check is opt-in:
     >>> with strict_signatures():
     ...     flow = parse | score  # raises IcoSignatureError on mismatch
 
-or per link with ``chain(a, b, strict=True)``. :func:`validate_signatures`
+or per node with ``chain(a, b, strict=True)`` / ``fork(..., strict=True)``
+(fork branches must accept a common input type). :func:`validate_signatures`
 reports every issue in an already built flow without raising.
 
 Compatibility is checked conservatively: anything that cannot be decided
@@ -64,22 +65,26 @@ def is_strict() -> bool:
 # Issues and errors
 # ────────────────────────────────────────────────
 
-IssueKind = Literal["mismatch", "uninferred"]
+IssueKind = Literal["mismatch", "conflict", "uninferred"]
 
 
 @dataclass(frozen=True, slots=True)
 class SignatureIssue:
-    """A problem found at the link between two chained nodes.
+    """A signature problem between two nodes of a flow.
 
     Attributes:
-        kind: ``"mismatch"`` when the output type of ``left`` is not assignable
-            to the input type of ``right`` (an error); ``"uninferred"`` when a
-            signature could not be inferred, so the link was not checked
-            (a warning).
-        left: Name of the upstream node.
-        right: Name of the downstream node.
-        output: Output type of ``left`` (``None`` when uninferred).
+        kind: ``"mismatch"`` (error) when the output type of ``left`` is not
+            assignable to the input type of the chained ``right``;
+            ``"conflict"`` (error) when two fork branches ``left`` and
+            ``right`` accept input types with no common type;
+            ``"uninferred"`` (warning) when a signature could not be
+            inferred, so the link was not checked.
+        left: Name of the upstream node (or the first fork branch).
+        right: Name of the downstream node (or the second fork branch).
+        output: Output type of ``left``; for a conflict, its input type
+            (``None`` when uninferred).
         input: Input type of ``right`` (``None`` when uninferred).
+        node: Name of the fork for a conflict, ``None`` otherwise.
     """
 
     kind: IssueKind
@@ -87,15 +92,22 @@ class SignatureIssue:
     right: str
     output: Any
     input: Any
+    node: str | None = None
 
     @property
     def is_error(self) -> bool:
-        return self.kind == "mismatch"
+        return self.kind != "uninferred"
 
     @property
     def message(self) -> str:
         from ico.core.signature_utils import format_ico_type
 
+        if self.kind == "conflict":
+            return (
+                f"fork '{self.node}': inputs {format_ico_type(self.output)} "
+                f"of '{self.left}' and {format_ico_type(self.input)} "
+                f"of '{self.right}' have no common type"
+            )
         link = f"'{self.left}' | '{self.right}'"
         if self.kind == "uninferred":
             return f"{link}: signature could not be inferred, link not checked"
@@ -110,7 +122,7 @@ class SignatureIssue:
 
 
 class IcoSignatureError(TypeError):
-    """Raised in strict mode when chained operators have incompatible types."""
+    """Raised in strict mode when composed operators have incompatible types."""
 
     def __init__(self, issue: SignatureIssue) -> None:
         super().__init__(issue.message)
@@ -146,21 +158,81 @@ def check_link(left: IcoNodeProtocol, right: IcoNodeProtocol) -> SignatureIssue 
     return None
 
 
+def check_fork_branches(
+    branches: Sequence[IcoNodeProtocol], fork_name: str
+) -> SignatureIssue | None:
+    """Check that fork branches accept a common input type.
+
+    Branches with uninferred signatures are skipped. Two unrelated classes
+    are treated as conflicting even though a common subclass might exist.
+
+    Returns:
+        A ``"conflict"`` issue for the first incompatible pair, else ``None``.
+    """
+    typed = [
+        (branch, sig)
+        for branch in branches
+        if (sig := _inferred_signature(branch)) is not None
+    ]
+    for pos, (a, a_sig) in enumerate(typed):
+        for b, b_sig in typed[pos + 1 :]:
+            if (
+                is_assignable(a_sig.i, b_sig.i) is False
+                and is_assignable(b_sig.i, a_sig.i) is False
+            ):
+                return SignatureIssue(
+                    "conflict", _label(a), _label(b), a_sig.i, b_sig.i, fork_name
+                )
+    return None
+
+
 def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
-    """Check every chain link in a flow tree and collect all issues.
+    """Check every chain link and fork in a flow tree and collect all issues.
 
     Unlike strict mode this never raises: errors and warnings are returned
     so that a caller (e.g. an agent) can see all problems at once.
     """
     from ico.core.chain import IcoChain
+    from ico.core.fork import IcoFork
 
     issues: list[SignatureIssue] = []
     for node in iterate_nodes(flow):
+        issue: SignatureIssue | None = None
         if isinstance(node, IcoChain):
             left, right = node.children
-            if (issue := check_link(left, right)) is not None:
-                issues.append(issue)
+            issue = check_link(left, right)
+        elif isinstance(node, IcoFork):
+            issue = check_fork_branches(node.children, node.name or "fork")
+        if issue is not None:
+            issues.append(issue)
     return issues
+
+
+def narrowest_type(types_: Sequence[Any]) -> Any | None:
+    """Pick the type among ``types_`` that is assignable to all the others.
+
+    Used to compute the input type of a fork: a value of the narrowest type
+    is accepted by every branch. ``Any`` never narrows. Undecidable
+    comparisons are treated as compatible.
+
+    Returns:
+        The narrowest type, or ``None`` if none is compatible with all others.
+    """
+    known = [t for t in types_ if not _is_any(t)]
+    if not known:
+        return types_[0] if types_ else None
+
+    def fits_all(candidate: Any) -> bool:
+        return all(is_assignable(candidate, other) is not False for other in known)
+
+    # Prefer a candidate proven compatible with every other type.
+    for candidate in known:
+        if all(is_assignable(candidate, other) is True for other in known):
+            return candidate
+    for candidate in known:
+        if fits_all(candidate):
+            return candidate
+    return None
 
 
 def _boundary_node(

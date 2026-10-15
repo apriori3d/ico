@@ -6,6 +6,7 @@ from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator, context_operator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.fork import IcoFork, fork
 from ico.core.identity import IcoIdentity
 from ico.core.node import HasRemoteFlow, IcoNode
 from ico.core.operator import IcoOperator, operator
@@ -57,6 +58,8 @@ __all__ = [
     "context_operator",
     "IcoContextPipeline",
     "IcoEpoch",
+    "IcoFork",
+    "fork",
     "IcoIdentity",
     "IcoNode",
     "IcoOperator",

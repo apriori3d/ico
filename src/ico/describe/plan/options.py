@@ -6,6 +6,7 @@ from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.fork import IcoFork
 from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
@@ -84,6 +85,7 @@ class PlanRendererOptions(RendererOptions):
             IcoSink: "🏁",
             IcoProgress: "⏳",
             IcoEpoch: "🧠",
+            IcoFork: "🔀",
         }
     )
     """Emoji icons for visual node type identification"""

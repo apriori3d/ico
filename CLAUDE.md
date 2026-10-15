@@ -29,7 +29,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 2. [x] Spec export (`ico.spec`): serializer registry keyed by node type,
        JSON only.
 3. [x] Optional runtime signature check for `IcoChain` (strict mode).
-4. [ ] `fork` combinator with overloads for 2–6 branches; output is a tuple.
+4. [x] `fork` combinator with overloads for 2–6 branches; output is a tuple.
 5. [ ] `route`, `partition`, `filter` combinators.
 6. [ ] `until` predicate and `max_iterations` for `IcoProcess`.
 7. [ ] `on_error` policy (`raise` / `skip` / `collect`) and `retry` for

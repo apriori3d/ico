@@ -10,6 +10,7 @@ from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator
 from ico.core.epoch import IcoEpoch
+from ico.core.fork import fork
 from ico.core.node import IcoNode
 from ico.core.operator import IcoOperator, IcoOperatorProtocol, operator
 from ico.core.process import IcoProcess
@@ -130,6 +131,17 @@ def test_chain_is_flattened_into_seq() -> None:
     ]
     assert root.sig == "int → str"
     assert root.name is None
+
+
+def test_fork_branches_in_order() -> None:
+    flow = IcoOperator(inc) | fork(double, to_str, name="split")
+    root = to_spec(flow, strict=True).root
+
+    fork_spec = root.children[1]
+    assert fork_spec.kind == "fork"
+    assert fork_spec.name == "split"
+    assert fork_spec.sig == "int → tuple[int, str]"
+    assert [c.ref for c in fork_spec.children] == [f"{MOD}:double", f"{MOD}:to_str"]
 
 
 def test_right_nested_chain_is_flattened() -> None:

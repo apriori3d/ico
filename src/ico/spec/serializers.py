@@ -17,6 +17,7 @@ from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.fork import IcoFork
 from ico.core.identity import IcoIdentity
 from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.operator import IcoOperator
@@ -263,6 +264,16 @@ def serialize_pipeline(node: IcoPipeline[object], ctx: SpecContext) -> NodeSpec:
         name=node.name,
         sig=node_signature(node),
         children=tuple(ctx.walk(step) for step in node.body),
+    )
+
+
+@spec_serializer(IcoFork)
+def serialize_fork(node: IcoFork[object, object], ctx: SpecContext) -> NodeSpec:
+    return NodeSpec(
+        kind="fork",
+        name=node.name,
+        sig=node_signature(node),
+        children=tuple(ctx.walk(branch) for branch in node.branches),
     )
 
 
