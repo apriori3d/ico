@@ -411,12 +411,13 @@ def serialize_async_stream(
 # IcoAgent is abstract; registering a base type is the point of the registry.
 @spec_serializer(IcoAgent)  # type: ignore[type-abstract]
 def serialize_agent(node: IcoAgent[object, object], ctx: SpecContext) -> NodeSpec:
+    # The worker subtree fully describes the factory: build() recreates it
+    # with a SpecFactory, so the original factory reference is not exported.
     factory = cast(Callable[[], IcoNodeProtocol], node.get_remote_flow_factory())
     return NodeSpec(
         kind="agent",
         name=node.name,
         sig=node_signature(node),
-        ref=callable_ref(factory, ctx, owner="agent flow factory"),
         params={"type": _type_ref(node)},
         children=(ctx.walk(factory()),),
     )

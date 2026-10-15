@@ -194,7 +194,7 @@ def test_unregistered_leaf_is_not_imported() -> None:
         build(spec_of(importable), REGISTRY)
 
 
-@pytest.mark.parametrize("kind", ["async_stream", "epoch", "agent", "monitor", "node"])
+@pytest.mark.parametrize("kind", ["epoch", "monitor", "progress", "node"])
 def test_unsupported_kinds(kind: str) -> None:
     with pytest.raises(SpecError, match=f"kind '{kind}' yet"):
         build(spec_of(NodeSpec(kind=kind)), REGISTRY)

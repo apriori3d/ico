@@ -12,6 +12,7 @@ Round trip ``to_spec(build(spec)) == spec`` holds for every buildable kind.
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from functools import reduce
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
@@ -26,6 +27,7 @@ from ico.core.partition import IcoPartition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
 from ico.core.route import IcoRoute
+from ico.core.signature import IcoSignature
 from ico.core.stream import IcoStream
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
 
@@ -53,20 +55,131 @@ def spec_builder(kind: str) -> Callable[[Builder], Builder]:
 
 
 if TYPE_CHECKING:
-    from ico.registry.registry import IcoRegistry
+    from ico.registry.registry import IcoRegistry, OperatorMeta, RegistryEntry
+
+
+# ────────────────────────────────────────────────
+# Operator resolution
+# ────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class _FunctionRef:
+    """Picklable reference to a registered function.
+
+    Functions are not pickled directly: ``@register`` and ``@operator()``
+    replace the module attribute with an IcoOperator, so pickling the
+    function by reference would fail. The module comes from a registry
+    entry, never from a spec.
+    """
+
+    module: str
+    qualname: str
+
+    def resolve(self) -> Callable[[Any], Any]:
+        import importlib
+
+        from ico.core.operator import IcoOperator
+
+        obj = cast(object, importlib.import_module(self.module))
+        for part in self.qualname.split("."):
+            obj = cast(object, getattr(obj, part))
+        if isinstance(obj, IcoOperator):
+            obj = cast(object, cast(IcoOperator[Any, Any], obj).fn)
+        return cast(Callable[[Any], Any], obj)
+
+
+@dataclass(frozen=True)
+class _Target:
+    """What an ``op`` reference resolves to.
+
+    ``cls`` and ``fn`` can create fresh instances; ``node`` is the registered
+    instance itself and is never pickled (see :class:`SpecFactory`).
+    """
+
+    meta: OperatorMeta
+    signature: str
+    cls: type | None = None
+    fn: Callable[[Any], Any] | _FunctionRef | None = None
+    node: IcoNodeProtocol | None = None
+
+    def function(self) -> Callable[[Any], Any] | None:
+        return self.fn.resolve() if isinstance(self.fn, _FunctionRef) else self.fn
+
+    @classmethod
+    def from_entry(cls, entry: RegistryEntry) -> _Target:
+        return cls(
+            meta=entry.meta,
+            signature=entry.signature.format(),
+            cls=entry.cls,
+            fn=_plain_function(entry.node),
+            node=entry.node,
+        )
+
+    def snapshot(self) -> _Target:
+        """A copy that recreates the operator without the registered instance."""
+        if self.cls is None and self.fn is None:
+            raise SpecError(
+                f"Operator '{self.meta.ref}' is a registered instance and cannot "
+                "be recreated for every worker; register its parts or an "
+                "operator class instead."
+            )
+        return _Target(
+            self.meta, self.signature, cls=self.cls, fn=_function_ref(self.fn)
+        )
+
+
+def _plain_function(node: IcoNodeProtocol | None) -> Callable[[Any], Any] | None:
+    """The user function of a plain IcoOperator, i.e. one rebuildable by wrapping."""
+    from ico.core.operator import IcoOperator
+
+    if node is None:
+        return None
+    node_type: type = type(node)
+    if node_type is not IcoOperator:  # subclasses carry their own state
+        return None
+    fn = cast(IcoOperator[Any, Any], node).fn
+    if cast(object, getattr(fn, "__self__", None)) is node:
+        return None
+    return fn
+
+
+def _function_ref(
+    fn: Callable[[Any], Any] | _FunctionRef | None,
+) -> Callable[[Any], Any] | _FunctionRef | None:
+    """Module-level functions travel by reference; others (local functions,
+    lambdas) stay as objects and work in-process only."""
+    if fn is None or isinstance(fn, _FunctionRef):
+        return fn
+    module = cast(object, getattr(fn, "__module__", None))
+    qualname = cast(object, getattr(fn, "__qualname__", None))
+    if (
+        isinstance(module, str)
+        and isinstance(qualname, str)
+        and "<" not in qualname  # <locals>, <lambda>
+    ):
+        return _FunctionRef(module, qualname)
+    return fn
+
+
+Lookup: TypeAlias = Callable[[str], _Target]
 
 
 class BuildContext:
     """Traversal state passed to builders.
 
     Attributes:
-        registry: Registry used to resolve ``op`` references.
+        lookup: Resolves ``"name@version"`` to what it refers to.
+        fresh: Create new instances for every operator (used by
+            :class:`SpecFactory` workers) instead of returning registered
+            instances.
     """
 
-    __slots__ = ("registry",)
+    __slots__ = ("lookup", "fresh")
 
-    def __init__(self, registry: IcoRegistry) -> None:
-        self.registry = registry
+    def __init__(self, lookup: Lookup, *, fresh: bool = False) -> None:
+        self.lookup = lookup
+        self.fresh = fresh
 
     def build(self, spec: NodeSpec) -> IcoNodeProtocol:
         """Build a node: registered operators by reference, others by kind."""
@@ -88,19 +201,30 @@ class BuildContext:
         """Build a child that is used as an operator."""
         return cast(AnyOp, self.build(spec))
 
-    def _resolve(self, spec: NodeSpec) -> IcoNodeProtocol:
+    def factory(self, worker: NodeSpec) -> SpecFactory:
+        """A picklable factory creating fresh copies of a worker subtree."""
+        refs = sorted(_op_refs(worker))
+        return SpecFactory(worker, tuple(self._target(ref).snapshot() for ref in refs))
+
+    def _target(self, ref: str) -> _Target:
         from ico.registry.registry import parse_ref
 
-        ref = cast(str, spec.op)
         try:
             parse_ref(ref)
-            entry = self.registry.get(ref)
+            return self.lookup(ref)
         except (ValueError, KeyError) as e:
             raise SpecError(f"Cannot resolve operator '{ref}': {e.args[0]}") from None
 
-        if entry.cls is not None:
+    def _resolve(self, spec: NodeSpec) -> IcoNodeProtocol:
+        from ico.core.operator import IcoOperator
+        from ico.registry.registry import META_ATTR
+
+        ref = cast(str, spec.op)
+        target = self._target(ref)
+
+        if target.cls is not None:
             # Constructor kwargs are validated by the class itself.
-            create = cast(Callable[..., IcoNodeProtocol], entry.cls)
+            create = cast(Callable[..., IcoNodeProtocol], target.cls)
             try:
                 node: IcoNodeProtocol = create(**spec.params)
             except TypeError as e:
@@ -108,15 +232,60 @@ class BuildContext:
         else:
             if spec.params:
                 raise SpecError(f"Operator '{ref}' takes no params.")
-            node = cast(IcoNodeProtocol, entry.node)
+            if self.fresh:
+                fn = target.snapshot().function()
+                fresh_op: IcoOperator[Any, Any] = IcoOperator(
+                    cast(Callable[[Any], Any], fn), name=spec.name
+                )
+                # Keep the reference so that the rebuilt flow exports the same spec.
+                setattr(fresh_op, META_ATTR, target.meta)
+                node = fresh_op
+            else:
+                node = cast(IcoNodeProtocol, target.node)
 
-        actual = _signature_text(node, entry.signature.format())
+        actual = _signature_text(node, target.signature)
         if spec.sig is not None and spec.sig != actual:
             raise SpecError(
                 f"Signature of '{ref}' changed: spec has {spec.sig!r}, "
                 f"registry has {actual!r}."
             )
         return node
+
+
+def _op_refs(spec: NodeSpec) -> set[str]:
+    refs = {spec.op} if spec.op is not None else set[str]()
+    for child in spec.children:
+        refs |= _op_refs(child)
+    return refs
+
+
+@dataclass(frozen=True)
+class SpecFactory:
+    """Picklable worker factory rebuilt from a spec subtree.
+
+    Used by :func:`build` for factory-based ``IcoAsyncStream`` pools and for
+    agents. Every call builds a fresh worker: functions are wrapped anew and
+    operator classes are instantiated with ``cls(**params)``. The operators
+    it needs travel with it (functions and classes pickle by reference), so
+    it also works in a spawned worker process without the parent registry.
+
+    Attributes:
+        worker: Spec of the worker flow.
+        targets: Operators referenced by the worker.
+    """
+
+    worker: NodeSpec
+    targets: tuple[_Target, ...]
+
+    def __call__(self) -> AnyOp:
+        by_ref = {t.meta.ref: t for t in self.targets}
+        return cast(
+            AnyOp, BuildContext(by_ref.__getitem__, fresh=True).build(self.worker)
+        )
+
+    def probe_signature(self) -> IcoSignature:
+        """Signature of the worker flow, from one probe worker."""
+        return self().signature
 
 
 def build(
@@ -130,14 +299,17 @@ def build(
             :data:`ico.registry.default_registry`.
 
     Returns:
-        The rebuilt flow. Registered operators are returned as the registered
-        instances (not copies).
+        The rebuilt flow. Registered operator instances are returned as is
+        (not copied); operator classes are instantiated per node. Workers of
+        factory-based async streams and agents are created by a
+        :class:`SpecFactory`, so each worker is a distinct instance.
 
     Raises:
         SpecError: On unknown operators, signature drift between the spec
-            and the registry, unregistered leaves, invalid params or kinds
-            that cannot be built yet (async_stream, epoch, agent, context
-            operators, runtime wrappers, monitors, progress).
+            and the registry, unregistered leaves, invalid params, registered
+            instances inside factory-made workers, or kinds that cannot be
+            built yet (epoch, context operators, runtime wrappers, monitors,
+            progress).
 
     Example:
         >>> flow = build(from_json(text))
@@ -146,7 +318,11 @@ def build(
 
     root = spec.root if isinstance(spec, PipelineSpec) else spec
     target = registry if registry is not None else default_registry
-    return BuildContext(target).build(root)
+
+    def lookup(ref: str) -> _Target:
+        return _Target.from_entry(target.get(ref))
+
+    return BuildContext(lookup).build(root)
 
 
 def _signature_text(node: IcoNodeProtocol, fallback: str) -> str:
@@ -286,3 +462,104 @@ def build_identity(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, 0)
     node: IcoIdentity[Any] = IcoIdentity(name=spec.name)
     return node
+
+
+@spec_builder("async_stream")
+def build_async_stream(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    from ico.core.async_stream import IcoAsyncStream
+
+    pool_size = _param(spec, "pool_size", int)
+    ordered = _param(spec, "ordered", bool)
+    on_error = _param(spec, "on_error", str, optional=True) or "raise"
+    if on_error not in ("raise", "skip", "collect"):
+        raise SpecError(f"Invalid on_error {on_error!r} in 'async_stream'.")
+    options: dict[str, Any] = {
+        "ordered": ordered,
+        "on_error": on_error,
+        "retry": _retry_policy(spec),
+        "name": spec.name,
+    }
+
+    if _param(spec, "factory", bool):
+        # One worker spec; every pool slot gets a fresh worker from it.
+        _children(spec, 1)
+        factory = ctx.factory(spec.children[0])
+        # Not parametrized: the stream infers its signature from its workers.
+        # SpecFactory returns an operator protocol; the pool accepts any worker.
+        stream: IcoAsyncStream[Any, Any] = IcoAsyncStream(
+            cast(Callable[[], Any], factory), pool_size=pool_size, **options
+        )
+        return stream
+
+    _children(spec, pool_size)
+    workers = [cast(Any, ctx.build(child)) for child in spec.children]
+    stream = IcoAsyncStream(workers, **options)
+    return stream
+
+
+def _retry_policy(spec: NodeSpec) -> Any:
+    import builtins
+
+    from ico.core.async_stream import RetryPolicy
+
+    raw = _param(spec, "retry", dict, optional=True)
+    if raw is None:
+        return None
+    retry = NodeSpec(kind="async_stream.retry", params=cast(dict[str, JsonValue], raw))
+
+    exceptions: list[type[Exception]] = []
+    for ref in cast(list[JsonValue], _param(retry, "retry_on", list)):
+        # Only builtin exception types: never import a module named by a spec.
+        module, _, name = str(ref).partition(":")
+        exc = (
+            cast(object, getattr(builtins, name, None))
+            if module == "builtins"
+            else None
+        )
+        if not (isinstance(exc, type) and issubclass(exc, Exception)):
+            raise SpecError(
+                f"Unsupported retry_on {ref!r}: only builtin exception types "
+                "(e.g. 'builtins:TimeoutError') can be restored from a spec."
+            )
+        exceptions.append(exc)
+
+    try:
+        return RetryPolicy(
+            max_retries=_param(retry, "max_retries", int),
+            delay=_number(retry, "delay"),
+            backoff=_number(retry, "backoff"),
+            retry_on=tuple(exceptions),
+        )
+    except ValueError as e:
+        raise SpecError(f"Invalid retry policy: {e}") from None
+
+
+def _number(spec: NodeSpec, key: str) -> float:
+    value = spec.params.get(key)
+    if type(value) not in (int, float):
+        raise SpecError(
+            f"Param '{key}' of '{spec.kind}' must be a number, got {value!r}."
+        )
+    return cast(float, value)
+
+
+@spec_builder("agent")
+def build_agent(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    from ico.runtime.agent.mp.mp_agent import MPAgent
+
+    # Only MPAgent can be rebuilt for now (YAGNI: no agent allowlist yet).
+    expected = f"{MPAgent.__module__}:{MPAgent.__qualname__}"
+    agent_type = _param(spec, "type", str)
+    if agent_type != expected:
+        raise SpecError(
+            f"Cannot build agent of type {agent_type!r}: only {expected!r} is supported."
+        )
+
+    _children(spec, 1)
+    factory = ctx.factory(spec.children[0])
+    # Parametrize with the worker types so the agent signature is inferred,
+    # as it was from the original factory's return annotation.
+    signature = factory.probe_signature()
+    if signature.infered:
+        return MPAgent[signature.i, signature.o](factory, name=spec.name)  # type: ignore[name-defined]
+    return MPAgent[Any, Any](factory, name=spec.name)
