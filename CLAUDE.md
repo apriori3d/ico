@@ -26,7 +26,8 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 
 ## Roadmap
 1. [x] Move example-only dependencies to optional extras.
-2. [x] Spec export: serializer registry keyed by node type, JSON/YAML.
+2. [x] Spec export (`ico.spec`): serializer registry keyed by node type,
+       JSON only.
 3. [ ] Optional runtime signature check for `IcoChain` (strict mode).
 4. [ ] `fork` combinator with overloads for 2–6 branches; output is a tuple.
 5. [ ] `route`, `partition`, `filter` combinators.

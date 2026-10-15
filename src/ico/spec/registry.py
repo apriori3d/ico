@@ -1,0 +1,99 @@
+"""Serializer registry and flow → spec conversion."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+from typing import TypeVar, cast
+
+from ico.core.node import IcoNodeProtocol
+from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
+
+N = TypeVar("N", bound=IcoNodeProtocol)
+
+Serializer = Callable[[N, "SpecContext"], NodeSpec]
+
+_SERIALIZERS: dict[type, Callable[[IcoNodeProtocol, SpecContext], NodeSpec]] = {}
+
+
+def spec_serializer(
+    node_type: type[N],
+) -> Callable[[Serializer[N]], Serializer[N]]:
+    """Register a spec serializer for a node type (and its subclasses).
+
+    The most specific registered type in the node's MRO wins, so a
+    serializer for a subclass overrides the one for its base class.
+
+    Example:
+        >>> @spec_serializer(MyNode)
+        ... def _my_node(node: MyNode, ctx: SpecContext) -> NodeSpec:
+        ...     return NodeSpec(kind="my_node", children=(ctx.walk(node.body),))
+    """
+
+    def decorator(fn: Serializer[N]) -> Serializer[N]:
+        _SERIALIZERS[node_type] = cast(
+            Callable[[IcoNodeProtocol, SpecContext], NodeSpec], fn
+        )
+        return fn
+
+    return decorator
+
+
+def find_serializer(
+    node: IcoNodeProtocol,
+) -> Callable[[IcoNodeProtocol, SpecContext], NodeSpec]:
+    """Return the serializer registered for the closest type in node's MRO."""
+    for cls in type(node).__mro__:
+        serializer = _SERIALIZERS.get(cls)
+        if serializer is not None:
+            return serializer
+    raise SpecError(f"No spec serializer registered for {type(node).__name__}")
+
+
+class SpecContext:
+    """Traversal state passed to serializers.
+
+    Attributes:
+        strict: When True, anonymous callables (lambdas, local functions)
+            raise :class:`SpecError` because they cannot be restored from
+            a spec. When False they are emitted with ``ref=None``.
+    """
+
+    __slots__ = ("strict",)
+
+    def __init__(self, *, strict: bool) -> None:
+        self.strict = strict
+
+    def walk(self, node: IcoNodeProtocol) -> NodeSpec:
+        """Serialize a child node with the registered serializer."""
+        return find_serializer(node)(node, self)
+
+
+def to_spec(node: IcoNodeProtocol, *, strict: bool = False) -> PipelineSpec:
+    """Convert an ICO flow into a serializable :class:`PipelineSpec`.
+
+    Args:
+        node: Root node of the flow.
+        strict: Raise :class:`SpecError` on anonymous callables.
+
+    Example:
+        >>> spec = to_spec(load | parse | save)
+        >>> print(to_json(spec))
+    """
+    # Import built-in serializers lazily to avoid import cycles with core.
+    import ico.spec.serializers  # noqa: F401  # pyright: ignore[reportUnusedImport]
+
+    return PipelineSpec(root=SpecContext(strict=strict).walk(node))
+
+
+def to_json(spec: PipelineSpec, *, indent: int | None = 2) -> str:
+    """Serialize a spec to a JSON string."""
+    return json.dumps(spec.to_dict(), indent=indent, ensure_ascii=False)
+
+
+def from_json(text: str) -> PipelineSpec:
+    """Parse a spec from a JSON string produced by :func:`to_json`."""
+    data = cast(JsonValue, json.loads(text))
+    if not isinstance(data, dict):
+        raise SpecError("Spec JSON must be an object")
+    return PipelineSpec.from_dict(data)

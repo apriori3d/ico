@@ -34,9 +34,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-yaml = [
-    "ruamel.yaml>=0.18",
-]
 notebook = [
     "ipywidgets>=8.1.8",
 ]
