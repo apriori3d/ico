@@ -16,6 +16,9 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 - One task per PR, small and focused.
 - All code, comments, docstrings, commit messages and PR descriptions
   are written in English.
+- YAGNI: implement only what the current item and its tests need. No new
+  extension points, registries or allowlists until there is a second real
+  use case. If a design grows beyond the item, stop and ask.
 
 ## Workflow
 1. Run tests and pyright before starting to confirm a clean baseline:

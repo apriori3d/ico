@@ -5,15 +5,16 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
-from typing import Any, Literal, TypeAlias, TypeVar, cast, overload
+from typing import Any, Literal, TypeAlias, TypeVar, cast, get_type_hints, overload
 
 from ico.core.node import IcoNodeProtocol
-from ico.core.operator import I, IcoOperatorProtocol, O, wrap_operator
+from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O, wrap_operator
 from ico.core.signature import IcoSignature
 from ico.registry.matching import EXACT, match_type
-from ico.spec.model import JsonValue
+from ico.spec.model import JsonValue, is_json_value
 
 N = TypeVar("N", bound=IcoNodeProtocol)
+C = TypeVar("C", bound=type[IcoOperator[Any, Any]])
 
 Status: TypeAlias = Literal["draft", "verified", "stable"]
 STATUSES: tuple[Status, ...] = ("draft", "verified", "stable")
@@ -53,20 +54,51 @@ class OperatorMeta:
 
 
 @dataclass(frozen=True, slots=True)
+class ParamInfo:
+    """A constructor parameter of a registered operator class.
+
+    Attributes:
+        name: Parameter name (also the attribute holding its value).
+        type: Formatted annotation, or ``None`` when not annotated.
+        required: Whether the parameter has no default.
+        default: Default value (meaningless when ``required``).
+    """
+
+    name: str
+    type: str | None
+    required: bool
+    default: Any = None
+
+    def card(self) -> dict[str, JsonValue]:
+        out: dict[str, JsonValue] = {"name": self.name, "required": self.required}
+        if self.type is not None:
+            out["type"] = self.type
+        if not self.required and is_json_value(self.default):
+            out["default"] = cast(JsonValue, self.default)
+        return out
+
+
+@dataclass(frozen=True, slots=True)
 class RegistryEntry:
-    """A registered operator.
+    """A registered operator: a node instance or a parametric operator class.
 
     Attributes:
         meta: Registry metadata.
-        node: The registered node (operator, source, sink or a whole flow).
-        signature: Inferred ICO signature of the node.
+        node: The registered node (operator, source, sink or a whole flow),
+            or ``None`` for a registered class.
+        cls: The registered operator class, or ``None`` for a node. Instances
+            are created with ``cls(**params)``.
+        signature: Inferred ICO signature.
         description: First paragraph of the docstring.
+        params: Constructor parameters of a registered class.
     """
 
     meta: OperatorMeta
-    node: IcoNodeProtocol
+    node: IcoNodeProtocol | None
+    cls: type[IcoOperator[Any, Any]] | None
     signature: IcoSignature
     description: str
+    params: tuple[ParamInfo, ...] = ()
 
     @property
     def ref(self) -> str:
@@ -74,7 +106,7 @@ class RegistryEntry:
 
     def card(self) -> dict[str, JsonValue]:
         """Compact JSON-compatible description of the operator."""
-        return {
+        card: dict[str, JsonValue] = {
             "name": self.meta.name,
             "version": self.meta.version,
             "sig": self.signature.format(),
@@ -83,6 +115,11 @@ class RegistryEntry:
             "caps": _json_strings(self.meta.caps),
             "status": self.meta.status,
         }
+        if self.cls is not None:
+            params: list[JsonValue] = []
+            params.extend(p.card() for p in self.params)
+            card["params"] = params
+        return card
 
 
 def _json_strings(items: frozenset[str]) -> list[JsonValue]:
@@ -156,6 +193,26 @@ class IcoRegistry:
 
     # ─── Registration ───
 
+    def _check_new(self, target: object, meta: OperatorMeta, replace: bool) -> None:
+        _validate_name(meta.name)
+        _validate_version(meta.version)
+        if meta.status not in STATUSES:
+            raise ValueError(
+                f"Operator status must be one of {STATUSES}, got {meta.status!r}."
+            )
+
+        existing_meta = get_meta(target)
+        if existing_meta is not None and existing_meta.ref != meta.ref:
+            raise ValueError(
+                f"Node is already registered as '{existing_meta.ref}', "
+                f"cannot register it as '{meta.ref}'."
+            )
+        if meta.ref in self._entries and not replace:
+            raise ValueError(
+                f"Operator '{meta.ref}' is already registered; "
+                "bump the version or pass replace=True."
+            )
+
     def add(
         self,
         node: IcoNodeProtocol,
@@ -171,24 +228,7 @@ class IcoRegistry:
                 duplicate reference (unless ``replace``), or a node already
                 registered under another reference.
         """
-        _validate_name(meta.name)
-        _validate_version(meta.version)
-        if meta.status not in STATUSES:
-            raise ValueError(
-                f"Operator status must be one of {STATUSES}, got {meta.status!r}."
-            )
-
-        existing_meta = get_meta(node)
-        if existing_meta is not None and existing_meta.ref != meta.ref:
-            raise ValueError(
-                f"Node is already registered as '{existing_meta.ref}', "
-                f"cannot register it as '{meta.ref}'."
-            )
-        if meta.ref in self._entries and not replace:
-            raise ValueError(
-                f"Operator '{meta.ref}' is already registered; "
-                "bump the version or pass replace=True."
-            )
+        self._check_new(node, meta, replace)
 
         signature = node_signature(node)
         if signature is None:
@@ -200,6 +240,7 @@ class IcoRegistry:
         entry = RegistryEntry(
             meta=meta,
             node=node,
+            cls=None,
             signature=signature,
             description=description
             if description is not None
@@ -209,15 +250,61 @@ class IcoRegistry:
         self._entries[meta.ref] = entry
         return entry
 
+    def add_class(
+        self,
+        cls: type[IcoOperator[Any, Any]],
+        meta: OperatorMeta,
+        *,
+        description: str | None = None,
+        replace: bool = False,
+    ) -> RegistryEntry:
+        """Register a parametric operator class under ``meta.ref``.
+
+        Instances are created with ``cls(**params)``. Following the sklearn
+        convention, every ``__init__`` parameter must be stored in an
+        attribute with the same name, so that a spec can capture it.
+
+        Raises:
+            ValueError: On invalid metadata, ``*args``/``**kwargs`` in
+                ``__init__``, a signature that cannot be inferred from the
+                generic base (e.g. ``IcoOperator[float, bool]``), or a
+                duplicate reference (unless ``replace``).
+        """
+        self._check_new(cls, meta, replace)
+
+        params = init_params(cls)
+        signature = class_signature(cls)
+        if signature is None:
+            raise ValueError(
+                f"Cannot register '{meta.ref}': its signature cannot be inferred. "
+                "Subclass a parametrized base such as IcoOperator[float, bool]."
+            )
+
+        own_doc = cast(object, vars(cls).get("__doc__"))
+        entry = RegistryEntry(
+            meta=meta,
+            node=None,
+            cls=cls,
+            signature=signature,
+            description=description
+            if description is not None
+            else _first_paragraph(own_doc if isinstance(own_doc, str) else None),
+            params=params,
+        )
+        setattr(cls, META_ATTR, meta)
+        self._entries[meta.ref] = entry
+        return entry
+
     def unregister(self, ref: str) -> RegistryEntry:
-        """Remove an entry and detach its metadata from the node.
+        """Remove an entry and detach its metadata from the node or class.
 
         Raises:
             KeyError: If the reference is not registered.
         """
         entry = self._entries.pop(ref)
-        if get_meta(entry.node) == entry.meta:
-            delattr(entry.node, META_ATTR)
+        target = entry.cls if entry.cls is not None else entry.node
+        if get_meta(target) == entry.meta:
+            delattr(target, META_ATTR)
         return entry
 
     # ─── Lookup ───
@@ -340,9 +427,26 @@ class _Registrar:
     def __call__(self, target: N) -> N: ...
 
     @overload
+    def __call__(self, target: C) -> C: ...
+
+    @overload
     def __call__(self, target: Callable[[I], O]) -> IcoOperatorProtocol[I, O]: ...
 
     def __call__(self, target: object) -> object:
+        if isinstance(target, type):
+            if not issubclass(target, IcoOperator):
+                raise TypeError(
+                    f"Cannot register class {target.__name__}: only IcoOperator "
+                    "subclasses can be registered as parametric operators."
+                )
+            operator_cls = cast(type[IcoOperator[Any, Any]], target)
+            self._registry.add_class(
+                operator_cls,
+                self._meta,
+                description=self._description,
+                replace=self._replace,
+            )
+            return operator_cls
         if isinstance(target, IcoNodeProtocol):
             node: IcoNodeProtocol = target
         elif callable(target):
@@ -377,6 +481,14 @@ def register(
     it to ``registry`` (the :data:`default_registry` by default). The node is
     returned unchanged; a plain function is first wrapped as an IcoOperator.
 
+    An ``IcoOperator`` subclass can be registered as a parametric operator:
+    specs then store its constructor kwargs and :func:`ico.spec.build` creates
+    instances with ``cls(**params)``. Every ``__init__`` parameter must be
+    stored in an attribute of the same name (sklearn convention), and heavy
+    initialization (loading models, opening connections) should be lazy or
+    happen in ``on_activate``, not in ``__init__``: instances are created
+    whenever a flow is built, e.g. once per worker.
+
     Args:
         name: Operator name (no ``@`` or whitespace).
         version: Positive integer version.
@@ -410,10 +522,77 @@ def register(
 # ────────────────────────────────────────────────
 
 
-def get_meta(node: object) -> OperatorMeta | None:
-    """Registry metadata of a node, or ``None`` if it is not registered."""
-    meta = cast(object, getattr(node, META_ATTR, None))
+def get_meta(target: object) -> OperatorMeta | None:
+    """Registry metadata of a node or class, or ``None`` if not registered.
+
+    A node is registered when it was registered itself or when its exact
+    class is a registered operator class (subclasses are not).
+    """
+    meta = _own_meta(target)
+    if meta is None and not isinstance(target, type):
+        meta = _own_meta(type(target))
+    return meta
+
+
+def _own_meta(target: object) -> OperatorMeta | None:
+    namespace = cast(object, getattr(target, "__dict__", None))
+    if namespace is None:
+        return None
+    meta = cast(object, cast(Any, namespace).get(META_ATTR))
     return meta if isinstance(meta, OperatorMeta) else None
+
+
+def registered_class(node: object) -> type[IcoOperator[Any, Any]] | None:
+    """The registered operator class of an instance, or ``None``."""
+    if _own_meta(node) is not None or _own_meta(type(node)) is None:
+        return None
+    return cast(type[IcoOperator[Any, Any]], type(node))
+
+
+def init_params(cls: type) -> tuple[ParamInfo, ...]:
+    """Constructor parameters of an operator class (without ``self``).
+
+    Raises:
+        ValueError: If ``__init__`` takes ``*args`` or ``**kwargs``: such
+            parameters cannot be captured by name.
+    """
+    from ico.core.signature_utils import format_ico_type
+
+    signature = inspect.signature(cls.__init__)
+    try:
+        hints = get_type_hints(cls.__init__)
+    except Exception:  # unresolvable annotations: keep them unformatted
+        hints = {}
+
+    params: list[ParamInfo] = []
+    for param in list(signature.parameters.values())[1:]:
+        if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+            raise ValueError(
+                f"Cannot register {cls.__name__}: __init__ must not take "
+                f"*args or **kwargs (found '{param.name}')."
+            )
+        hint = cast(object, hints.get(param.name))
+        required = param.default is param.empty
+        params.append(
+            ParamInfo(
+                name=param.name,
+                type=format_ico_type(hint) if hint is not None else None,
+                required=required,
+                default=None if required else cast(object, param.default),
+            )
+        )
+    return tuple(params)
+
+
+def class_signature(cls: type[IcoOperator[Any, Any]]) -> IcoSignature | None:
+    """Signature of an operator class from its generic base, without __init__."""
+    from ico.core.signature_utils import resolve_types_from_generic, wrap_type_if_any
+
+    probe = cls.__new__(cls)  # not initialized: only the class hierarchy is used
+    i_type, o_type = resolve_types_from_generic(probe, IcoOperator, I, O)
+    if i_type is None or o_type is None:
+        return None
+    return IcoSignature(i=wrap_type_if_any(i_type), c=None, o=wrap_type_if_any(o_type))
 
 
 def node_signature(node: IcoNodeProtocol) -> IcoSignature | None:
@@ -439,7 +618,11 @@ def node_description(node: object) -> str:
         if cast(object, getattr(fn, "__self__", None)) is node:
             continue
         if fn is not None and callable(fn):
-            doc = inspect.getdoc(fn)
-            if doc:
-                return doc.strip().split("\n\n", 1)[0].replace("\n", " ")
+            return _first_paragraph(inspect.getdoc(fn))
     return ""
+
+
+def _first_paragraph(doc: str | None) -> str:
+    if not doc:
+        return ""
+    return inspect.cleandoc(doc).split("\n\n", 1)[0].replace("\n", " ")

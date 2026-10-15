@@ -98,13 +98,25 @@ class BuildContext:
         except (ValueError, KeyError) as e:
             raise SpecError(f"Cannot resolve operator '{ref}': {e.args[0]}") from None
 
-        actual = entry.signature.format()
+        if entry.cls is not None:
+            # Constructor kwargs are validated by the class itself.
+            create = cast(Callable[..., IcoNodeProtocol], entry.cls)
+            try:
+                node: IcoNodeProtocol = create(**spec.params)
+            except TypeError as e:
+                raise SpecError(f"Cannot create '{ref}' from params: {e}") from None
+        else:
+            if spec.params:
+                raise SpecError(f"Operator '{ref}' takes no params.")
+            node = cast(IcoNodeProtocol, entry.node)
+
+        actual = _signature_text(node, entry.signature.format())
         if spec.sig is not None and spec.sig != actual:
             raise SpecError(
                 f"Signature of '{ref}' changed: spec has {spec.sig!r}, "
                 f"registry has {actual!r}."
             )
-        return entry.node
+        return node
 
 
 def build(
@@ -135,6 +147,12 @@ def build(
     root = spec.root if isinstance(spec, PipelineSpec) else spec
     target = registry if registry is not None else default_registry
     return BuildContext(target).build(root)
+
+
+def _signature_text(node: IcoNodeProtocol, fallback: str) -> str:
+    from ico.spec.serializers import node_signature
+
+    return node_signature(node) or fallback
 
 
 # ────────────────────────────────────────────────

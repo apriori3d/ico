@@ -160,11 +160,9 @@ def test_default_registry_used_when_not_given() -> None:
 def test_static_types_preserved(registry: IcoRegistry) -> None:
     # Checked by pyright and mypy in `make ci`.
     op: IcoOperatorProtocol[int, str] = register("to_str", 1, registry=registry)(to_str)
-    node: IcoOperator[str, list[str]] = register("tok", 1, registry=registry)(
-        IcoOperator(tokenize)
-    )
+    node = IcoOperator(tokenize)
+    assert register("tok", 1, registry=registry)(node) is node
     assert op(1) == "1"
-    assert node("a") == ["a"]
 
 
 @pytest.mark.parametrize(

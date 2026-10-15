@@ -7,7 +7,13 @@ from collections.abc import Callable
 from typing import TypeVar, cast
 
 from ico.core.node import IcoNodeProtocol
-from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
+from ico.spec.model import (
+    JsonValue,
+    NodeSpec,
+    PipelineSpec,
+    SpecError,
+    is_json_value,
+)
 
 N = TypeVar("N", bound=IcoNodeProtocol)
 
@@ -78,14 +84,44 @@ def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
     Registered nodes, including whole flows registered as one operator, are
     exported as ``kind="op"`` with an ``op="name@version"`` reference and no
     children: the registry entry is the source of truth for their contents.
+    Instances of registered operator classes also export their constructor
+    kwargs, read from same-named attributes, as ``params``.
+
+    Raises:
+        SpecError: If a constructor parameter has no same-named attribute or
+            its value is not JSON-compatible.
     """
-    from ico.registry.registry import get_meta
+    from ico.registry.registry import get_meta, init_params, registered_class
     from ico.spec.serializers import node_signature
 
     meta = get_meta(node)
     if meta is None:
         return None
-    return NodeSpec(kind="op", name=node.name, sig=node_signature(node), op=meta.ref)
+
+    params: dict[str, JsonValue] = {}
+    cls = registered_class(node)
+    if cls is not None:
+        for param in init_params(cls):
+            if not hasattr(node, param.name):
+                raise SpecError(
+                    f"Cannot export '{meta.ref}': constructor parameter "
+                    f"'{param.name}' must be stored in an attribute of the same name."
+                )
+            value = cast(object, getattr(node, param.name))
+            if not is_json_value(value):
+                raise SpecError(
+                    f"Cannot export '{meta.ref}': parameter '{param.name}' = "
+                    f"{value!r} is not JSON-compatible."
+                )
+            params[param.name] = cast(JsonValue, value)
+
+    return NodeSpec(
+        kind="op",
+        name=node.name,
+        sig=node_signature(node),
+        op=meta.ref,
+        params=params,
+    )
 
 
 def to_spec(node: IcoNodeProtocol, *, strict: bool = False) -> PipelineSpec:

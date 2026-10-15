@@ -8,13 +8,25 @@ exchange it as JSON.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypeAlias
+from typing import TypeAlias, cast
 
 JsonValue: TypeAlias = (
     str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 )
 
 SPEC_VERSION = 1
+
+
+def is_json_value(value: object) -> bool:
+    """Whether ``value`` is a JSON-compatible :data:`JsonValue` (recursively)."""
+    if value is None or isinstance(value, str | int | float | bool):
+        return True
+    if isinstance(value, list):
+        return all(is_json_value(v) for v in cast(list[object], value))
+    if isinstance(value, dict):
+        items = cast(dict[object, object], value).items()
+        return all(isinstance(k, str) and is_json_value(v) for k, v in items)
+    return False
 
 
 class SpecError(ValueError):
