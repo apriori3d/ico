@@ -8,11 +8,11 @@ exchange it as JSON.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypeAlias, Union
+from typing import TypeAlias
 
-JsonValue: TypeAlias = Union[
-    str, int, float, bool, None, list["JsonValue"], dict[str, "JsonValue"]
-]
+JsonValue: TypeAlias = (
+    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+)
 
 SPEC_VERSION = 1
 

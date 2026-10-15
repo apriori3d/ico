@@ -116,7 +116,9 @@ def test_local_function_raises_in_strict_mode() -> None:
 
 
 def test_chain_is_flattened_into_seq() -> None:
-    flow = IcoOperator(inc) | IcoOperator(double) | IcoOperator(inc) | IcoOperator(to_str)
+    flow = (
+        IcoOperator(inc) | IcoOperator(double) | IcoOperator(inc) | IcoOperator(to_str)
+    )
     root = to_spec(flow, strict=True).root
 
     assert root.kind == "seq"

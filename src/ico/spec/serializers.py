@@ -213,7 +213,9 @@ def serialize_batcher(node: IcoBatcher[object], ctx: SpecContext) -> NodeSpec:
 
 
 @spec_serializer(IcoChain)
-def serialize_chain(node: IcoChain[object, object, object], ctx: SpecContext) -> NodeSpec:
+def serialize_chain(
+    node: IcoChain[object, object, object], ctx: SpecContext
+) -> NodeSpec:
     # Nested binary chains (a | b) | c are flattened into one sequence.
     return NodeSpec(
         kind="seq",
@@ -293,6 +295,7 @@ def serialize_runtime_wrapper(
 def serialize_async_stream(
     node: IcoAsyncStream[object, object], ctx: SpecContext
 ) -> NodeSpec:
+    workers: tuple[NodeSpec, ...]
     if node.pool_from_factory:
         # All workers are identical copies: emit one worker plus pool size.
         workers = (ctx.walk(node.pool[0]),)
@@ -313,7 +316,8 @@ def serialize_async_stream(
     )
 
 
-@spec_serializer(IcoAgent)
+# IcoAgent is abstract; registering a base type is the point of the registry.
+@spec_serializer(IcoAgent)  # type: ignore[type-abstract]
 def serialize_agent(node: IcoAgent[object, object], ctx: SpecContext) -> NodeSpec:
     factory = cast(Callable[[], IcoNodeProtocol], node.get_remote_flow_factory())
     return NodeSpec(
