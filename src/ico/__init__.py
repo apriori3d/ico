@@ -21,6 +21,12 @@ from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper, wrap_runtime
 from ico.core.signature import IcoSignature
+from ico.core.signature_check import (
+    IcoSignatureError,
+    SignatureIssue,
+    strict_signatures,
+    validate_signatures,
+)
 from ico.core.sink import IcoSink, sink
 from ico.core.source import IcoSource, source
 from ico.core.stream import IcoStream
@@ -58,6 +64,10 @@ __all__ = [
     "IcoPipeline",
     "IcoProcess",
     "IcoSignature",
+    "IcoSignatureError",
+    "SignatureIssue",
+    "strict_signatures",
+    "validate_signatures",
     "IcoSink",
     "sink",
     "IcoSource",
