@@ -229,6 +229,19 @@ def test_process_params() -> None:
     assert root.children[0].ref == f"{MOD}:inc"
 
 
+def is_large(x: int) -> bool:
+    return x > 100
+
+
+def test_process_until_params() -> None:
+    flow = IcoProcess(double, until=is_large, max_iterations=20, on_limit="raise")
+    root = to_spec(flow, strict=True).root
+
+    assert root.kind == "process"
+    assert root.params == {"max_iterations": 20, "on_limit": "raise"}
+    assert [c.ref for c in root.children] == [f"{MOD}:double", f"{MOD}:is_large"]
+
+
 def test_epoch_children_order() -> None:
     epoch = IcoEpoch(IcoSource(numbers), IcoContextOperator(accumulate))
     root = to_spec(epoch).root

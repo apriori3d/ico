@@ -13,7 +13,7 @@ from ico.core.node import HasRemoteFlow, IcoNode
 from ico.core.operator import IcoOperator, operator
 from ico.core.partition import IcoPartition, partition
 from ico.core.pipeline import IcoPipeline
-from ico.core.process import IcoProcess
+from ico.core.process import IcoProcess, IcoProcessLimitError
 from ico.core.route import IcoRoute, IcoRouteError, route
 
 # core/runtime
@@ -73,6 +73,7 @@ __all__ = [
     "IcoPartition",
     "partition",
     "IcoProcess",
+    "IcoProcessLimitError",
     "IcoRoute",
     "IcoRouteError",
     "route",

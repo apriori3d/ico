@@ -244,8 +244,12 @@ def serialize_process(node: IcoProcess[object], ctx: SpecContext) -> NodeSpec:
         kind="process",
         name=node.name,
         sig=node_signature(node),
-        params={"num_iterations": node.num_iterations},
-        children=(ctx.walk(node.body),),
+        params=(
+            {"num_iterations": node.max_iterations}
+            if node.until is None
+            else {"max_iterations": node.max_iterations, "on_limit": node.on_limit}
+        ),
+        children=tuple(ctx.walk(child) for child in node.children),
     )
 
 

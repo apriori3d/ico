@@ -190,13 +190,16 @@ def check_branch_inputs(
 
 
 def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
-    """Check every chain link and fork in a flow tree and collect all issues.
+    """Check chain links, fork/route branches and process stop conditions.
+
+    Collects all issues in the flow tree.
 
     Unlike strict mode this never raises: errors and warnings are returned
     so that a caller (e.g. an agent) can see all problems at once.
     """
     from ico.core.chain import IcoChain
     from ico.core.fork import IcoFork
+    from ico.core.process import IcoProcess
     from ico.core.route import IcoRoute
 
     issues: list[SignatureIssue] = []
@@ -207,6 +210,10 @@ def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
             issue = check_link(left, right)
         elif isinstance(node, IcoFork | IcoRoute):
             issue = check_branch_inputs(node.children, node.name or "")
+        elif isinstance(node, IcoProcess) and len(node.children) == 2:
+            # Process with a stop condition: the body output feeds `until`.
+            body, until = node.children
+            issue = check_link(body, until)
         if issue is not None:
             issues.append(issue)
     return issues
