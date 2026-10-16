@@ -10,7 +10,7 @@ comparing label counts with the labels of the indices from the spec's own
 index source.
 
 Usage:
-    poetry run python src/examples/ml/cv/cifar/cifar_spec_run.py [flow.json]
+    poetry run python src/examples/ml/cv/cifar/cifar_spec_run.py [flow.spec.json]
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from ico import IcoRuntime, IcoSink, RichProgressTool
 from ico.core.operator import IcoOperatorProtocol
 from ico.spec import build, from_json
 
-DEFAULT_SPEC = Path(__file__).parent / "cifar_data_flow.json"
+DEFAULT_SPEC = Path(__file__).parent / "cifar_data_flow.spec.json"
 
 
 def expected_label_counts(

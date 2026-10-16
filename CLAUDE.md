@@ -58,7 +58,8 @@ spec export in `src/ico/spec`, tests in `src/tests`.
    every `build()` error is a `SpecError` with `path`, `expected`, `got`,
    `refs` (strict chains: `at chain step N`). `find_path` is deferred, see
    `docs/design/registry.md`.
-10. [ ] Ignore generated spec files (e.g. `cifar_data_flow.json`) in git.
+10. [x] Ignore generated spec files in git: they are named `*.spec.json`
+    (e.g. `cifar_data_flow.spec.json`); committed fixtures use another name.
 11. [ ] Push the branch, open a PR, merge into `main` before starting MCP.
 12. [ ] `load_operators(path)`: import operator modules from a directory and
     register them, so a server can rebuild its registry on restart and

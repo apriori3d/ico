@@ -13,7 +13,7 @@ but is built from the registered operators of `cifar_ops`, so it can be
 exported in strict mode and rebuilt elsewhere with `cifar_spec_run.py`.
 
 Usage:
-    poetry run python src/examples/ml/cv/cifar/cifar_spec_export.py [out.json]
+    poetry run python src/examples/ml/cv/cifar/cifar_spec_export.py [out.spec.json]
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from ico import IcoAsyncStream, IcoBatcher, IcoPipeline, IcoProgress, MPAgent
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.spec import to_json, to_spec
 
-DEFAULT_OUT = Path(__file__).parent / "cifar_data_flow.json"
+DEFAULT_OUT = Path(__file__).parent / "cifar_data_flow.spec.json"
 
 
 def make_worker_flow(batch_size: int) -> IcoOperatorProtocol[Iterator[int], CifarBatch]:
