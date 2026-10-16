@@ -9,6 +9,7 @@ Example:
     >>> default_registry.search(input=str, tags={"text"})
 """
 
+from ico.registry.loader import LoadReport, load_operators
 from ico.registry.matching import EXACT, SUBCLASS, MatchRank, match_type
 from ico.registry.registry import (
     STATUSES,
@@ -28,6 +29,7 @@ __all__ = [
     "STATUSES",
     "SUBCLASS",
     "IcoRegistry",
+    "LoadReport",
     "MatchRank",
     "OperatorMeta",
     "RegistryEntry",
@@ -35,6 +37,7 @@ __all__ = [
     "default_registry",
     "format_ref",
     "get_meta",
+    "load_operators",
     "match_type",
     "parse_ref",
     "register",

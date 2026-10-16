@@ -91,6 +91,9 @@ class RegistryEntry:
         signature: Inferred ICO signature.
         description: First paragraph of the docstring.
         params: Constructor parameters of a registered class.
+        module: Module that defines the registered function or class, used
+            to find the entries of a module when it is reloaded; ``None``
+            when unknown (e.g. a composite flow).
     """
 
     meta: OperatorMeta
@@ -99,6 +102,7 @@ class RegistryEntry:
     signature: IcoSignature
     description: str
     params: tuple[ParamInfo, ...] = ()
+    module: str | None = None
 
     @property
     def ref(self) -> str:
@@ -245,6 +249,7 @@ class IcoRegistry:
             description=description
             if description is not None
             else node_description(node),
+            module=node_module(node),
         )
         setattr(node, META_ATTR, meta)
         self._entries[meta.ref] = entry
@@ -290,6 +295,7 @@ class IcoRegistry:
             if description is not None
             else _first_paragraph(own_doc if isinstance(own_doc, str) else None),
             params=params,
+            module=cls.__module__,
         )
         setattr(cls, META_ATTR, meta)
         self._entries[meta.ref] = entry
@@ -608,6 +614,17 @@ def node_signature(node: IcoNodeProtocol) -> IcoSignature | None:
 
 # Attributes holding the user callable of leaf nodes, in lookup order.
 _CALLABLE_ATTRS = ("_fn", "fn", "provider", "consumer")
+
+
+def node_module(node: object) -> str | None:
+    """Module of the user function wrapped by a plain operator, or ``None``."""
+    if type(node) is not IcoOperator:
+        return None
+    fn = cast(object, cast(IcoOperator[Any, Any], node).fn)
+    if cast(object, getattr(fn, "__self__", None)) is node:
+        return None
+    module = cast(object, getattr(fn, "__module__", None))
+    return module if isinstance(module, str) else None
 
 
 def node_description(node: object) -> str:

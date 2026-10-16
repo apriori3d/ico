@@ -61,7 +61,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 10. [x] Ignore generated spec files in git: they are named `*.spec.json`
     (e.g. `cifar_data_flow.spec.json`); committed fixtures use another name.
 11. [ ] Push the branch, open a PR, merge into `main` before starting MCP.
-12. [ ] `load_operators(path)`: import operator modules from a directory and
+12. [x] `load_operators(path)`: import operator modules from a directory and
     register them, so a server can rebuild its registry on restart and
     load operators proposed by an agent. See `docs/design/registry.md`,
     "Loading operators from a directory":
