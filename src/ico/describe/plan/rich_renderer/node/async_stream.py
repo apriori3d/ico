@@ -15,7 +15,7 @@ from ico.describe.plan.rich_renderer.node.stream import (
 )
 from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from ico.describe.rich_style import DescribeStyle
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
 @register_renderer(IcoAsyncStream)
@@ -76,17 +76,17 @@ def create_worker_flow() -> IcoOperatorProtocol[float, float]:
 if __name__ == "__main__":
     from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 
-    pool = [MPAgent(create_worker_flow) for _ in range(4)]
+    pool = [MPWorker(create_worker_flow) for _ in range(4)]
 
     astream1 = IcoAsyncStream(
-        lambda: MPAgent(create_worker_flow),
+        lambda: MPWorker(create_worker_flow),
         pool_size=4,
         name="With subflow factory",
     )
     astream2 = IcoAsyncStream(
         [
-            MPAgent(create_worker_flow),
-            MPAgent(create_worker_flow),
+            MPWorker(create_worker_flow),
+            MPWorker(create_worker_flow),
         ],
         name="With explicit pool",
     )

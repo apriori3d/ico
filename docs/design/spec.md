@@ -162,7 +162,7 @@ the main chain. In the CIFAR example `create_train_context` produces a
   artifact. Domain operators never implement saving themselves; the
   example's `save_checkpoint_step` is replaced by it.
 - A context references resources but does not own them.
-- A context never travels to an `MPAgent` worker. `build()` rejects a spec
+- A context never travels to an `MPWorker` runner process. `build()` rejects a spec
   where a node that needs a context ends up inside a worker.
 - Nested contexts (`CifarEvalContext` holding the train context) are
   allowed; only the outermost context that crosses an iteration boundary of
@@ -174,7 +174,7 @@ the main chain. In the CIFAR example `create_train_context` produces a
 ### Validation: the full CIFAR training flow
 
 The design is validated when the complete CIFAR flow of
-`ico_cifar_complete_flow_mp.py` (data loader with `MPAgent` workers,
+`ico_cifar_complete_flow_mp.py` (data loader with a pool of `MPWorker`s,
 training and validation epochs, `IcoProcess` over epochs) is exported to a
 spec, rebuilt with `build()` in a fresh process, and trains with the same
 behavior; resuming from a snapshot continues from the saved epoch and
@@ -203,7 +203,7 @@ A crystallized pipeline with a live input stays reproducible.
 ### Shared resources across workers
 
 A read-only resource such as the CIFAR dataset is opened once and attached
-by every `MPAgent` worker without a copy.
+by every `MPWorker` runner process without a copy.
 
 ```python
 class IcoShareable(Protocol[R, H]):

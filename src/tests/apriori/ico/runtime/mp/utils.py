@@ -28,7 +28,7 @@ class MPProcessMock(
         self._channel.runtime_port = self
 
     def _portal_fn(self, input: I) -> O:
-        # Send item to agent process
+        # Send item to worker process
         self._channel.send(input)
         item = self._channel.wait_for_item()
         assert item is not None
@@ -48,6 +48,6 @@ class MPProcessMock(
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
         if isinstance(event, IcoFaultEvent):
-            raise IcoRuntimeError(f"Agent exception: {event.info['message']}")
+            raise IcoRuntimeError(f"Worker exception: {event.info['message']}")
 
         return super().on_event(event)

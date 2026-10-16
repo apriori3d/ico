@@ -115,7 +115,7 @@ class IcoChannelRuntimePort(Protocol):
         • Protocol-based: Flexible integration with various runtime nodes
 
     Usage Pattern:
-        Runtime nodes (agents, workers) implement this protocol to enable
+        Runtime nodes (workers, runners) implement this protocol to enable
         channel-based distributed runtime coordination across processes.
     """
 
@@ -145,7 +145,7 @@ class IcoChannel(Generic[I, O], ABC):
     """Bidirectional communication channel for distributed ICO execution.
 
     IcoChannel provides sophisticated message-based communication between
-    agent and worker processes, enabling distributed computation with
+    worker and runner processes, enabling distributed computation with
     unified runtime tree coordination and reliable message delivery.
 
     Channel Architecture:
@@ -157,8 +157,8 @@ class IcoChannel(Generic[I, O], ABC):
 
     Communication Patterns:
         • Data Flow: Computation payloads (I → O) between processes
-        • Command Distribution: Runtime commands from agent to worker
-        • Event Propagation: Runtime events from worker to agent
+        • Command Distribution: Runtime commands from worker to runner
+        • Event Propagation: Runtime events from runner to worker
         • Acknowledgment Protocol: Reliable delivery confirmation
 
     Message Processing:
@@ -183,8 +183,8 @@ class IcoChannel(Generic[I, O], ABC):
         O: Type of output data received through this channel
 
     Note:
-        Channel direction is from sender perspective - agent sends I
-        and receives O, while worker receives I and sends O.
+        Channel direction is from sender perspective - worker sends I
+        and receives O, while runner receives I and sends O.
     """
 
     __slots__ = (
@@ -257,7 +257,7 @@ class IcoChannel(Generic[I, O], ABC):
             Channel with swapped send/receive endpoints and reversed types.
 
         Usage:
-            Agent creates channel[I,O] and worker uses inverted channel[O,I]
+            Worker creates channel[I,O] and runner uses inverted channel[O,I]
             to maintain proper type relationships across process boundaries.
         """
         ...
@@ -473,7 +473,7 @@ class IcoChannel(Generic[I, O], ABC):
         if isinstance(message.event, IcoFaultEvent):
             self._send(AcknowledgeMessage(self._message_id, message.id))
             raise IcoRuntimeError(
-                f"Remote agent raise an exception: {message.event.info}"
+                f"Remote worker raise an exception: {message.event.info}"
             )
 
         if not self.accept_events:

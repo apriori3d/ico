@@ -51,7 +51,7 @@ Decisions:
   package on `sys.path` (it has `__init__.py`), and modules are imported by
   name, e.g. `operators.fetch_report`. Loading files by path with
   `importlib` would give modules arbitrary names: `module:qualname` refs
-  would not be reproducible, and pickling to `spawn` workers (`MPAgent`)
+  would not be reproducible, and pickling to `spawn` workers (`MPWorker`)
   would fail because the child process cannot import the module.
 - **Collect errors per file.** One broken file must not take down the
   server and the rest of the registry. Errors are collected in the report;

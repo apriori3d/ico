@@ -38,10 +38,10 @@ class MPQueueSendEndpoint(Generic[I], IcoSendEndpoint[I]):
         • RuntimeMessage: Commands, events, and control messages
         • Type Safety: Generic parameterization ensures type consistency
 
-    Agent Integration:
-        MPQueueSendEndpoint is used within IcoAgent/IcoAgentWorker for outgoing
+    Worker Integration:
+        MPQueueSendEndpoint is used within IcoWorker/IcoRunner for outgoing
         communication to remote processes. The endpoint handles serialization
-        and cross-process transmission automatically within agent infrastructure.
+        and cross-process transmission automatically within worker infrastructure.
     """
 
     __slots__ = "queue"
@@ -112,10 +112,10 @@ class MPQueueReceiveEndpoint(Generic[O], IcoReceiveEndpoint[O]):
     Message Processing Flow:
         Remote Process → Queue → get() → Deserialize → Local Process
 
-    Agent Integration:
-        MPQueueReceiveEndpoint is used within IcoAgent/IcoAgentWorker for incoming
+    Worker Integration:
+        MPQueueReceiveEndpoint is used within IcoWorker/IcoRunner for incoming
         communication from remote processes. The endpoint handles deserialization
-        and cross-process reception automatically within agent infrastructure.
+        and cross-process reception automatically within worker infrastructure.
 
     Exception Handling:
         Queue operations can raise exceptions in edge cases:
@@ -185,11 +185,11 @@ class MPQueueReceiveEndpoint(Generic[O], IcoReceiveEndpoint[O]):
 
 
 class MPChannel(Generic[I, O], IcoChannel[I, O]):
-    """Multiprocessing-based bidirectional channel for ICO agent/worker communication.
+    """Multiprocessing-based bidirectional channel for ICO worker/runner communication.
 
     MPChannel provides complete bidirectional inter-process communication using
     Python's multiprocessing.Queue infrastructure, enabling reliable data flow
-    and runtime coordination between ICO Agent and Worker processes.
+    and runtime coordination between ICO Worker and Runner processes.
 
     Bidirectional Architecture:
         • **Send Capability**: Outgoing messages via MPQueueSendEndpoint[I]
@@ -200,13 +200,13 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
     Channel Pair Pattern:
         MPChannel supports bidirectional communication by creating inverted pairs:
 
-        **Agent Side**: MPChannel[TaskData, ResultData]
-        • Sends: TaskData to worker
-        • Receives: ResultData from worker
+        **Worker Side**: MPChannel[TaskData, ResultData]
+        • Sends: TaskData to runner
+        • Receives: ResultData from runner
 
-        **Worker Side**: MPChannel[ResultData, TaskData] (inverted)
-        • Sends: ResultData to agent
-        • Receives: TaskData from agent
+        **Runner Side**: MPChannel[ResultData, TaskData] (inverted)
+        • Sends: ResultData to worker
+        • Receives: TaskData from worker
 
     Queue Creation Strategy:
         MPChannel automatically creates queues if not provided:
@@ -214,8 +214,8 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         • **Manual Injection**: Accepts pre-configured endpoints for custom setups
         • **Context Management**: Ensures proper multiprocessing context usage
 
-    Agent Integration:
-        MPChannel is the primary communication infrastructure for ICO agent/worker
+    Worker Integration:
+        MPChannel is the primary communication infrastructure for ICO worker/runner
         distributed execution, providing reliable bidirectional IPC with automatic
         queue management and runtime message coordination.
 
@@ -276,8 +276,8 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
             • **Type Safety**: Generic parameters preserved in queue typing
 
         Runtime Configuration:
-            • **Command Flow**: Agent typically accepts_commands=True, sends to worker
-            • **Event Flow**: Worker typically accepts_events=False, sends to agent
+            • **Command Flow**: Worker typically accepts_commands=True, sends to runner
+            • **Event Flow**: Runner typically accepts_events=False, sends to worker
             • **Bidirectional**: Both data flows work regardless of command/event settings
             • **Timeout Handling**: Configurable timeout behavior for robust communication
 
@@ -326,7 +326,7 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         self.mp_context = mp_context
 
     def invert(self) -> MPChannel[O, I]:
-        """Create inverted channel pair for symmetric agent/worker communication.
+        """Create inverted channel pair for symmetric worker/runner communication.
 
         Returns:
             Inverted MPChannel with swapped send/receive queues and flipped runtime settings.
@@ -338,21 +338,21 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
             Original and inverted channels share the same underlying queues but
             with swapped send/receive roles, enabling symmetric process communication:
 
-            **Original Channel (Agent)**: MPChannel[Task, Result]
-            • Sends via: task_queue (to worker)
-            • Receives via: result_queue (from worker)
-            • Commands: accept_commands=True (can send to worker)
-            • Events: accept_events=False (receives from worker)
+            **Original Channel (Worker)**: MPChannel[Task, Result]
+            • Sends via: task_queue (to runner)
+            • Receives via: result_queue (from runner)
+            • Commands: accept_commands=True (can send to runner)
+            • Events: accept_events=False (receives from runner)
 
-            **Inverted Channel (Worker)**: MPChannel[Result, Task]
-            • Sends via: result_queue (to agent) - same queue, opposite direction
-            • Receives via: task_queue (from agent) - same queue, opposite direction
-            • Commands: accept_commands=False (receives from agent)
-            • Events: accept_events=True (can send to agent)
+            **Inverted Channel (Runner)**: MPChannel[Result, Task]
+            • Sends via: result_queue (to worker) - same queue, opposite direction
+            • Receives via: task_queue (from worker) - same queue, opposite direction
+            • Commands: accept_commands=False (receives from worker)
+            • Events: accept_events=True (can send to worker)
 
         Queue Sharing Architecture:
             ```
-            Agent Process          Shared Queues          Worker Process
+            Worker Process          Shared Queues          Runner Process
             ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
             │ Send: Task  │────→ │ task_queue  │ ←──── │ Recv: Task  │
             │ Recv: Result│ ←──── │result_queue │────→ │ Send: Result│

@@ -132,7 +132,7 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
 
     Integration Benefits:
         • Real-time Monitoring: Live progress updates during execution
-        • Distributed Progress: Works across agent/worker process boundaries
+        • Distributed Progress: Works across worker/runner process boundaries
         • Multiple Tracking: Multiple progress points in complex flows
         • Tool Integration: Compatible with rich progress displays
         • Zero Overhead: No impact when progress monitoring not needed

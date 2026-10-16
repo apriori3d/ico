@@ -1,4 +1,4 @@
-"""MPAgent Basic Example - Multiprocessing with ICO Framework"""
+"""MPWorker Basic Example - Multiprocessing with ICO Framework"""
 
 import time
 from collections.abc import Iterator
@@ -11,7 +11,7 @@ from ico import (
     IcoProcess,
     IcoProgress,
     IcoRuntime,
-    MPAgent,
+    MPWorker,
     RichPrinterTool,
     RichProgressTool,
     operator,
@@ -23,7 +23,7 @@ from ico import (
 
 class WorkerFlowFactory:
     """
-    Factory for creating worker flow that runs inside each MPAgent process.
+    Factory for creating worker flow that runs inside each MPWorker process.
     Creates IcoProcess with: input → double → shift → progress, repeated num_iterations times.
     Must be at module level for multiprocessing pickling.
     """
@@ -67,9 +67,9 @@ class WorkerFlowFactory:
 
 if __name__ == "__main__":
     """
-    MPAgent Lifecycle Demonstration
+    MPWorker Lifecycle Demonstration
 
-    This example walks through the complete MPAgent lifecycle, showing how worker
+    This example walks through the complete MPWorker lifecycle, showing how worker
     processes are created, managed, and terminated by the ICO runtime system.
 
     Demonstration Steps:
@@ -80,11 +80,11 @@ if __name__ == "__main__":
 
     2. **Flow Architecture**:
        - Source generates data items with delays (simulates real data pipeline)
-       - MPAgent workers process items in separate processes
+       - MPWorkers process items in separate runner processes
        - Progress tracking monitors work across process boundaries
 
     3. **Runtime Lifecycle Observation**:
-       - **Idle** state: `IcoAgentWorker` exists as a logical node but no processes yet
+       - **Idle** state: `IcoRunner` exists as a logical node but no processes yet
        - **Ready** state: At activation, worker processes are spawned
        - **Running** state: Execute flow with live progress bars showing distributed work
        - **Idle** state: At deactivation, worker processes are cleaned up and shutdown
@@ -122,23 +122,23 @@ if __name__ == "__main__":
     def save_result(x: int) -> None:
         pass  # Results discarded for demo purposes
 
-    # 🎯 MPAgent Creation: Workers will be spawned on activation
-    mp_process1 = MPAgent[int, int](WorkerFlowFactory(name="Worker 1"))
-    mp_process2 = MPAgent[int, int](WorkerFlowFactory(name="Worker 2"))
+    # 🎯 MPWorker Creation: Workers will be spawned on activation
+    mp_process1 = MPWorker[int, int](WorkerFlowFactory(name="Worker 1"))
+    mp_process2 = MPWorker[int, int](WorkerFlowFactory(name="Worker 2"))
 
     # Overall progress tracking for main data flow
     progress = IcoProgress[int](total=total, name="Overall Progress")
 
     # Complete flow: source → progress → workers sequence → sink
     flow = numbers | (progress | mp_process1 | mp_process2).stream() | save_result
-    flow.name = "MPAgent Demonstration Flow"
+    flow.name = "MPWorker Demonstration Flow"
 
     # Display initial flow structure
     print("\n📋 Initial Flow Structure:")
     flow.describe()
 
     # Create runtime with progress monitoring
-    print("\n🎯 Creating Runtime with MPAgent nodes...")
+    print("\n🎯 Creating Runtime with MPWorker nodes...")
 
     console = Console()
     progress_tool = RichProgressTool(console=console)
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     runtime = IcoRuntime(flow, tools=[progress_tool, printer_tool])
 
-    print("\n📊 Runtime Tree BEFORE Activation (MPAgent nodes registered):")
+    print("\n📊 Runtime Tree BEFORE Activation (MPWorker nodes registered):")
     runtime.describe()
 
     # 🚀 ACTIVATION: This is when worker processes are actually created!
@@ -167,9 +167,9 @@ if __name__ == "__main__":
     runtime.deactivate()
     runtime.describe()
 
-    print("\n✅ MPAgent Lifecycle Complete!")
+    print("\n✅ MPWorker Lifecycle Complete!")
     print("🎓 Key Learnings:")
-    print("   • MPAgent nodes register during runtime creation")
+    print("   • MPWorker nodes register during runtime creation")
     print("   • Worker processes spawn only on activation")
     print("   • Progress tracking works across process boundaries")
     print("   • Runtime automatically manages process lifecycle")

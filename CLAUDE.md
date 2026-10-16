@@ -90,7 +90,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
     - Result is a small dataclass with `to_dict()`: outputs, total,
       truncated, errors.
 
-14. [ ] Rename the agent/worker pair and runtime tools (before `ico-mcp`,
+14. [x] Rename the agent/worker pair and runtime tools (before `ico-mcp`,
     where "agent" means the LLM agent and "tool" means an MCP tool).
     Full rename everywhere: code, tests, README, examples, notebooks,
     docstrings and `docs/design`. No deprecated aliases. Pure rename, no

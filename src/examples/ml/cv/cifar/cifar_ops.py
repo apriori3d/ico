@@ -13,7 +13,7 @@ plain JSON constructor kwargs:
 * `cifar.shuffle`, `cifar.collate` - the original functions, registered.
 
 Importing this module registers them in `ico.registry.default_registry`.
-A process that builds a flow from a spec (or a spawned MPAgent worker that
+A process that builds a flow from a spec (or a spawned MPWorker runner process that
 unpickles a SpecFactory) imports it to resolve the references.
 
 Note:

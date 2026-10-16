@@ -139,7 +139,7 @@ class BaseStateModel:
 
     Subclass Customization:
         Subclasses can override transitions dict to customize state behavior
-        for specialized runtime nodes (agents, tools, specific operators).
+        for specialized runtime nodes (workers, tools, specific operators).
     """
 
     transitions: ClassVar[StateTransitionMap] = {

@@ -2,7 +2,7 @@
 
 Nothing here knows how the flow was built: the structure comes from the
 spec written by `cifar_spec_export.py`, and the operators come from the
-registry populated by importing `cifar_ops`. The MPAgent workers are
+registry populated by importing `cifar_ops`. The MPWorkers are
 recreated from the spec in spawned processes.
 
 The run checks that every selected sample arrived exactly once, by
@@ -58,11 +58,11 @@ def main() -> None:
         shapes.add(tuple(batch.images.shape))
         labels.update(int(label) for label in batch.labels)
 
-    # The runtime activates the MPAgent workers and shows their progress.
+    # The runtime activates the MPWorkers and shows their progress.
     closed_flow = data_flow | IcoSink(consume)
     runtime = IcoRuntime(closed_flow, tools=[RichProgressTool()])
     t0 = time.perf_counter()
-    runtime.activate()  # spawns the MPAgent worker processes
+    runtime.activate()  # spawns the MPWorker runner processes
     t1 = time.perf_counter()
     runtime.run()
     t2 = time.perf_counter()

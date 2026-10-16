@@ -3,9 +3,9 @@
 The flow mirrors the train data flow of `ico_cifar_complete_flow_mp.py`:
 
     indices | shuffle | progress.stream() | batcher
-        | IcoAsyncStream(pool of MPAgent workers)
+        | IcoAsyncStream(pool of MPWorkers)
 
-where every MPAgent worker runs
+where every MPWorker runs
 
     (progress | fetch | augmentations).stream() | collate
 
@@ -34,7 +34,7 @@ from examples.ml.cv.cifar.ico_cifar_complete_flow_mp import (
     collate,
     shuffle_indices,
 )
-from ico import IcoAsyncStream, IcoBatcher, IcoPipeline, IcoProgress, MPAgent
+from ico import IcoAsyncStream, IcoBatcher, IcoPipeline, IcoProgress, MPWorker
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.spec import to_json, to_spec
 
@@ -42,7 +42,7 @@ DEFAULT_OUT = Path(__file__).parent / "cifar_data_flow.spec.json"
 
 
 def make_worker_flow(batch_size: int) -> IcoOperatorProtocol[Iterator[int], CifarBatch]:
-    """Flow run by every MPAgent worker: indices batch → collated CifarBatch."""
+    """Flow run by every MPWorker runner process: indices batch → collated CifarBatch."""
     # Progress nodes are not parametrized: a spec carries no Python types, so
     # build() recreates them unparametrized and the round trip stays exact.
     worker_progress: IcoProgress[int] = IcoProgress(total=batch_size, name="Worker")
@@ -63,7 +63,7 @@ def make_data_flow(
     num_workers: int = 4,
     limit: int | None = 2_000,
 ) -> IcoOperatorProtocol[None, Iterator[CifarBatch]]:
-    """The train data loader with a pool of MPAgent worker processes."""
+    """The train data loader with a pool of MPWorker runner processes."""
     indices = CifarIndices(split="train", train_ratio=0.8, seed=0, limit=limit)
     total = limit if limit is not None else 40_000
     track_progress: IcoProgress[int] = IcoProgress(
@@ -71,12 +71,12 @@ def make_data_flow(
     )
     batcher: IcoBatcher[int] = IcoBatcher(batch_size=batch_size)
 
-    def create_mp_agent() -> IcoOperator[Iterator[int], CifarBatch]:
-        # Only used to describe the worker: build() recreates agents and
+    def create_mp_worker() -> IcoOperator[Iterator[int], CifarBatch]:
+        # Only used to describe the worker: build() recreates workers and
         # workers from the spec with a SpecFactory.
-        return MPAgent(lambda: make_worker_flow(batch_size))
+        return MPWorker(lambda: make_worker_flow(batch_size))
 
-    workers_pool = IcoAsyncStream(create_mp_agent, pool_size=num_workers)
+    workers_pool = IcoAsyncStream(create_mp_worker, pool_size=num_workers)
 
     data_flow = (
         indices | shuffle_indices | track_progress.stream() | batcher | workers_pool

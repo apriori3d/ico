@@ -13,10 +13,10 @@ from ico.core.partition import IcoPartition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
 from ico.core.route import IcoRoute
-from ico.core.runtime.agent import IcoAgent
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
+from ico.core.runtime.worker import IcoWorker
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
@@ -56,7 +56,7 @@ class PlanRendererOptions(RendererOptions):
     """Show collection sizes when available"""
 
     show_remote_flows: bool = True
-    """Display flows inside distributed agents"""
+    """Display flows inside distributed workers"""
 
     dim_ico_nodes: bool = False
     """Dim ICO framework nodes to focus on user code"""
@@ -79,7 +79,7 @@ class PlanRendererOptions(RendererOptions):
 
     node_icons: dict[type[IcoNodeProtocol | IcoRuntimeNode], str] = field(
         default_factory=lambda: {
-            IcoAgent: "👷",
+            IcoWorker: "👷",
             IcoBatcher: "📦",
             IcoStream: "🎞️ ",
             IcoAsyncStream: "🚀",

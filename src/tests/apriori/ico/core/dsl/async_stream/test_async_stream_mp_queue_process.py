@@ -7,7 +7,7 @@ import pytest
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.operator import IcoOperator
 from ico.core.source import IcoSource
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
 def flow_identity() -> IcoOperator[int, int]:
@@ -39,48 +39,48 @@ def test_single_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
     num = 5
     data = list(range(1, num + 1))
-    agent = MPAgent(double_flow_factory).activate()
+    worker = MPWorker(double_flow_factory).activate()
     try:
         source = IcoSource[int](lambda: iter(data))
-        flow = source | IcoAsyncStream([agent])
+        flow = source | IcoAsyncStream([worker])
         result = list(flow(None))
         assert result == [d * 2 for d in data]
     finally:
-        agent.deactivate()
+        worker.deactivate()
 
 
 def test_slow_then_fast_unordered_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
-    agent1 = MPAgent(slow_tripple_flow_factory).activate()
-    agent2 = MPAgent(double_flow_factory).activate()
+    worker1 = MPWorker(slow_tripple_flow_factory).activate()
+    worker2 = MPWorker(double_flow_factory).activate()
     data = [1, 2]
 
     try:
         source = IcoSource[int](lambda: iter(data))
-        flow = source | IcoAsyncStream([agent1, agent2], ordered=False)
+        flow = source | IcoAsyncStream([worker1, worker2], ordered=False)
         result = list(flow(None))
         assert result == [4, 3]
 
     finally:
-        agent1.deactivate()
-        agent2.deactivate()
+        worker1.deactivate()
+        worker2.deactivate()
 
 
 def test_slow_then_fast_ordered_mp_process_round_trip() -> None:
     """Ensure data passes through full async stream and multiprocessing roundtrip."""
-    agent1 = MPAgent(slow_tripple_flow_factory).activate()
-    agent2 = MPAgent(double_flow_factory).activate()
+    worker1 = MPWorker(slow_tripple_flow_factory).activate()
+    worker2 = MPWorker(double_flow_factory).activate()
     data = [1, 2]
 
     try:
         source = IcoSource[int](lambda: iter(data))
-        flow = source | IcoAsyncStream([agent1, agent2], ordered=True)
+        flow = source | IcoAsyncStream([worker1, worker2], ordered=True)
         result = list(flow(None))
         assert result == [3, 4]
 
     finally:
-        agent1.deactivate()
-        agent2.deactivate()
+        worker1.deactivate()
+        worker2.deactivate()
 
 
 if __name__ == "__main__":

@@ -8,10 +8,10 @@ from ico.core.runtime.node import IcoRuntimeNode
 # ────────────────────────────────────────────────
 
 
-class IcoTool(IcoRuntimeNode):
+class IcoRuntimeTool(IcoRuntimeNode):
     """Base class for ICO runtime tools.
 
-    IcoTool provides the foundational architecture for runtime monitoring and
+    IcoRuntimeTool provides the foundational architecture for runtime monitoring and
     management tools that integrate with the ICO runtime tree. Tools receive
     runtime events and provide various monitoring, debugging, visualization,
     and management capabilities during computation execution.
@@ -27,7 +27,7 @@ class IcoTool(IcoRuntimeNode):
         of computation execution through standardized interfaces:
 
         1. **Event Flow**: Runtime events bubble up to tools via on_forward_event()
-        2. **Tool Registration**: Tools register with runtime through IcoToolBox
+        2. **Tool Registration**: Tools register with runtime through IcoRuntimeToolBox
         3. **Runtime Tree Integration**: Tools become part of runtime hierarchy
         4. **Passive Design**: Tools monitor without altering computation logic
 
@@ -51,7 +51,7 @@ class IcoTool(IcoRuntimeNode):
         • Provide real-time feedback
 
     Tool Integration with ToolBox:
-        IcoTool instances are managed through IcoToolBox container,
+        IcoRuntimeTool instances are managed through IcoRuntimeToolBox container,
         which provides:
         • Multi-tool coordination
         • Event distribution to multiple tools
@@ -60,12 +60,12 @@ class IcoTool(IcoRuntimeNode):
         • Dynamic tool addition/removal
 
     Base Implementation:
-        IcoTool provides minimal base implementation with extension points
+        IcoRuntimeTool provides minimal base implementation with extension points
         for specialized tool functionality. Subclasses override methods
         to implement specific monitoring and management capabilities.
 
     Note:
-        IcoTool is a base class requiring subclass implementation of
+        IcoRuntimeTool is a base class requiring subclass implementation of
         on_forward_event() for specific tool functionality. Common tool
         implementations include RichProgressTool, LoggingTool, and DebugTool.
     """

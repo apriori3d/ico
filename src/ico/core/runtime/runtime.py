@@ -8,8 +8,8 @@ from ico.core.runtime.node import (
     IcoRuntimeNode,
 )
 from ico.core.runtime.state import BaseStateModel
-from ico.core.runtime.tool import IcoTool
-from ico.core.runtime.toolbox import IcoToolBox
+from ico.core.runtime.tool import IcoRuntimeTool
+from ico.core.runtime.toolbox import IcoRuntimeToolBox
 from ico.core.runtime.utils import discover_and_connect_runtime_nodes
 
 # ────────────────────────────────────────────────
@@ -22,7 +22,7 @@ class OnForwardEventProtocol:
 
     Simple protocol enabling external listeners to receive runtime events
     forwarded from IcoRuntime execution. Used for lightweight event monitoring
-    without full IcoTool infrastructure.
+    without full IcoRuntimeTool infrastructure.
 
     Integration:
         • Event Reception: Receives events via on_forward_event()
@@ -160,7 +160,7 @@ class IcoRuntime(IcoRuntimeNode):
     closure: IcoOperatorProtocol[
         None, None
     ]  # Complete computation flow (Source → Sink)
-    toolbox: IcoToolBox  # Tool container for runtime monitoring
+    toolbox: IcoRuntimeToolBox  # Tool container for runtime monitoring
     event_listeners: list[OnForwardEventProtocol] = []  # External event listeners
 
     def __init__(
@@ -171,7 +171,7 @@ class IcoRuntime(IcoRuntimeNode):
         runtime_parent: IcoRuntimeNode | None = None,
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
-        tools: Sequence[IcoTool] | None = None,
+        tools: Sequence[IcoRuntimeTool] | None = None,
     ) -> None:
         """Initialize runtime coordinator with computation flow and tool integration.
 
@@ -212,12 +212,12 @@ class IcoRuntime(IcoRuntimeNode):
         )
         self.closure = closure
 
-        # Tools in toolbox might need to use `IcoToolRegistrationProtocol` to register for runtime events,
+        # Tools in toolbox might need to use `IcoRuntimeToolRegistrationProtocol` to register for runtime events,
         # so we need to discover and connect runtime nodes before creating the toolbox and adding tools to it.
 
         discover_and_connect_runtime_nodes(self, closure)
 
-        self.toolbox = IcoToolBox(runtime=self, tools=tools)
+        self.toolbox = IcoRuntimeToolBox(runtime=self, tools=tools)
         self.add_runtime_children(self.toolbox)
 
     # ────────────────────────────────────────────────

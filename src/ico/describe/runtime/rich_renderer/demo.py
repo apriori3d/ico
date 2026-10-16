@@ -9,7 +9,7 @@ from ico.core.runtime.runtime import IcoRuntime
 from ico.core.sink import sink
 from ico.core.source import source
 from ico.describe.runtime.rich_renderer.tree_renderer import RuntimeTreeRenderer
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 """
 Runtime Tree Renderer Visualization Demo
@@ -19,8 +19,8 @@ a complex flow and demonstrating real-time runtime state visualization:
 
 • Runtime lifecycle states (Ready → Running → Complete)
 • IcoProgress nodes with state tracking
-• MP agents with worker state visualization
-• Runtime tree hierarchy with expand_agents option
+• MP workers with worker state visualization
+• Runtime tree hierarchy with expand_workers option
 • State-colored display (green/yellow/red indicators)
 • Multi-column runtime table (Tree | State | Name)
 • Dynamic state updates during execution
@@ -102,11 +102,11 @@ if __name__ == "__main__":
     # Shows batcher runtime states
     batcher = IcoBatcher[int](batch_size=3)
 
-    # ── MP Agents Layer ──
-    # Shows agent worker runtime hierarchy
-    agents = [MPAgent(create_augment_flow) for _ in range(2)]
+    # ── MP Workers Layer ──
+    # Shows runner runtime hierarchy
+    workers = [MPWorker(create_augment_flow) for _ in range(2)]
     workers_pool = IcoAsyncStream(
-        agents,
+        workers,
         name="MP Workers Pool",  # Named for runtime visualization
     )
 
@@ -151,9 +151,9 @@ if __name__ == "__main__":
     runtime.run()
     renderer.render(runtime)
 
-    print("\n🔄 Step 3: After Agent Deactivation (Mixed States)")
+    print("\n🔄 Step 3: After Worker Deactivation (Mixed States)")
     print("-" * 40)
-    agents[1].deactivate()
+    workers[1].deactivate()
     renderer.render(runtime)
 
     print("\n✅ Step 4: Complete Shutdown (Final States)")
@@ -164,9 +164,9 @@ if __name__ == "__main__":
     print("\n🎯 Demo Features Shown:")
     print("  • Runtime state progression (Ready → Running → Complete)")
     print("  • IcoProgress nodes with progress tracking")
-    print("  • MP agent runtime hierarchies and worker states")
+    print("  • MP worker runtime hierarchies and worker states")
     print("  • State-colored visualization (green/yellow/red)")
-    print("  • Runtime tree expansion with agent details")
+    print("  • Runtime tree expansion with worker details")
     print("  • Dynamic state updates during execution")
     print("  • Multi-column runtime format (Tree | State | Name)")
     print("\n✨ Runtime visualization complete!")

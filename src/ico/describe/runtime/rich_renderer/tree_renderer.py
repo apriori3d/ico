@@ -4,7 +4,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from ico.core.runtime.agent import IcoAgentWorker
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
@@ -16,7 +15,8 @@ from ico.core.runtime.state import (
     IcoStateEvent,
     IcoStateRequestCommand,
 )
-from ico.core.runtime.tool import IcoTool
+from ico.core.runtime.tool import IcoRuntimeTool
+from ico.core.runtime.worker import IcoRunner
 from ico.core.tree_utils import TreePathIndex
 from ico.describe.rich_style import DescribeStyle
 from ico.describe.runtime.options import RuntimeRendererOptions
@@ -37,7 +37,7 @@ from ico.describe.utils import import_all_renderers
 RendererTypes: TypeAlias = RuntimeRowRenderer | RuntimeCustomRenderer
 
 
-class RuntimeTreeRenderer(IcoTool):
+class RuntimeTreeRenderer(IcoRuntimeTool):
     """
     Runtime tree visualization tool using Rich console rendering.
 
@@ -109,7 +109,7 @@ class RuntimeTreeRenderer(IcoTool):
         self._table = self._create_table()
 
         tree_walker = create_runtime_renderer_walker(
-            expand_remote_runtimes=self.options.expand_agents
+            expand_remote_runtimes=self.options.expand_workers
         )
         tree_walker.walk(
             node,
@@ -160,7 +160,7 @@ class RuntimeTreeRenderer(IcoTool):
                     style=DescribeStyle.tree.value,
                 )
 
-            if isinstance(node_info.node, IcoAgentWorker):
+            if isinstance(node_info.node, IcoRunner):
                 print("!")
             self.render_row(renderer, node, indent=branch)
 

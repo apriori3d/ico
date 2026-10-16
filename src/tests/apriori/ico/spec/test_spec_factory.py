@@ -1,4 +1,4 @@
-"""Rebuilding factory-based async streams and agents with SpecFactory."""
+"""Rebuilding factory-based async streams and workers with SpecFactory."""
 
 import os
 import pickle
@@ -12,7 +12,7 @@ from ico.core.operator import IcoOperator
 from ico.core.runtime.progress import IcoProgress
 from ico.core.source import IcoSource
 from ico.registry import IcoRegistry, register
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.spec import (
     NodeSpec,
     PipelineSpec,
@@ -24,7 +24,7 @@ from ico.spec import (
     to_spec,
 )
 
-# Module-level registrations: a spawned MPAgent worker imports this module
+# Module-level registrations: a spawned MPWorker runner process imports this module
 # to unpickle the SpecFactory, which re-registers them in its own process.
 REGISTRY = IcoRegistry()
 
@@ -110,8 +110,8 @@ def test_error_handling_roundtrip() -> None:
 
 
 def test_spec_factory_is_picklable() -> None:
-    rebuilt = build(to_spec(MPAgent(make_worker), strict=True), REGISTRY)
-    assert isinstance(rebuilt, MPAgent)
+    rebuilt = build(to_spec(MPWorker(make_worker), strict=True), REGISTRY)
+    assert isinstance(rebuilt, MPWorker)
     factory = rebuilt.flow_factory
     assert isinstance(factory, SpecFactory)
 
@@ -123,17 +123,17 @@ def test_spec_factory_is_picklable() -> None:
     assert restored.probe_signature().format() == "int → int"
 
 
-# ─── Agents ───
+# ─── Workers ───
 
 
-def test_agent_roundtrip_and_run() -> None:
-    agent = MPAgent(make_worker)
-    node = roundtrip(agent)
-    assert isinstance(node, MPAgent)
-    rebuilt = cast(MPAgent[int, int], node)
+def test_worker_roundtrip_and_run() -> None:
+    worker = MPWorker(make_worker)
+    node = roundtrip(worker)
+    assert isinstance(node, MPWorker)
+    rebuilt = cast(MPWorker[int, int], node)
 
     assert isinstance(rebuilt.flow_factory, SpecFactory)
-    assert rebuilt.signature.format() == agent.signature.format() == "int → int"
+    assert rebuilt.signature.format() == worker.signature.format() == "int → int"
 
     active = rebuilt.activate()
     try:
@@ -143,10 +143,10 @@ def test_agent_roundtrip_and_run() -> None:
         active.deactivate()
 
 
-def test_rebuilt_agent_runs_in_another_process() -> None:
-    node = build(to_spec(MPAgent(make_pid_worker), strict=True), REGISTRY)
-    assert isinstance(node, MPAgent)
-    rebuilt = cast(MPAgent[int, int], node)
+def test_rebuilt_worker_runs_in_another_process() -> None:
+    node = build(to_spec(MPWorker(make_pid_worker), strict=True), REGISTRY)
+    assert isinstance(node, MPWorker)
+    rebuilt = cast(MPWorker[int, int], node)
 
     active = rebuilt.activate()
     try:
@@ -163,29 +163,31 @@ def make_untyped_worker() -> IcoOperator[int, int]:
     return cast(IcoOperator[int, int], progress | inc)
 
 
-def test_agent_with_uninferred_worker_roundtrip() -> None:
-    # No return annotation on the factory: the agent signature is uninferred.
-    agent = MPAgent(lambda: make_untyped_worker())  # pyright: ignore[reportUnknownLambdaType]
-    assert not agent.signature.infered
+def test_worker_with_uninferred_worker_roundtrip() -> None:
+    # No return annotation on the factory: the worker signature is uninferred.
+    worker = MPWorker(lambda: make_untyped_worker())  # pyright: ignore[reportUnknownLambdaType]
+    assert not worker.signature.infered
 
-    node = roundtrip(agent)
-    assert isinstance(node, MPAgent)
-    assert not cast(MPAgent[int, int], node).signature.infered
+    node = roundtrip(worker)
+    assert isinstance(node, MPWorker)
+    assert not cast(MPWorker[int, int], node).signature.infered
 
 
-def test_agent_spec_has_no_factory_ref() -> None:
-    root = to_spec(MPAgent(make_worker), strict=True).root
+def test_worker_spec_has_no_factory_ref() -> None:
+    root = to_spec(MPWorker(make_worker), strict=True).root
     assert root.ref is None
     assert root.children[0].kind == "seq"
 
 
-def test_unknown_agent_type() -> None:
+def test_unknown_worker_type() -> None:
     root = NodeSpec(
-        kind="agent",
-        params={"type": "somewhere:OtherAgent"},
+        kind="worker",
+        params={"type": "somewhere:OtherWorker"},
         children=(NodeSpec(kind="op", op="inc@1"),),
     )
-    with pytest.raises(SpecError, match="only 'ico.runtime.agent.mp.mp_agent:MPAgent'"):
+    with pytest.raises(
+        SpecError, match="only 'ico.runtime.worker.mp.mp_worker:MPWorker'"
+    ):
         build(PipelineSpec(root=root), REGISTRY)
 
 

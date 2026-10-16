@@ -24,7 +24,7 @@ from ico.describe.plan.rich_renderer.row_renderer import (
     RowRenderer,
 )
 from ico.describe.rich_style import DescribeStyle
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
 @register_renderer(IcoEpoch)
@@ -168,10 +168,10 @@ if __name__ == "__main__":
     ╰─▸ emit
 
     """
-    pool = [MPAgent(create_worker_flow) for _ in range(4)]
+    pool = [MPWorker(create_worker_flow) for _ in range(4)]
 
     astream = IcoAsyncStream(
-        lambda: MPAgent(create_worker_flow),
+        lambda: MPWorker(create_worker_flow),
         pool_size=4,
         name="With subflow factory",
     )
