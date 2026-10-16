@@ -113,7 +113,30 @@ spec export in `src/ico/spec`, tests in `src/tests`.
     Propose the full list of renames first; ask if a new name collides with
     existing code.
 
-Next: start `ico-mcp` (separate package) on top of items 10–14.
+15. [ ] Progress for external consumers: `JsonProgressTool`, a runtime tool
+    like `RichProgressTool` that renders nothing and instead emits
+    throttled JSON progress snapshots to a callback, one per progress node
+    update: `{"key": "<TreePathIndex>", "label": "...", "done", "total",
+    "rate", "eta"}`. No aggregate across nodes: progress nodes are not
+    reliably nested (parallel workers count the same items), so turning
+    snapshots into MCP progress notifications is decided in `ico-mcp`.
+    Labels come from the flow at registration, as in `RichProgressTool`:
+    the progress node name, else `"Progress <n>"` by registration order.
+    `TreePathIndex` is only a stable key; no mapping to spec paths.
+    Throttle per node (default ≤ 2 updates/s) and always emit the final
+    state.
+
+16. [ ] JSON backend for `describe` (plan view model), next to `RichText`:
+    a render-neutral tree built by the existing per-node-type renderer
+    registry. Each node: `label`, `sig`, `ref`, `badges` (e.g. `pool ×4`,
+    `until`, `on_error=skip`), `layout` (`sequence` / `parallel` / `loop` /
+    `leaf`), `children`, and `progress_key` for progress nodes, equal to
+    the key used by `JsonProgressTool` (matched by node identity in the
+    same built flow). Consumers render it without knowing node kinds:
+    the `ico-mcp` dashboard first, later a Jupyter view or Live Board.
+    JSON-compatible, with a schema test.
+
+Next: start `ico-mcp` (separate package) on top of items 10–16.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
