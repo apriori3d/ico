@@ -58,19 +58,51 @@ spec export in `src/ico/spec`, tests in `src/tests`.
    every `build()` error is a `SpecError` with `path`, `expected`, `got`,
    `refs` (strict chains: `at chain step N`). `find_path` is deferred, see
    `docs/design/registry.md`.
-10. [ ] `build(spec)` for context nodes: `IcoEpoch`, `IcoContextPipeline`
-    and `IcoContextOperator`, so that training flows (not only data
-    loaders) can be rebuilt from a spec.
-11. [ ] Resources in specs (see `docs/design/spec.md`): `resources`
-    section, `@register` kind `resource`, `ResourceRef[T]`, `{"$res": name}`
-    in params, lazy open, scopes `run` and `process`.
-12. [ ] Registered contexts: register kind `context`, `IcoStateful`
-    protocol, registered context factory operators with an `init`
-    snapshot param, core `checkpoint` node. Validate on the full CIFAR
-    training flow (see `docs/design/spec.md`, "Validation").
-13. [ ] Artifact handles (URI + content hash) for checkpoints and large
-    outputs.
-14. [ ] `live` / `pinned` modes for non-deterministic sources.
-15. [ ] Shared resources across workers: `IcoShareable` (`export` /
-    `attach`), scope `shared` owned by `build()`, memmap handles in the
-    artifact store `~/.ico/artifacts/<hash>/`. First case: CIFAR dataset.
+10. [ ] Ignore generated spec files (e.g. `cifar_data_flow.json`) in git.
+11. [ ] Push the branch, open a PR, merge into `main` before starting MCP.
+12. [ ] `load_operators(path)`: import operator modules from a directory and
+    register them, so a server can rebuild its registry on restart and
+    load operators proposed by an agent. See `docs/design/registry.md`,
+    "Loading operators from a directory":
+    - the directory is a package on `sys.path`; modules are imported by
+      name (needed for stable refs and pickling to spawn workers);
+    - errors are collected per file in a report; `strict=True` raises;
+    - re-registering `name@version` is an error; `replace=True` only for
+      `draft` entries (re-imports that one module);
+    - no sandboxing: the docstring warns that importing executes code;
+      isolation belongs to `ico-mcp`.
+13. [ ] `ico.spec.run(spec, input=None, *, max_items=...)` in core (no new
+    dependencies; `ico-mcp` and a future CLI are thin wrappers). JSON
+    boundary, see `docs/design/spec.md`, "Running a spec":
+    - `input` is a JSON value or `None` (flow starts with a source whose
+      params are in the spec). No decoding of JSON into domain types: if a
+      flow needs `Image`, its first step is a loader from `str`.
+    - Data never passes through the agent: inputs and outputs are
+      references (paths, URIs), not bytes.
+    - The output must be JSON-compatible; otherwise raise `SpecError` with a
+      hint to end the flow with an operator that writes results and returns
+      paths.
+    - Iterator outputs are collected up to `max_items`; the result reports
+      the first N items and the total count.
+    - Per-item errors (`on_error="collect"`) are returned with spec paths.
+    - Result is a small dataclass with `to_dict()`: outputs, total,
+      truncated, errors.
+
+Next: start `ico-mcp` (separate package) on top of items 10–13.
+
+## Deferred (after MCP)
+Do not implement until a real task hits the limitation. Designs are in
+`docs/design/spec.md`.
+- `build(spec)` for context nodes (`IcoEpoch`, `IcoContextPipeline`,
+  `IcoContextOperator`). Revisit when an agent needs to rebuild a training
+  flow.
+- Resources in specs (`resources` section, `ResourceRef[T]`, `{"$res": name}`,
+  lazy open, scopes). Revisit when parametric operators with lazy loading
+  are not enough, likely the first GPU-model pipeline.
+- Registered contexts, `IcoStateful`, `checkpoint` node. Revisit together
+  with context nodes.
+- Artifact handles (URI + content hash). Revisit together with caching.
+- `live` / `pinned` modes for non-deterministic sources.
+- Shared resources across workers (`IcoShareable`, scope `shared`, memmap
+  artifact store). Revisit when per-worker loading cost is a real problem.
+- `find_path` (see `docs/design/registry.md`).

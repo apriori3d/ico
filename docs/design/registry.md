@@ -29,6 +29,52 @@ at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image
 `expected`, `got`, `refs`); `validate_signatures()` returns the same data in
 `SignatureIssue`. See "Error locations" in `spec.md`.
 
+## Loading operators from a directory
+
+The registry lives in memory and is filled when a module with `@register`
+is imported. A server process starts with an empty registry, while
+operators proposed by an agent are files in a directory. `load_operators`
+bridges the two:
+
+```python
+report = load_operators("operators")
+report.loaded   # ["direct.fetch_report@1", ...]
+report.errors   # [("operators/broken.py", "SyntaxError: ...")]
+```
+
+Used at server start (load everything accumulated so far) and after an
+agent proposes an operator (load one new file).
+
+Decisions:
+
+- **Import as a package, by module name.** The operator directory is a
+  package on `sys.path` (it has `__init__.py`), and modules are imported by
+  name, e.g. `operators.fetch_report`. Loading files by path with
+  `importlib` would give modules arbitrary names: `module:qualname` refs
+  would not be reproducible, and pickling to `spawn` workers (`MPAgent`)
+  would fail because the child process cannot import the module.
+- **Collect errors per file.** One broken file must not take down the
+  server and the rest of the registry. Errors are collected in the report;
+  `strict=True` raises on the first error (for tests and CI).
+- **Re-registering `name@version`.** An error by default. `replace=True` is
+  allowed only for entries with status `draft`, so an agent can iterate on
+  its draft. A `stable` operator can only be superseded by a new version:
+  a spec that refers to `name@version` of a stable operator always gets the
+  same code. Replacing a draft re-imports only that one module; there is no
+  general hot reload of already imported modules.
+- **Out of scope:** entry points from installed packages (deferred until
+  the domain template), hot reload.
+
+### Security
+
+Importing an operator module executes its code with the full permissions
+of the importing process. `load_operators` does not sandbox anything and
+must not be used on untrusted code in a process that holds secrets or
+data it must protect. Isolation is the responsibility of the caller:
+`ico-mcp` must load and run agent-proposed operators in a separate process
+or container, with only the capabilities declared in the operator's
+`caps`. The `load_operators` docstring states this explicitly.
+
 ## Deferred: `find_path(from_type, to_type)`
 
 Idea: search the registry type graph for the shortest operator chains that

@@ -233,3 +233,37 @@ CIFAR: `export` writes the train split once as `uint8 (50000, 32, 32, 3)`
 `.npy` (~150 MB instead of ~600 MB float32 per process); `attach` is
 `np.load(path, mmap_mode="r")` + `torch.from_numpy`; conversion to float
 moves into `cifar.fetch`, per item.
+
+## Running a spec
+
+`ico.spec.run(spec, input=None, *, max_items=...)` builds a spec and runs it
+with a JSON boundary on both sides. It lives in core so that `ico-mcp`, a
+CLI and tests share one implementation.
+
+Rule: data never passes through the agent's context. An image as base64 is
+thousands of tokens, and the agent does not need to see it to run a
+pipeline. The agent passes references; the pipeline loads the data.
+
+Input, two common shapes:
+
+1. A path or a list of paths; the first operator loads the data:
+   `run(spec, input="data/catalog_42/shirt_01.jpg")` with
+   `load_image: str → Image` as the first step.
+2. No input: the flow starts with a source whose params are part of the
+   spec, e.g. `catalog_source(root="data/catalog_42")`; `run(spec)`.
+   Re-running on another catalog changes only a param.
+
+`run` does not decode JSON into domain types; that keeps core free of any
+knowledge of how domain types are constructed.
+
+Output follows the same rule: no images back to the agent. The last
+operator writes results to disk and returns paths plus a short summary
+(e.g. "48 passed, 3 sent to review"). A non-JSON output is an error with a
+hint to add such an operator. Iterator outputs are capped by `max_items`
+(first N items plus the total count) so that a large run does not flood the
+agent's context. Per-item errors collected by `on_error="collect"` are
+returned with their spec paths.
+
+This is independent of resources (deferred): resources are heavy objects
+used by operators (models, datasets); inputs are the data flowing through
+the pipeline.
