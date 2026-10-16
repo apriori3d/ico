@@ -1,7 +1,7 @@
 """Signature inference must degrade to "uninferred" instead of raising."""
 
 from collections.abc import Callable, Iterator
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 import pytest
 
@@ -19,6 +19,9 @@ from ico.core.source import IcoSource
 
 def numbers() -> Iterator[int]:
     return iter([1, 2, 3])
+
+
+T = TypeVar("T")
 
 
 # ─── Unbound TypeVars from generic resolution ───
@@ -45,9 +48,23 @@ def test_unbound_typevar_link_reported_as_uninferred() -> None:
 # ─── Callables that cannot be introspected ───
 
 
-def test_builtin_without_signature_is_uninferred() -> None:
-    assert infer_from_callable(print) is None
-    assert not IcoSink(print).signature.infered
+def no_signature(x: int) -> int:
+    return x
+
+
+# inspect.signature() raises for an invalid __signature__ on every Python
+# version, like it does for builtins without signature metadata (e.g. print
+# on 3.10; print has a text signature since 3.11).
+no_signature.__signature__ = "invalid"  # type: ignore[attr-defined]
+
+
+def test_callable_without_signature_is_uninferred() -> None:
+    assert infer_from_callable(no_signature) is None
+    assert not IcoOperator(no_signature).signature.infered
+
+
+def test_builtin_sink_signature_does_not_raise() -> None:
+    assert IcoSink(print).signature is not None
 
 
 def test_describe_with_builtin_sink(capsys: pytest.CaptureFixture[str]) -> None:
@@ -97,13 +114,15 @@ def test_format_any_encodings() -> None:
 
 
 def test_chain_fallback_signature_formats_as_any() -> None:
-    untyped: IcoOperator[Any, Any] = IcoOperator(identity_untyped)
+    # A TypeVar-only operator is uninferred on every Python version (an
+    # `Any` annotation is inferred since 3.11, where typing.Any is a class).
+    untyped: IcoOperator[Any, Any] = IcoOperator(identity_generic)
     signature = (untyped | IcoOperator(to_str_typed)).signature
     assert not signature.infered
     assert signature.format() == "Any → Any"
 
 
-def identity_untyped(x: Any) -> Any:
+def identity_generic(x: T) -> T:
     return x
 
 
