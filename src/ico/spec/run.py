@@ -9,7 +9,7 @@ starts with a loader from `str`.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -18,6 +18,7 @@ from ico.core.tree_utils import TreePathIndex
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError, is_json_value
 
 if TYPE_CHECKING:
+    from ico.core.runtime.tool import IcoRuntimeTool
     from ico.registry.registry import IcoRegistry
 
 DEFAULT_MAX_ITEMS = 100
@@ -88,6 +89,7 @@ def run(
     *,
     registry: IcoRegistry | None = None,
     max_items: int = DEFAULT_MAX_ITEMS,
+    tools: Sequence[IcoRuntimeTool] = (),
 ) -> RunResult:
     """Build a spec and run it once.
 
@@ -99,6 +101,9 @@ def run(
             :data:`ico.registry.default_registry`.
         max_items: Maximum number of iterator output items to return; the
             iterator is still consumed to the end and counted in ``total``.
+        tools: Runtime tools attached to the run, e.g. a
+            :class:`~ico.tools.progress.JsonProgressTool` that reports
+            progress to the caller.
 
     Returns:
         A :class:`RunResult`.
@@ -142,7 +147,7 @@ def run(
     closure: IcoOperatorProtocol[None, None] = (
         IcoOperator(provide) | flow | IcoOperator(collect)
     )
-    runtime = IcoRuntime(closure)
+    runtime = IcoRuntime(closure, tools=tools)
     errors: list[RunError] = []
     runtime.activate()
     try:

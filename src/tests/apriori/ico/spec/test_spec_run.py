@@ -7,11 +7,13 @@ import pytest
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.fork import fork
 from ico.core.operator import IcoOperator
+from ico.core.runtime.progress import IcoProgress
 from ico.core.stream import IcoStream
 from ico.core.tree_utils import TreePathIndex
 from ico.registry import IcoRegistry, register
 from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.spec import SpecError, run, to_spec
+from ico.tools.progress.json_progress_tool import JsonProgressTool, ProgressSnapshot
 
 # Module-level registrations: spawned MPWorker runner processes import this module.
 REGISTRY = IcoRegistry()
@@ -74,6 +76,20 @@ def test_source_without_input_and_iterator_output() -> None:
     result = run(to_spec(flow), registry=REGISTRY)
     assert result.outputs == (0, 2, 4, 6, 8)
     assert result.total == 5 and not result.truncated
+
+
+def test_tools_are_attached_to_the_run() -> None:
+    progress: IcoProgress[int] = IcoProgress(total=3, name="items")
+    flow = Numbers(n=3) | (progress | op("inc")).stream()
+    snapshots: list[ProgressSnapshot] = []
+
+    result = run(
+        to_spec(flow), registry=REGISTRY, tools=[JsonProgressTool(snapshots.append)]
+    )
+
+    assert result.outputs == (1, 2, 3)
+    assert snapshots[-1]["label"] == "items"
+    assert (snapshots[-1]["done"], snapshots[-1]["total"]) == (3, 3)
 
 
 def test_max_items_caps_outputs_but_counts_all() -> None:
