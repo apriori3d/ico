@@ -155,3 +155,24 @@ Do not implement until a real task hits the limitation. Designs are in
 - Shared resources across workers (`IcoShareable`, scope `shared`, memmap
   artifact store). Revisit when per-worker loading cost is a real problem.
 - `find_path` (see `docs/design/registry.md`).
+
+### Known issues (deferred)
+Found while validating the CIFAR example; not fixed yet.
+- `MPWorker` shutdown waits for the join timeout when the runner returned a
+  torch tensor: the runner process exits only after the parent's
+  `join(timeout=5)` returns, so stopping a pool of N workers takes ~5 s × N
+  (CIFAR, 4 workers: run 1 s, stop 20 s). Workers returning plain values
+  (ints, or with torch only imported) stop in ~0.1 s. Not caused by
+  progress events or `RichProgressTool`; closing the parent channel before
+  join does not help. Revisit with the first tensor pipeline run through
+  `ico-mcp`, where it adds latency to every `run()`.
+- A parent that raises or exits without `deactivate()` hangs at interpreter
+  exit: runner processes are not daemons and block on their input queue,
+  and `multiprocessing` joins them. `ico.spec.run` is safe (`deactivate()`
+  in `finally`); other callers are not. Revisit together with the shutdown
+  issue (daemon runners or an exit hook).
+- Signature inference of `Any`-annotated callables depends on the Python
+  version: uninferred on 3.10, inferred as `Any → Any` on 3.11+ (where
+  `typing.Any` is a class), so strict checks and `validate_signatures` can
+  differ between versions. Revisit when the difference shows up in a real
+  flow or before declaring the behavior.
