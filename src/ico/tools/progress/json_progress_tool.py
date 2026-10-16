@@ -51,9 +51,12 @@ class JsonProgressTool(IcoRuntimeTool):
     - ``rate``: items per second since the node (re)started; ``eta``:
       seconds left at that rate. Both are ``None`` while unknown.
 
-    Snapshots are throttled per node to at most ``max_rate`` per second; the
-    final state of every node with pending updates is always emitted on
-    deactivation. The callback may be called from different threads (async
+    On activation every registered node is reported once with ``done = 0``,
+    in registration order (the order of the nodes in the flow), so a
+    consumer knows all nodes, e.g. the first one, before any progress. Progress nodes inside ``MPWorker`` runner processes
+    that register later are reported from their first update. Snapshots are
+    throttled per node to at most ``max_rate`` per second; the final state
+    of every node with pending updates is always emitted on deactivation. The callback may be called from different threads (async
     streams, worker channels), but never concurrently.
 
     Example:
@@ -113,6 +116,9 @@ class JsonProgressTool(IcoRuntimeTool):
                 state.done = 0.0
                 state.started = state.last_emit = None
                 state.dirty = False
+                # Initial state: consumers learn every node before any
+                # progress. Not throttled.
+                self.on_progress(_snapshot(state, None, None))
 
     def on_deactivate(self) -> None:
         super().on_deactivate()
@@ -153,13 +159,17 @@ class JsonProgressTool(IcoRuntimeTool):
         eta = max(state.total - state.done, 0.0) / rate if rate else None
         state.last_emit = now
         state.dirty = False
-        self.on_progress(
-            {
-                "key": state.key,
-                "label": state.label,
-                "done": state.done,
-                "total": state.total,
-                "rate": rate,
-                "eta": eta,
-            }
-        )
+        self.on_progress(_snapshot(state, rate, eta))
+
+
+def _snapshot(
+    state: _NodeProgress, rate: float | None, eta: float | None
+) -> ProgressSnapshot:
+    return {
+        "key": state.key,
+        "label": state.label,
+        "done": state.done,
+        "total": state.total,
+        "rate": rate,
+        "eta": eta,
+    }

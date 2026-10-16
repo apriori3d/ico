@@ -55,8 +55,9 @@ def test_snapshot_format_and_final_state() -> None:
     progress: IcoProgress[int] = IcoProgress(total=4, name="items")
     run(numbers(4) | progress.stream(), tool)
 
-    first, last = snapshots[0], snapshots[-1]
+    initial, first, last = snapshots[0], snapshots[1], snapshots[-1]
     assert set(first) == {"key", "label", "done", "total", "rate", "eta"}
+    assert (initial["done"], initial["rate"], initial["eta"]) == (0.0, None, None)
     assert (first["label"], first["done"], first["total"]) == ("items", 1.0, 4)
     assert first["rate"] is None and first["eta"] is None  # nothing measured yet
     assert (last["done"], last["eta"]) == (4.0, 0.0)
@@ -70,7 +71,7 @@ def test_eta_from_rate() -> None:
     progress: IcoProgress[int] = IcoProgress(total=10)
     run(numbers(3) | progress.stream(), tool)
 
-    second = snapshots[1]  # 2 items, 1 s since start
+    second = snapshots[2]  # after the initial one: 2 items, 1 s since start
     assert (second["done"], second["rate"], second["eta"]) == (2.0, 2.0, 4.0)
 
 
@@ -80,7 +81,7 @@ def test_throttle_per_node_and_final_state() -> None:
     progress: IcoProgress[int] = IcoProgress(total=10)
     run(numbers(10) | progress.stream(), tool)
 
-    assert [s["done"] for s in snapshots] == [1.0, 6.0, 10.0]
+    assert [s["done"] for s in snapshots] == [0.0, 1.0, 6.0, 10.0]
 
 
 def test_no_duplicate_final_snapshot() -> None:
@@ -88,7 +89,7 @@ def test_no_duplicate_final_snapshot() -> None:
     progress: IcoProgress[int] = IcoProgress(total=2)
     run(numbers(2) | progress.stream(), tool)
 
-    assert [s["done"] for s in snapshots] == [1.0, 2.0]
+    assert [s["done"] for s in snapshots] == [0.0, 1.0, 2.0]
 
 
 def test_next_iteration_starts_from_zero() -> None:
@@ -107,7 +108,7 @@ def test_next_iteration_starts_from_zero() -> None:
     )
     IcoRuntime(closure, tools=[tool]).activate().run().deactivate()
 
-    assert [s["done"] for s in snapshots] == [1.0, 2.0, 3.0, 1.0, 2.0, 3.0]
+    assert [s["done"] for s in snapshots] == [0.0, 1.0, 2.0, 3.0, 1.0, 2.0, 3.0]
 
 
 def test_labels_from_flow() -> None:
@@ -119,6 +120,19 @@ def test_labels_from_flow() -> None:
 
     labels = {str(s["key"]): str(s["label"]) for s in snapshots}
     assert sorted(labels.values()) == ["Progress 1", "Progress 2", "named"]
+
+
+def test_initial_snapshots_list_all_nodes_in_flow_order() -> None:
+    snapshots, tool = collect(max_rate=1000, clock=FakeClock(1.0))
+    first: IcoProgress[int] = IcoProgress(total=2, name="first")
+    second: IcoProgress[int] = IcoProgress(total=2, name="second")
+    run(numbers(2) | (first | second).stream(), tool)
+
+    initial = snapshots[:2]
+    assert [s["label"] for s in initial] == ["first", "second"]
+    assert [s["done"] for s in initial] == [0.0, 0.0]
+    assert len(snapshots) > 2
+    assert all(s["done"] != 0.0 for s in snapshots[2:])
 
 
 def test_invalid_max_rate() -> None:
