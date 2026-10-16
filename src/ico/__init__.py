@@ -56,6 +56,7 @@ from ico.runtime.worker.mp.mp_worker import MPWorker
 
 # tools
 from ico.tools.printer.rich_printer_tool import RichPrinterTool
+from ico.tools.progress.json_progress_tool import JsonProgressTool
 from ico.tools.progress.rich_progress_tool import RichProgressTool, WorkerFlow
 
 __all__ = [
@@ -117,6 +118,7 @@ __all__ = [
     "register",
     # tools
     "RichPrinterTool",
+    "JsonProgressTool",
     "RichProgressTool",
     "WorkerFlow",
     # describe
