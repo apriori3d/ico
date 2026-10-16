@@ -14,6 +14,7 @@ Security:
 
 from __future__ import annotations
 
+import dataclasses
 import importlib
 import importlib.util
 import sys
@@ -22,7 +23,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import cast
 
-from ico.registry.registry import RegistryEntry, default_registry
+from ico.registry.registry import STATUSES, RegistryEntry, Status, default_registry
 from ico.spec.model import JsonValue
 
 
@@ -56,6 +57,7 @@ def load_operators(
     *,
     strict: bool = False,
     replace: bool = False,
+    status: Status | None = None,
 ) -> LoadReport:
     """Import every operator module of a package directory.
 
@@ -72,19 +74,26 @@ def load_operators(
             all their registered entries are ``draft``: a ``verified`` or
             ``stable`` operator can only be superseded by a new version.
             If a reload fails, the previous entries are restored.
+        status: Status of every entry registered by this package, overriding
+            what the modules passed to ``@register``: status comes from the
+            package location (e.g. ``draft`` for a drafts package, ``stable``
+            for the reviewed one). ``None`` keeps the modules' own status.
+            ``replace`` checks the overridden status.
 
     Returns:
         A :class:`LoadReport`. One broken file does not prevent the others
         from loading (unless ``strict``).
 
     Raises:
-        ValueError: If ``path`` is not a package directory, or its package
-            name already refers to another directory.
+        ValueError: If ``status`` is unknown, ``path`` is not a package
+            directory, or its package name already refers to another directory.
 
     Warning:
         Importing executes the modules' code with this process's permissions;
         see the module docstring.
     """
+    if status is not None and status not in STATUSES:
+        raise ValueError(f"status must be one of {STATUSES}, got {status!r}")
     directory = Path(path).resolve()
     if not (directory / "__init__.py").is_file():
         raise ValueError(f"{directory} is not a package: it has no __init__.py")
@@ -117,9 +126,12 @@ def load_operators(
             continue
         try:
             if existing is None:
-                loaded.extend(_import_new(module_name))
+                refs = _import_new(module_name)
             else:
-                loaded.extend(_reload_drafts(existing))
+                refs = _reload_drafts(existing)
+            if status is not None:
+                _apply_status(refs, status)
+            loaded.extend(refs)
         except Exception as e:
             if strict:
                 raise
@@ -163,6 +175,17 @@ def _reload_drafts(module: ModuleType) -> list[str]:
             _restore(entry)
         raise
     return sorted(set(_refs()) - before)
+
+
+def _apply_status(refs: list[str], status: Status) -> None:
+    """Re-register entries with the given status (entries are immutable)."""
+    for ref in refs:
+        entry = default_registry.get(ref)
+        if entry.meta.status == status:
+            continue
+        default_registry.unregister(ref)
+        meta = dataclasses.replace(entry.meta, status=status)
+        _restore(dataclasses.replace(entry, meta=meta))
 
 
 def _drop_bytecode(module: ModuleType) -> None:
