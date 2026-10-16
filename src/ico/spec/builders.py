@@ -179,12 +179,14 @@ class BuildContext:
     node's path in the spec tree (see :meth:`NodeSpec.at`).
     """
 
-    __slots__ = ("lookup", "fresh", "_stack")
+    __slots__ = ("lookup", "fresh", "_stack", "paths")
 
     def __init__(self, lookup: Lookup, *, fresh: bool = False) -> None:
         self.lookup = lookup
         self.fresh = fresh
         self._stack: list[tuple[NodeSpec, TreePathIndex]] = []
+        # id(built node) -> its spec path, to locate errors raised at run time.
+        self.paths: dict[int, TreePathIndex] = {}
 
     @property
     def path(self) -> TreePathIndex:
@@ -196,7 +198,9 @@ class BuildContext:
         path = self._child_path(spec)
         self._stack.append((spec, path))
         try:
-            return self._build(spec)
+            node = self._build(spec)
+            self.paths.setdefault(id(node), path)
+            return node
         except SpecError as e:
             if e.path is not None:
                 raise  # already located at a descendant
@@ -351,15 +355,24 @@ def build(
     Example:
         >>> flow = build(from_json(text))
     """
+    root = spec.root if isinstance(spec, PipelineSpec) else spec
+    return registry_context(registry).build(root)
+
+
+def registry_context(registry: IcoRegistry | None = None) -> BuildContext:
+    """A build context resolving ``op`` references through ``registry``.
+
+    Use it instead of :func:`build` to keep ``BuildContext.paths`` after a
+    build, e.g. to locate errors raised while the flow runs.
+    """
     from ico.registry.registry import default_registry
 
-    root = spec.root if isinstance(spec, PipelineSpec) else spec
     target = registry if registry is not None else default_registry
 
     def lookup(ref: str) -> _Target:
         return _Target.from_entry(target.get(ref))
 
-    return BuildContext(lookup).build(root)
+    return BuildContext(lookup)
 
 
 def _signature_text(node: IcoNodeProtocol, fallback: str) -> str:

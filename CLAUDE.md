@@ -72,7 +72,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
       `draft` entries (re-imports that one module);
     - no sandboxing: the docstring warns that importing executes code;
       isolation belongs to `ico-mcp`.
-13. [ ] `ico.spec.run(spec, input=None, *, max_items=...)` in core (no new
+13. [x] `ico.spec.run(spec, input=None, *, max_items=...)` in core (no new
     dependencies; `ico-mcp` and a future CLI are thin wrappers). JSON
     boundary, see `docs/design/spec.md`, "Running a spec":
     - `input` is a JSON value or `None` (flow starts with a source whose

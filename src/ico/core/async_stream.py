@@ -88,16 +88,19 @@ class IcoStreamErrors(RuntimeError):
 
     Attributes:
         errors: Failed items, ordered by input index.
+        stream: The stream that collected them, so a caller can locate it
+            (e.g. ``ico.spec.run`` maps it to a spec path); ``None`` if unknown.
     """
 
     _SHOWN = 5
 
-    def __init__(self, errors: list[ItemError]) -> None:
+    def __init__(self, errors: list[ItemError], stream: object | None = None) -> None:
         shown = "; ".join(str(e) for e in errors[: self._SHOWN])
         more = len(errors) - self._SHOWN
         suffix = f"; and {more} more" if more > 0 else ""
         super().__init__(f"{len(errors)} stream item(s) failed: {shown}{suffix}")
         self.errors = errors
+        self.stream = stream
 
 
 @final
@@ -424,7 +427,9 @@ class IcoAsyncStream(
             if source_error is not None:
                 raise source_error
             if errors:
-                raise IcoStreamErrors(sorted(errors, key=lambda e: e.index))
+                raise IcoStreamErrors(
+                    sorted(errors, key=lambda e: e.index), stream=self
+                )
         finally:
             if completed:
                 # ─── Graceful shutdown ───

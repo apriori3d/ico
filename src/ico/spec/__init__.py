@@ -15,15 +15,19 @@ from ico.spec.registry import (
     to_json,
     to_spec,
 )
+from ico.spec.run import RunError, RunResult, run
 
 __all__ = [
     "BuildContext",
     "build",
+    "run",
     "spec_builder",
     "SPEC_VERSION",
     "JsonValue",
     "NodeSpec",
     "PipelineSpec",
+    "RunError",
+    "RunResult",
     "SpecContext",
     "SpecError",
     "SpecFactory",
