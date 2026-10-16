@@ -90,7 +90,7 @@ This catches integration errors early and makes large pipelines easier to reason
 Parallel execution is part of the core design — no need to rewrite your pipeline:
 ```python
 workers = IcoAsyncStream(
-    lambda: MPAgent(heavy_computation),
+    lambda: MPWorker(heavy_computation),
     pool_size=cpu_count()
 )
 

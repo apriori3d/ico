@@ -10,7 +10,7 @@ from ico.core.process import IcoProcess
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 # ─── Operator ───
 
@@ -264,25 +264,25 @@ def test_infer_form_epoch_from_type_hints_with_source() -> None:
     assert epoch.signature.format() == "Iterator[int], str → str"
 
 
-# ─── MPAgent ───
+# ─── MPWorker ───
 
 
-def test_infer_form_mp_agent_from_generics() -> None:
-    """Test MPAgent signature inference from explicit Generic parameters."""
+def test_infer_form_mp_worker_from_generics() -> None:
+    """Test MPWorker signature inference from explicit Generic parameters."""
 
     def create_worker_flow() -> IcoOperator[str, int]:
         return IcoOperator[str, int](lambda x: len(x))
 
-    agent = MPAgent[str, int](flow_factory=create_worker_flow)
-    signature = agent.signature
+    worker = MPWorker[str, int](flow_factory=create_worker_flow)
+    signature = worker.signature
 
-    # MPAgent should have signature: str → int (input → output)
-    # Context (c) should be None for agents
+    # MPWorker should have signature: str → int (input → output)
+    # Context (c) should be None for workers
     assert signature.format() == "str → int"
 
 
-def test_infer_form_mp_agent_with_type_hints() -> None:
-    """Test MPAgent signature inference from factory function type hints."""
+def test_infer_form_mp_worker_with_type_hints() -> None:
+    """Test MPWorker signature inference from factory function type hints."""
 
     def computation(x: int) -> float:
         return float(x * 2)
@@ -290,13 +290,13 @@ def test_infer_form_mp_agent_with_type_hints() -> None:
     def create_worker_flow() -> IcoOperator[int, float]:
         return IcoOperator(computation)
 
-    agent = MPAgent(flow_factory=create_worker_flow)
-    signature = agent.signature
+    worker = MPWorker(flow_factory=create_worker_flow)
+    signature = worker.signature
     assert signature.format() == "int → float"
 
 
-def test_infer_form_mp_agent_complex_computation() -> None:
-    """Test MPAgent signature with complex computation flow."""
+def test_infer_form_mp_worker_complex_computation() -> None:
+    """Test MPWorker signature with complex computation flow."""
 
     def string_processor(text: str) -> list[str]:
         return text.split()
@@ -304,8 +304,8 @@ def test_infer_form_mp_agent_complex_computation() -> None:
     def create_complex_flow() -> IcoOperator[str, list[str]]:
         return IcoOperator(string_processor)
 
-    agent = MPAgent[str, list[str]](flow_factory=create_complex_flow)
-    signature = agent.signature
+    worker = MPWorker[str, list[str]](flow_factory=create_complex_flow)
+    signature = worker.signature
 
     # Test complex type handling
     assert signature.format() == "str → list[str]"  # Should be "str → list[str]?"

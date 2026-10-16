@@ -10,7 +10,7 @@ import pytest
 
 from ico.core.operator import IcoOperator
 from ico.registry import default_registry, load_operators
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 DOUBLE = '''
 from ico.registry import register
@@ -199,9 +199,9 @@ def test_loaded_operator_runs_in_spawned_worker(package: Package) -> None:
     module = sys.modules[f"{package.name}.double"]
 
     # The spawned process imports the module by name to unpickle the factory.
-    agent = MPAgent(module.make_flow)
-    agent.activate()
+    worker = MPWorker(module.make_flow)
+    worker.activate()
     try:
-        assert agent(21) == 42
+        assert worker(21) == 42
     finally:
-        agent.deactivate()
+        worker.deactivate()

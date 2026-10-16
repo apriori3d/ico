@@ -62,7 +62,7 @@ def load_operators(
     The directory must be a package (contain ``__init__.py``). Its parent is
     appended to ``sys.path`` if needed, and modules are imported by name,
     ``<package>.<module>``, so that ``module:qualname`` references are
-    reproducible and spawned ``MPAgent`` workers can import them too. Only
+    reproducible and spawned ``MPWorker`` runner processes can import them too. Only
     the top-level ``*.py`` files are loaded, in name order.
 
     Args:

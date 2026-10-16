@@ -10,7 +10,7 @@ class IcoRuntimeError(Exception):
         • Resource failures: Memory allocation, handle exhaustion, connection issues
         • IPC failures: Inter-process communication errors in distributed execution
         • Tree coordination: Runtime tree structure or synchronization problems
-        • Agent failures: Remote execution node failures or timeouts
+        • Worker failures: Remote execution node failures or timeouts
 
     Error Handling Integration:
         • Runtime errors automatically trigger IcoFaultEvent generation

@@ -1,4 +1,4 @@
-"""MPAgent Pool Example - Parallel Processing with IcoAsyncStream"""
+"""MPWorker Pool Example - Parallel Processing with IcoAsyncStream"""
 
 import time
 from collections.abc import Iterator
@@ -10,7 +10,7 @@ from ico import (
     IcoAsyncStream,
     IcoProgress,
     IcoRuntime,
-    MPAgent,
+    MPWorker,
     RichPrinterTool,
     RichProgressTool,
     sink,
@@ -19,14 +19,14 @@ from ico import (
 
 if __name__ == "__main__":
     """
-    MPAgent Pool with IcoAsyncStream Demonstration
+    MPWorker Pool with IcoAsyncStream Demonstration
 
     This example shows how to use IcoAsyncStream for parallel processing with multiple
-    MPAgent workers, enabling concurrent execution instead of sequential processing.
+    MPWorkers, enabling concurrent execution instead of sequential processing.
 
     Key Features:
 
-    1. **IcoAsyncStream**: Runs multiple MPAgent workers in parallel (not sequential)
+    1. **IcoAsyncStream**: Runs multiple MPWorkers in parallel (not sequential)
     2. **Worker Differentiation**: Different workers have different iteration counts
     3. **Concurrent Processing**: Each input item is processed by ALL workers simultaneously
     4. **Independent Progress**: Each worker shows its own progress tracking
@@ -69,10 +69,10 @@ if __name__ == "__main__":
     def save_result(x: int) -> None:
         pass  # Results discarded for demo purposes
 
-    # 🎯 MPAgent Creation: Workers will be spawned on activation
+    # 🎯 MPWorker Creation: Workers will be spawned on activation
     # Different iteration counts to show concurrent vs sequential behavior
-    mp_process1 = MPAgent[int, int](WorkerFlowFactory(name="Worker 1", num_iters=5))
-    mp_process2 = MPAgent[int, int](WorkerFlowFactory(name="Worker 2", num_iters=10))
+    mp_process1 = MPWorker[int, int](WorkerFlowFactory(name="Worker 1", num_iters=5))
+    mp_process2 = MPWorker[int, int](WorkerFlowFactory(name="Worker 2", num_iters=10))
 
     # 🚀 IcoAsyncStream: Runs workers in parallel (concurrently), not sequentially
     # Each input item goes through BOTH workers at the same time
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     # Complete flow: source → progress → async workers → sink
     flow = numbers | progress.stream() | async_stream | save_result
-    flow.name = "MPAgent Pool with AsyncStream"
+    flow.name = "MPWorker Pool with AsyncStream"
 
     # Display initial flow structure
     print("\n📋 Initial Flow Structure:")
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     runtime = IcoRuntime(flow, tools=[progress_tool, printer_tool])
 
-    print("\n📊 Runtime Tree BEFORE Activation (MPAgent nodes registered):")
+    print("\n📊 Runtime Tree BEFORE Activation (MPWorker nodes registered):")
     runtime.describe()
 
     # 🚀 ACTIVATION: This is when worker processes are actually created!
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     runtime.deactivate()
     runtime.describe()
 
-    print("\n✅ MPAgent AsyncStream Complete!")
+    print("\n✅ MPWorker AsyncStream Complete!")
     print("🎓 Key Learnings:")
     print("   • IcoAsyncStream runs workers in parallel, not sequential")
     print("   • Each input item processed by ALL workers concurrently")

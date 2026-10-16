@@ -29,7 +29,7 @@ class RunError:
 
     Attributes:
         path: Spec path of the stream that collected the error, or ``None``
-            if it cannot be located (e.g. a stream inside an MPAgent worker).
+            if it cannot be located (e.g. a stream inside an MPWorker runner process).
         index: Position of the item in that stream's input.
         item: The input item (``repr`` if it is not JSON-compatible).
         error: ``"ErrorType: message"``.

@@ -5,13 +5,13 @@ CIFAR-10 image classification, showcasing ICO as a superior PyTorch DataLoader r
 
 🚀 **Key Multiprocessing Features:**
 - **IcoAsyncStream**: Parallel processing across multiple worker processes
-- **MPAgent**: Distributed data loading with independent augmentation pipelines
+- **MPWorker**: Distributed data loading with independent augmentation pipelines
 - **WorkerFlowFactory**: Process-isolated pipelines with individual data access
 - **Shared Memory Tensors**: Zero-copy inter-process communication
 - **Runtime Monitoring**: Real-time progress tracking across all workers
 
 🏗️ **Architecture Highlights:**
-- Each MPAgent worker runs in separate OS process (no Python GIL limitation)
+- Each MPWorker runs its flow in a separate OS process (no Python GIL limitation)
 - Independent dataset item fetching across workers (true concurrent I/O)
 - Process-isolated augmentation pipelines with unique random states
 - Efficient shared memory tensor transfer (eliminates serialization costs)
@@ -49,7 +49,7 @@ from ico import (
     IcoProgress,
     IcoRuntime,
     IcoSource,
-    MPAgent,
+    MPWorker,
     RichProgressTool,
     operator,
 )
@@ -205,7 +205,7 @@ class WorkerFlowFactory:
     Factory for creating multiprocessing workers with independent data pipelines.
 
     🔄 **Multiprocessing Design:**
-    Each MPAgent spawns separate process running this factory's pipeline:
+    Each MPWorker spawns separate process running this factory's pipeline:
     - Independent data loading (no GIL contention)
     - Isolated augmentation strategies per worker
     - Progress tracking across process boundaries
@@ -495,14 +495,14 @@ if __name__ == "__main__":
     # Node: batch_size needs only for progress tracking.
 
     # ─────────────────────────────────────────────────────────────────────────────────
-    # 🏭 MULTIPROCESSING WORKER FACTORY & AGENT POOL CREATION
+    # 🏭 MULTIPROCESSING WORKER FACTORY & WORKER POOL CREATION
     # ─────────────────────────────────────────────────────────────────────────────────
-    def create_mp_agent() -> IcoOperator[Iterator[int], CifarBatch]:
+    def create_mp_worker() -> IcoOperator[Iterator[int], CifarBatch]:
         """
-        Factory function for creating MPAgent workers with independent data pipelines.
+        Factory function for creating MPWorkers with independent data pipelines.
 
         🔄 **Multiprocessing Benefits:**
-        - Each MPAgent runs in separate OS process (no Python GIL limitation)
+        - Each MPWorker runs in separate OS process (no Python GIL limitation)
         - Independent data loading: workers can fetch different dataset items concurrently
         - Isolated augmentation: each worker has own random state for diverse transforms
         - Shared memory tensors: zero-copy data transfer between worker and main process
@@ -516,16 +516,16 @@ if __name__ == "__main__":
             batch_size=batch_size,
             delay=worker_delay,  # Simulates latency for demo purposes (
         )
-        return MPAgent(worker_flow_factory)
+        return MPWorker(worker_flow_factory)
 
     # ─────────────────────────────────────────────────────────────────────────────────
     # 🏊 PARALLEL WORKER POOL - CORE MULTIPROCESSING ARCHITECTURE
     # ─────────────────────────────────────────────────────────────────────────────────
-    # IcoAsyncStream coordinates multiple MPAgent processes:
+    # IcoAsyncStream coordinates multiple MPWorker processes:
     # - Distributes work (batch indices) across available workers
     # - Collects results from parallel workers as they complete
     # - Maintains load balancing between processes automatically
-    workers_pool = IcoAsyncStream(create_mp_agent, pool_size=num_workers)
+    workers_pool = IcoAsyncStream(create_mp_worker, pool_size=num_workers)
     # ─────────────────────────────────────────────────────────────────────────────────
     # 🚀 MAIN TRAINING PIPELINE WITH MULTIPROCESSING DATA LOADING
     # ─────────────────────────────────────────────────────────────────────────────────
@@ -546,7 +546,7 @@ if __name__ == "__main__":
     )
     train_data_flow.name = "Train Flow"
 
-    print("Train flow structure with MPAgent pool (workers run in parallel):")
+    print("Train flow structure with MPWorker pool (workers run in parallel):")
     train_data_flow.describe()
 
     # ──────── Create model train flow ────────
@@ -562,7 +562,7 @@ if __name__ == "__main__":
     train_flow = start_train | train_epoch
     train_flow.name = "Complete Train Flow"
 
-    print("\nComplete train flow structure with MPAgent pool and training pipeline:")
+    print("\nComplete train flow structure with MPWorker pool and training pipeline:")
     train_flow.describe()
 
     # ──────── Validation flow -────────
@@ -620,7 +620,7 @@ if __name__ == "__main__":
     # 🎬 RUNTIME EXECUTION WITH MULTIPROCESSING COORDINATION
     # ─────────────────────────────────────────────────────────────────────────────────
     # ICO Runtime manages the complete multiprocessing infrastructure:
-    # - Spawns and coordinates MPAgent worker processes
+    # - Spawns and coordinates MPWorker runner processes
     # - Synchronizes progress tracking across process boundaries
     # - Handles process cleanup and resource management
     # - Provides unified monitoring via RichProgressTool

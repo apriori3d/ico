@@ -20,12 +20,12 @@ from ico.core.runtime.state import (
     IdleState,
     ReadyState,
 )
-from ico.core.runtime.tool import IcoTool
+from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.tree_utils import TreePathIndex
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
-class StateCollectorTool(IcoTool):
+class StateCollectorTool(IcoRuntimeTool):
     """Tool for collecting node states with their paths in the tree."""
 
     def __init__(self) -> None:
@@ -57,7 +57,7 @@ def test_flow_with_runtime() -> None:
     Create test runtime tree with multiple levels and siblings:
 
     Runtime
-    ├── IcoToolBox
+    ├── IcoRuntimeToolBox
     │   └── StateCollectorTool
     ├── IcoRuntimeWrapper
         └── IcoRuntimeNode
@@ -102,16 +102,16 @@ def test_flow_with_runtime() -> None:
     assert collector.collected_states == expected_states
 
 
-def _agent_flow_factory() -> IcoOperatorProtocol[Any, Any]:
+def _worker_flow_factory() -> IcoOperatorProtocol[Any, Any]:
     return wrap_runtime_fn(
         IcoIdentity[Any](),
         IcoRuntimeNode(runtime_name="worker_runtime_node"),
     )
 
 
-def test_flow_with_mp_agent() -> None:
+def test_flow_with_mp_worker() -> None:
     """
-    Create test runtime tree with multiple levels and siblings with mp agent.
+    Create test runtime tree with multiple levels and siblings with mp worker.
 
     """
 
@@ -119,7 +119,7 @@ def test_flow_with_mp_agent() -> None:
     flow = (
         IcoIdentity[Any]()
         | wrap_runtime_fn(IcoIdentity[Any](), shared_runtime_node)
-        | MPAgent(_agent_flow_factory)
+        | MPWorker(_worker_flow_factory)
     )
     runtime = IcoRuntime(flow)
     runtime.activate()

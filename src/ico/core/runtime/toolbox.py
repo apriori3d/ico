@@ -5,7 +5,7 @@ from typing import Protocol, runtime_checkable
 
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import IcoRuntimeNode, create_runtime_walker
-from ico.core.runtime.tool import IcoTool
+from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.tree_utils import TreePathIndex
 
 # ────────────────────────────────────────────────
@@ -14,7 +14,7 @@ from ico.core.tree_utils import TreePathIndex
 
 
 @runtime_checkable
-class IcoToolRegistrationProtocol(Protocol):
+class IcoRuntimeToolRegistrationProtocol(Protocol):
     """Protocol for tools that require runtime node registration.
 
     Tools implementing this protocol receive notifications about all nodes
@@ -23,7 +23,7 @@ class IcoToolRegistrationProtocol(Protocol):
 
     Registration Flow:
         1. Tool added to ToolBox via add_tool()
-        2. ToolBox checks if tool implements IcoToolRegistrationProtocol
+        2. ToolBox checks if tool implements IcoRuntimeToolRegistrationProtocol
         3. If yes, ToolBox walks entire runtime tree
         4. For each node: calls tool.register_node(node, path)
         5. Tool can build internal tracking structures
@@ -50,10 +50,10 @@ class IcoToolRegistrationProtocol(Protocol):
 # ────────────────────────────────────────────────
 
 
-class IcoToolBox(IcoRuntimeNode):
+class IcoRuntimeToolBox(IcoRuntimeNode):
     """Container and coordinator for multiple runtime tools.
 
-    IcoToolBox manages collections of runtime tools, providing centralized
+    IcoRuntimeToolBox manages collections of runtime tools, providing centralized
     event forwarding, tool lifecycle management, and runtime tree integration
     for comprehensive monitoring and management of ICO computation execution.
 
@@ -67,7 +67,7 @@ class IcoToolBox(IcoRuntimeNode):
         ToolBox provides two-tier tool registration:
 
         1. **Basic Registration**: All tools added as runtime children
-        2. **Protocol Registration**: Tools implementing IcoToolRegistrationProtocol
+        2. **Protocol Registration**: Tools implementing IcoRuntimeToolRegistrationProtocol
            receive notifications about all runtime nodes for comprehensive tracking
 
     Event Flow Architecture:
@@ -86,7 +86,7 @@ class IcoToolBox(IcoRuntimeNode):
         • **Protocol Handling**: Automatic runtime node registration for protocol tools
 
     Registration Protocol Support:
-        Tools implementing IcoToolRegistrationProtocol receive comprehensive
+        Tools implementing IcoRuntimeToolRegistrationProtocol receive comprehensive
         runtime tree visibility:
 
         1. Runtime tree traversal with expand_remote_runtimes=True
@@ -108,7 +108,7 @@ class IcoToolBox(IcoRuntimeNode):
         while maintaining separation from computation flow logic.
 
     Base Implementation:
-        IcoToolBox provides complete tool container functionality with
+        IcoRuntimeToolBox provides complete tool container functionality with
         standardized interfaces for tool management, event distribution,
         and runtime tree integration.
     """
@@ -116,12 +116,12 @@ class IcoToolBox(IcoRuntimeNode):
     __slots__ = ("runtime", "tools")
 
     runtime: IcoRuntimeNode  # Runtime node being monitored by tools
-    tools: list[IcoTool]  # Collection of registered runtime tools
+    tools: list[IcoRuntimeTool]  # Collection of registered runtime tools
 
     def __init__(
         self,
         runtime: IcoRuntimeNode,
-        tools: Sequence[IcoTool] | None = None,
+        tools: Sequence[IcoRuntimeTool] | None = None,
     ) -> None:
         """Initialize tool container with runtime and optional initial tools.
 
@@ -140,7 +140,7 @@ class IcoToolBox(IcoRuntimeNode):
         if tools is not None:
             self.add_tool(*tools)
 
-    def add_tool(self, *tools: IcoTool) -> None:
+    def add_tool(self, *tools: IcoRuntimeTool) -> None:
         """Add tools to container with full registration and runtime integration.
 
         Args:
@@ -149,12 +149,12 @@ class IcoToolBox(IcoRuntimeNode):
         Registration Process:
             1. Add tools to internal collection
             2. Register tools as runtime children for event flow
-            3. Check for IcoToolRegistrationProtocol implementation
+            3. Check for IcoRuntimeToolRegistrationProtocol implementation
             4. If protocol found: walk runtime tree and register all nodes
             5. Enable tools to receive runtime events and build tracking structures
 
         Protocol Registration:
-            Tools implementing IcoToolRegistrationProtocol receive comprehensive
+            Tools implementing IcoRuntimeToolRegistrationProtocol receive comprehensive
             runtime tree visibility through register_node() calls for each
             node in the runtime hierarchy.
         """
@@ -162,13 +162,13 @@ class IcoToolBox(IcoRuntimeNode):
         self.add_runtime_children(*tools)
 
         for tool in tools:
-            if isinstance(tool, IcoToolRegistrationProtocol):
+            if isinstance(tool, IcoRuntimeToolRegistrationProtocol):
                 runtime_walker = create_runtime_walker(expand_remote_runtimes=True)
 
                 for node_info in runtime_walker.traverse(self.runtime):
                     tool.register_node(*node_info.node_path)
 
-    def remove_tool(self, *tools: IcoTool) -> None:
+    def remove_tool(self, *tools: IcoRuntimeTool) -> None:
         """Remove tools from container and cleanup runtime integration.
 
         Args:

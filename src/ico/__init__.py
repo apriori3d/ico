@@ -52,7 +52,7 @@ from ico.describe.runtime.options import RuntimeRendererOptions
 from ico.registry import IcoRegistry, register
 
 # runtime
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 # tools
 from ico.tools.printer.rich_printer_tool import RichPrinterTool
@@ -111,7 +111,7 @@ __all__ = [
     "IcoRuntimeWrapper",
     "wrap_runtime",
     # runtime
-    "MPAgent",
+    "MPWorker",
     # registry
     "IcoRegistry",
     "register",

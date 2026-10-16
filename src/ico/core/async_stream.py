@@ -113,7 +113,7 @@ class IcoAsyncStream(
     IcoAsyncStream enables concurrent processing of stream items using a pool of
     workers (operators). Items are distributed among workers for parallel execution,
     with results streamed back as soon as they're produced. Workers can be async
-    operators for I/O-bound tasks or multiprocessing agents (MPAgent) for CPU-intensive
+    operators for I/O-bound tasks or multiprocessing workers (MPWorker) for CPU-intensive
     computations. This provides significant performance improvements across different
     workload types.
 
@@ -147,14 +147,14 @@ class IcoAsyncStream(
         >>> ordered_results = list(ordered_stream(iter([1, 2, 3])))
         >>> # Results in order: [2, 4, 6]
 
-        >>> # Factory-based worker creation with MPAgent for CPU-bound work
-        >>> from ico.runtime.agent.mp.mp_agent import MPAgent
+        >>> # Factory-based worker creation with MPWorker for CPU-bound work
+        >>> from ico.runtime.worker.mp.mp_worker import MPWorker
         >>> def make_worker() -> IcoAsyncOperator[int, int]:
         ...     return IcoAsyncOperator(slow_process)
 
-        >>> def make_mp_worker() -> MPAgent[int, int]:
-        ...     # MPAgent provides true multiprocessing for CPU-intensive operations
-        ...     return MPAgent(lambda: IcoOperator(lambda x: x ** 2))
+        >>> def make_mp_worker() -> MPWorker[int, int]:
+        ...     # MPWorker provides true multiprocessing for CPU-intensive operations
+        ...     return MPWorker(lambda: IcoOperator(lambda x: x ** 2))
 
         >>> dynamic_stream = IcoAsyncStream(make_worker, pool_size=4)
         >>> # Creates 4 workers dynamically when needed
@@ -170,13 +170,13 @@ class IcoAsyncStream(
     • No external timeout or blocking assumptions.
 
     Attributes:
-        pool: List of worker operators (sync, async, or multiprocessing agents).
+        pool: List of worker operators (sync, async, or multiprocessing workers).
         ordered: Whether to preserve input order in results.
         pool_size: Number of workers in the pool.
 
     Note:
         Best suited for I/O-bound tasks where concurrency provides significant
-        performance gains. For CPU-bound tasks, consider using MPAgent workers
+        performance gains. For CPU-bound tasks, consider using MPWorkers
         for true multiprocessing or other process-based parallelism approaches.
     """
 
@@ -228,9 +228,9 @@ class IcoAsyncStream(
         """Initialize async stream with worker pool or factory.
 
         Args:
-            pool: Either a sequence of pre-created operators/agents or a factory function
+            pool: Either a sequence of pre-created operators/workers or a factory function
                  that creates new workers. Supports IcoOperator, IcoAsyncOperator, and
-                 MPAgent types. Factory enables dynamic worker creation.
+                 MPWorker types. Factory enables dynamic worker creation.
             pool_size: Required when pool is a factory. Number of workers to create.
                       Ignored when pool is a sequence (uses sequence length).
             ordered: If True, results are yielded in the same order as input items.

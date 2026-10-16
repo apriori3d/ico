@@ -6,7 +6,7 @@ from ico.core.operator import IcoOperatorProtocol, operator
 from ico.core.pipeline import IcoPipeline
 from ico.core.sink import sink
 from ico.core.source import source
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 """
 Plan Renderer Visualization Demo
@@ -16,7 +16,7 @@ a complex data processing flow with multiple components:
 
 • Source nodes with data size visualization
 • Batch processing with batch_size display
-• Parallel workers using async streams and MP agents
+• Parallel workers using async streams and MP workers
 • Pipeline grouping and nested flow structures
 • Named components with rich formatting
 • Multi-column table output (Flow, Signature, Name)
@@ -100,9 +100,9 @@ if __name__ == "__main__":
     batcher = IcoBatcher[int](batch_size=3)
 
     # ── Parallel Processing Layer ──
-    # Shows async stream with MP agents (parallel workers)
+    # Shows async stream with MP workers (parallel workers)
     workers_pool = IcoAsyncStream(
-        lambda: MPAgent(create_augment_flow),
+        lambda: MPWorker(create_augment_flow),
         pool_size=2,
         name="Parallel Workers Pool",  # Named for visualization clarity
     )
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     print("  • Batcher with batch_size parameter")
     print("  • Pipeline grouping with named sections")
     print("  • Async streams with parallel workers")
-    print("  • MP agent nodes for distributed processing")
+    print("  • MP worker nodes for distributed processing")
     print("  • Complex signature flows (I/C/O types)")
     print("  • Sink nodes for output handling")
     print("  • Multi-column table format (Flow | Signature | Name)")

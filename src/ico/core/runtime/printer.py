@@ -27,7 +27,7 @@ class IcoPrintEvent(IcoRuntimeEvent):
         - Extends IcoRuntimeEvent for runtime integration
 
     Event Flow:
-        IcoPrinter.call() → bubble_event() → IcoTool.on_backward_event()
+        IcoPrinter.call() → bubble_event() → IcoRuntimeTool.on_backward_event()
 
     Usage:
         ```python

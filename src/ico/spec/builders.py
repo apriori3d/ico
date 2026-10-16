@@ -3,7 +3,7 @@
 Leaf operators are resolved by their ``op="name@version"`` reference; the
 structural nodes around them are rebuilt from ``kind``, ``params`` and
 ``children``. Importable ``ref="module:qualname"`` references are never
-imported: a spec may come from an agent, so only registered operators can
+imported: a spec may come from a worker, so only registered operators can
 be instantiated.
 
 Round trip ``to_spec(build(spec)) == spec`` holds for every buildable kind.
@@ -304,7 +304,7 @@ class SpecFactory:
     """Picklable worker factory rebuilt from a spec subtree.
 
     Used by :func:`build` for factory-based ``IcoAsyncStream`` pools and for
-    agents. Every call builds a fresh worker: functions are wrapped anew and
+    workers. Every call builds a fresh worker: functions are wrapped anew and
     operator classes are instantiated with ``cls(**params)``. The operators
     it needs travel with it (functions and classes pickle by reference), so
     it also works in a spawned worker process without the parent registry.
@@ -317,10 +317,10 @@ class SpecFactory:
     worker: NodeSpec
     targets: tuple[_Target, ...]
 
-    # Annotated with the untyped node protocol on purpose: agents infer their
+    # Annotated with the untyped node protocol on purpose: workers infer their
     # signature from the factory's return annotation, and an operator type
     # here would claim "Any → Any" as inferred. build() parametrizes the
-    # agent from probe_signature() instead.
+    # worker from probe_signature() instead.
     def __call__(self) -> IcoNodeProtocol:
         by_ref = {t.meta.ref: t for t in self.targets}
         return BuildContext(by_ref.__getitem__, fresh=True).build(self.worker)
@@ -343,7 +343,7 @@ def build(
     Returns:
         The rebuilt flow. Registered operator instances are returned as is
         (not copied); operator classes are instantiated per node. Workers of
-        factory-based async streams and agents are created by a
+        factory-based async streams and workers are created by a
         :class:`SpecFactory`, so each worker is a distinct instance.
 
     Raises:
@@ -419,7 +419,7 @@ def build_seq(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     from ico.core.signature_utils import format_ico_type
 
     steps = [ctx.op(child) for child in spec.children]
-    # Check every link before composing, so that a spec written by an agent
+    # Check every link before composing, so that a spec written by a worker
     # fails with the location, references and types of the bad step.
     for position in range(1, len(steps)):
         issue = check_link(steps[position - 1], steps[position])
@@ -622,30 +622,30 @@ def _number(spec: NodeSpec, key: str) -> float:
     return cast(float, value)
 
 
-@spec_builder("agent")
-def build_agent(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
-    from ico.runtime.agent.mp.mp_agent import MPAgent
+@spec_builder("worker")
+def build_worker(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    from ico.runtime.worker.mp.mp_worker import MPWorker
 
-    # Only MPAgent can be rebuilt for now (YAGNI: no agent allowlist yet).
-    expected = f"{MPAgent.__module__}:{MPAgent.__qualname__}"
-    agent_type = _param(spec, "type", str)
-    if agent_type != expected:
+    # Only MPWorker can be rebuilt for now (YAGNI: no worker allowlist yet).
+    expected = f"{MPWorker.__module__}:{MPWorker.__qualname__}"
+    worker_type = _param(spec, "type", str)
+    if worker_type != expected:
         raise SpecError(
-            f"Cannot build agent of type {agent_type!r}: only {expected!r} is supported."
+            f"Cannot build worker of type {worker_type!r}: only {expected!r} is supported."
         )
 
     _children(spec, 1)
     factory = ctx.factory(spec.children[0])
-    # Parametrize with the worker types so the agent signature is inferred,
+    # Parametrize with the worker types so the worker signature is inferred,
     # as it was from the original factory's return annotation.
     signature = factory.probe_signature()
     if signature.infered:
-        return MPAgent[signature.i, signature.o](  # type: ignore[name-defined]
+        return MPWorker[signature.i, signature.o](  # type: ignore[name-defined]
             cast(Callable[[], AnyOp], factory), name=spec.name
         )
-    # Unparametrized, like the original agent: MPAgent[Any, Any] would report
+    # Unparametrized, like the original worker: MPWorker[Any, Any] would report
     # an inferred "Any → Any" signature and break the round trip.
-    agent: MPAgent[Any, Any] = MPAgent(
+    worker: MPWorker[Any, Any] = MPWorker(
         cast(Callable[[], AnyOp], factory), name=spec.name
     )
-    return agent
+    return worker

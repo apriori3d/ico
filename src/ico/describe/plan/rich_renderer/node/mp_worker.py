@@ -10,12 +10,12 @@ from ico.describe.plan.rich_renderer.group_renderer import (
 from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 from ico.describe.rich_style import DescribeStyle
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
-@register_renderer(MPAgent)
+@register_renderer(MPWorker)
 class MPProcessRenderer(GroupRenderer):
-    """Specialized group renderer for MPAgent nodes with worker process display."""
+    """Specialized group renderer for MPWorker nodes with worker process display."""
 
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     def create_worker_flow() -> IcoOperatorProtocol[int, float]:
         return fetch_data_item | scale | shift
 
-    process = MPAgent(create_worker_flow)
+    process = MPWorker(create_worker_flow)
 
     plan_renderer = PlanRenderer()
     plan_renderer.render(process)

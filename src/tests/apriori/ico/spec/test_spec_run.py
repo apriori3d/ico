@@ -10,10 +10,10 @@ from ico.core.operator import IcoOperator
 from ico.core.stream import IcoStream
 from ico.core.tree_utils import TreePathIndex
 from ico.registry import IcoRegistry, register
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.spec import SpecError, run, to_spec
 
-# Module-level registrations: spawned MPAgent workers import this module.
+# Module-level registrations: spawned MPWorker runner processes import this module.
 REGISTRY = IcoRegistry()
 
 
@@ -122,8 +122,8 @@ def test_build_errors_propagate() -> None:
         )
 
 
-def test_mpagent_pool_runs_from_spec() -> None:
-    pool = IcoAsyncStream(lambda: MPAgent(make_double_worker), pool_size=2)
+def test_mpworker_pool_runs_from_spec() -> None:
+    pool = IcoAsyncStream(lambda: MPWorker(make_double_worker), pool_size=2)
     flow = Numbers(n=4) | pool
     result = run(to_spec(flow, strict=True), registry=REGISTRY)
     assert sorted(cast(list[int], list(result.outputs))) == [0, 2, 4, 6]

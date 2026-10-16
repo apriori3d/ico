@@ -16,15 +16,15 @@ from ico.core.runtime.progress import (
     IcoProgressEvent,
 )
 from ico.core.runtime.runtime import IcoRuntime
-from ico.core.runtime.tool import IcoTool
+from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.sink import sink
 from ico.core.source import source
 from ico.core.tree_utils import TreePathIndex
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
 @final
-class RichProgressTool(IcoTool):
+class RichProgressTool(IcoRuntimeTool):
     """
     Rich Progress integration tool for ICO runtime system.
 
@@ -39,7 +39,7 @@ class RichProgressTool(IcoTool):
         - Handles task resets when progress nodes restart
 
     Runtime Integration:
-        - Implements IcoTool interface for seamless runtime integration
+        - Implements IcoRuntimeTool interface for seamless runtime integration
         - Uses tree path indexing for progress node identification
         - Processes forward events to update visual progress indicators
         - Maintains progress state isolation between different runtime branches
@@ -79,7 +79,7 @@ class RichProgressTool(IcoTool):
         State:
             - Creates empty task mapping dictionary
             - Stores reference to Rich Console component
-            - Inherits IcoTool runtime integration capabilities
+            - Inherits IcoRuntimeTool runtime integration capabilities
         """
         super().__init__()
         self.console = console or Console()
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     Comprehensive demonstration of RichProgressTool with distributed computation.
 
     Example Architecture:
-        - Multi-agent processing with independent progress tracking
+        - Multi-worker processing with independent progress tracking
         - Rich Progress visualization for real-time monitoring
         - ICO runtime coordination with tool integration
         - Stream processing with progress aggregation
@@ -254,14 +254,14 @@ if __name__ == "__main__":
 
     Progress Visualization:
         - "Overall Progress": tracks data through main flow
-        - "Worker 1": tracks processing in first agent
-        - "Worker 2": tracks processing in second agent
+        - "Worker 1": tracks processing in first worker
+        - "Worker 2": tracks processing in second worker
         - Rich console displays all progress bars simultaneously
 
     Execution Flow:
         1. Numbers generated with 1s intervals (simulated slow source)
         2. Overall progress tracks each number through main pipeline
-        3. Stream distributes processing across two MPAgent workers
+        3. Stream distributes processing across two MPWorkers
         4. Each worker shows independent progress for internal iterations
         5. Results collected and printed (discarded in demo)
 
@@ -288,9 +288,9 @@ if __name__ == "__main__":
     # Overall progress tracking for main data flow
     progress = IcoProgress[int](total=total, name="Overall Progress")
 
-    # Distributed processing agents with individual progress tracking
-    mp_process1 = MPAgent[int, int](WorkerFlow(name="Worker 1"))
-    mp_process2 = MPAgent[int, int](WorkerFlow(name="Worker 2"))
+    # Distributed processing workers with individual progress tracking
+    mp_process1 = MPWorker[int, int](WorkerFlow(name="Worker 1"))
+    mp_process2 = MPWorker[int, int](WorkerFlow(name="Worker 2"))
 
     # Complete flow: source → progress → parallel workers → sink
     flow = numbers | (progress | mp_process1 | mp_process2).stream() | print_result

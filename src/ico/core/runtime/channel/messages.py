@@ -24,7 +24,7 @@ class ChannelMessage:
     """Base class for all inter-process communication messages.
 
     ChannelMessage provides the foundation for distributed communication
-    between agent processes and worker processes. Every message carries
+    between worker processes and runner processes. Every message carries
     a unique identifier for tracking, acknowledgment, and error handling.
 
     Message Architecture:
@@ -34,7 +34,7 @@ class ChannelMessage:
         • Serialization-friendly immutable design
 
     Message Flow:
-        Agent ↔️ Worker communication through bidirectional channels with
+        Worker ↔️ Runner communication through bidirectional channels with
         typed message envelopes ensuring reliable distributed coordination.
 
     Usage:
@@ -50,12 +50,12 @@ class DataMessage(Generic[P], ChannelMessage):
     """Message carrying computation data payloads between processes.
 
     DataMessage transports actual computation data (input/output items)
-    between agent and worker processes. Generic parameterization ensures
+    between worker and runner processes. Generic parameterization ensures
     type safety across process boundaries.
 
     Data Flow Pattern:
-        • Agent → Worker: Input data items for remote processing
-        • Worker → Agent: Computed output data items
+        • Worker → Runner: Input data items for remote processing
+        • Runner → Worker: Computed output data items
         • Type preservation: Generic payload maintains type information
         • Serialization: Payload must be serializable for IPC transport
 
@@ -64,7 +64,7 @@ class DataMessage(Generic[P], ChannelMessage):
 
     Usage:
         Primary mechanism for computation data exchange in distributed
-        ICO execution across agent/worker process boundaries.
+        ICO execution across worker/runner process boundaries.
     """
 
     payload: P
@@ -96,16 +96,16 @@ class CommandMessage(RuntimeMessage):
     """Message carrying runtime commands to remote processes.
 
     CommandMessage enables distributed runtime tree coordination by
-    transmitting lifecycle commands from agent to worker processes.
+    transmitting lifecycle commands from worker to runner processes.
 
     Command Distribution:
-        • Agent broadcasts commands to local runtime tree
-        • CommandMessage forwards commands to remote worker process
-        • Worker receives and broadcasts commands to remote runtime subtree
+        • Worker broadcasts commands to local runtime tree
+        • CommandMessage forwards commands to remote runner process
+        • Runner receives and broadcasts commands to remote runtime subtree
         • Maintains unified command propagation across process boundaries
 
     Supported Commands:
-        • IcoActivateCommand: Resource allocation and worker preparation
+        • IcoActivateCommand: Resource allocation and runner preparation
         • IcoRunCommand: Execution initiation across distributed nodes
         • IcoDeactivateCommand: Graceful shutdown and cleanup
 
@@ -122,22 +122,22 @@ class EventMessage(RuntimeMessage):
     """Message carrying runtime events from remote processes.
 
     EventMessage enables distributed event bubbling by transmitting
-    runtime feedback from worker processes back to agent processes.
+    runtime feedback from runner processes back to worker processes.
 
     Event Propagation:
-        • Worker runtime tree generates events (state changes, errors)
-        • EventMessage transmits events to agent process
-        • Agent receives and bubbles events through local runtime tree
+        • Runner runtime tree generates events (state changes, errors)
+        • EventMessage transmits events to worker process
+        • Worker receives and bubbles events through local runtime tree
         • Maintains unified event propagation across process boundaries
 
     Event Types:
-        • IcoStateEvent: Worker state changes and lifecycle updates
-        • IcoFaultEvent: Error conditions requiring agent intervention
-        • IcoHeartbeatEvent: Worker health and liveness indicators
+        • IcoStateEvent: Runner state changes and lifecycle updates
+        • IcoFaultEvent: Error conditions requiring worker intervention
+        • IcoHeartbeatEvent: Runner health and liveness indicators
 
     Usage:
         Critical for distributed error handling, monitoring, and runtime
-        tree coordination across agent/worker process boundaries.
+        tree coordination across worker/runner process boundaries.
     """
 
     event: IcoRuntimeEvent
@@ -149,7 +149,7 @@ class AcknowledgeMessage(RuntimeMessage):
 
     AcknowledgeMessage provides delivery confirmation in distributed
     communication, enabling reliable message passing and error detection
-    in agent/worker coordination.
+    in worker/runner coordination.
 
     Acknowledgment Protocol:
         • Message sender transmits message with unique ID

@@ -24,16 +24,16 @@ from ico.core.signature import IcoSignature
 from ico.core.signature_utils import infer_from_flow_factory
 
 # ────────────────────────────────────────────────
-# Agent-specific runtime states
+# Worker-specific runtime states
 # ────────────────────────────────────────────────
 
 
 @dataclass(slots=True, frozen=True)
 class PendingState(IcoRuntimeState):
-    """Agent worker state before activation completion.
+    """Runner state before activation completion.
 
-    PendingState represents agent workers that are initializing but not yet
-    ready for execution. Used during agent startup and resource allocation.
+    PendingState represents runners that are initializing but not yet
+    ready for execution. Used during runner startup and resource allocation.
     """
 
     name: ClassVar[str] = "Pending"
@@ -41,9 +41,9 @@ class PendingState(IcoRuntimeState):
 
 @dataclass(slots=True, frozen=True)
 class WaitingState(ReadyState):
-    """Agent state waiting for input/output data exchange.
+    """Worker state waiting for input/output data exchange.
 
-    WaitingState indicates the agent is ready and waiting for data items
+    WaitingState indicates the worker is ready and waiting for data items
     to arrive through the communication channel. Inherits ready status
     while indicating waiting behavior.
     """
@@ -53,9 +53,9 @@ class WaitingState(ReadyState):
 
 @dataclass(slots=True, frozen=True)
 class SendingState(ReadyState):
-    """Agent state actively sending data through communication channel.
+    """Worker state actively sending data through communication channel.
 
-    SendingState indicates the agent is transmitting data items through
+    SendingState indicates the worker is transmitting data items through
     the inter-process communication channel. Maintains ready status
     while performing data transmission.
     """
@@ -64,18 +64,18 @@ class SendingState(ReadyState):
 
 
 # ────────────────────────────────────────────────
-# Agent state management models
+# Worker state management models
 # ────────────────────────────────────────────────
 
 
-class AgentStateModel(BaseStateModel):
-    """State model for runtime agents with communication states.
+class WorkerStateModel(BaseStateModel):
+    """State model for runtime workers with communication states.
 
-    AgentStateModel extends base state management with specialized states
+    WorkerStateModel extends base state management with specialized states
     for inter-process communication and coordination. Manages the additional
     states required for distributed execution scenarios.
 
-    Agent-Specific States:
+    Worker-Specific States:
         • waiting(): Transition to WaitingState (waiting for data)
         • sending(): Transition to SendingState (transmitting data)
 
@@ -110,24 +110,24 @@ class AgentStateModel(BaseStateModel):
         self.update_state(SendingState())
 
 
-class AgentWorkerStateModel(AgentStateModel):
-    """Extended state model for agent worker processes.
+class RunnerStateModel(WorkerStateModel):
+    """Extended state model for runner processes.
 
-    AgentWorkerStateModel adds pending state management for agent workers
+    RunnerStateModel adds pending state management for runners
     that initialize in separate processes and require additional startup
     coordination before becoming ready for execution.
 
-    Worker-Specific States:
+    Runner-Specific States:
         • pending(): Transition to PendingState (initialization phase)
-        • Inherits all AgentStateModel communication states
+        • Inherits all WorkerStateModel communication states
 
     Usage:
-        Used by IcoAgentWorker instances running in separate processes
+        Used by IcoRunner instances running in separate processes
         to coordinate their initialization and execution lifecycle.
     """
 
     def pending(self) -> None:
-        """Transition to pending state during worker initialization.
+        """Transition to pending state during runner initialization.
 
         Raises:
             RuntimeError: If currently in ready state (invalid transition).
@@ -138,19 +138,19 @@ class AgentWorkerStateModel(AgentStateModel):
 
 
 # ────────────────────────────────────────────────
-# Distributed execution agent
+# Distributed execution worker
 # ────────────────────────────────────────────────
 
 
-class IcoAgent(
+class IcoWorker(
     Generic[I, O],
     IcoOperator[I, O],
     IcoRuntimeNode,
     ABC,
 ):
-    """Distributed execution agent integrating computation flow with runtime tree.
+    """Distributed execution worker integrating computation flow with runtime tree.
 
-    IcoAgent provides an abstraction for distributed computation
+    IcoWorker provides an abstraction for distributed computation
     that seamlessly integrates with both ICO computation flows and runtime trees.
     It manages remote execution through inter-process communication channels
     while maintaining unified runtime tree coordination.
@@ -158,52 +158,52 @@ class IcoAgent(
     Architecture Integration:
         • Computation Flow: Implements IcoOperator[I, O] for data processing
         • Runtime Tree: Inherits IcoRuntimeNode for lifecycle management
-        • Distributed Execution: Manages remote worker processes via channels
+        • Distributed Execution: Manages remote runner processes via channels
         • Type Safety: Generic parameterization ensures type consistency
 
     Distributed Execution Model:
-        • Portal Pattern: Local agent acts as portal to remote computation
-        • Worker Process: Remote IcoAgentWorker executes actual computation
+        • Portal Pattern: Local worker acts as portal to remote computation
+        • Runner Process: Remote IcoRunner executes actual computation
         • Channel Communication: Bidirectional data and control flow
         • Runtime Coordination: Unified command/event propagation
 
-    Agent Lifecycle:
-        1. Creation: Agent created with flow_factory and channel configuration
-        2. Activation: Worker process spawned, channel established
+    Worker Lifecycle:
+        1. Creation: Worker created with flow_factory and channel configuration
+        2. Activation: Runner process spawned, channel established
         3. Execution: Data items sent/received through channel portal
-        4. Deactivation: Worker process terminated, resources cleaned up
+        4. Deactivation: Runner process terminated, resources cleaned up
 
     Runtime Tree Integration:
-        • Worker Placeholder: IcoRemotePlaceholderNode represents remote worker
-        • Command Propagation: Runtime commands forwarded to remote worker
-        • Event Bubbling: Worker events bubbled through placeholder
-        • State Coordination: Agent states synchronized with runtime tree
+        • Runner Placeholder: IcoRemotePlaceholderNode represents remote runner
+        • Command Propagation: Runtime commands forwarded to remote runner
+        • Event Bubbling: Runner events bubbled through placeholder
+        • State Coordination: Worker states synchronized with runtime tree
 
     Channel Communication:
         • Bidirectional Channels: Data flows in both directions
-        • Command Forwarding: Runtime commands sent to worker
-        • Event Bubbling: Worker events received and propagated
+        • Command Forwarding: Runtime commands sent to runner
+        • Event Bubbling: Runner events received and propagated
         • Error Handling: Fault events enable distributed error recovery
 
     State Management:
-        • AgentStateModel: Extended states for communication phases
-        • Waiting State: Agent waiting for worker response
-        • Sending State: Agent transmitting data to worker
+        • WorkerStateModel: Extended states for communication phases
+        • Waiting State: Worker waiting for runner response
+        • Sending State: Worker transmitting data to runner
         • Fault Handling: Automatic fault state on communication errors
 
     Implementation Requirements:
         Subclasses must implement:
-        • get_remote_runtime_factory(): Create remote worker instance
-        • _activate_worker(): Setup worker process and communication
-        • _deactivate_worker(): Cleanup worker process and resources
+        • get_remote_runtime_factory(): Create remote runner instance
+        • _activate_runner(): Setup runner process and communication
+        • _deactivate_runner(): Cleanup runner process and resources
 
     Example Usage:
-        • MPAgent: Multiprocessing implementation using multiprocessing channels
-        • NetworkAgent: Distributed execution over network protocols (TBD)
-        • ContainerAgent: Kubernetes/Docker container execution (TBD)
+        • MPWorker: Multiprocessing implementation using multiprocessing channels
+        • NetworkWorker: Distributed execution over network protocols (TBD)
+        • ContainerWorker: Kubernetes/Docker container execution (TBD)
 
     Note:
-        IcoAgent bridges local computation flows with distributed runtime
+        IcoWorker bridges local computation flows with distributed runtime
         execution, enabling transparent scalability while maintaining
         unified runtime tree coordination and type safety.
     """
@@ -212,8 +212,8 @@ class IcoAgent(
     flow_factory: Callable[[], IcoOperatorProtocol[I, O]]
     subtree_factory: Callable[[], IcoRuntimeNode]
 
-    # Placeholder for worker in runtime tree (actual worker exists in separate process).
-    _worker_placeholder: IcoRuntimeNode
+    # Placeholder for runner in runtime tree (actual runner exists in separate process).
+    _runner_placeholder: IcoRuntimeNode
 
     def __init__(
         self,
@@ -224,22 +224,22 @@ class IcoAgent(
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
     ) -> None:
-        """Initialize agent with dual inheritance and worker placeholder setup.
+        """Initialize worker with dual inheritance and runner placeholder setup.
 
         Initializes both computation flow operator and runtime node infrastructure,
         establishing the foundation for distributed execution coordination.
 
         Args:
-            channel: Communication channel to remote worker (may be created later).
+            channel: Communication channel to remote runner (may be created later).
             flow_factory: Factory function to create computation flow for remote execution.
             name: Optional name for both operator identity and runtime node.
-            runtime_children: Additional runtime children beyond worker placeholder.
-            state_model: Custom state model (defaults to AgentStateModel).
+            runtime_children: Additional runtime children beyond runner placeholder.
+            state_model: Custom state model (defaults to WorkerStateModel).
 
         Architecture Setup:
             • Dual initialization: Both IcoOperator and IcoRuntimeNode
             • Portal function: _portal_fn handles data exchange
-            • Worker placeholder: Added to runtime children for tree coordination
+            • Runner placeholder: Added to runtime children for tree coordination
             • Channel integration: Prepared for communication establishment
         """
         # Note: pylance cannot infer IcoOperator.__init__ from Generic inheritance, but mypy can.
@@ -251,58 +251,58 @@ class IcoAgent(
             self,
             runtime_name=name,
             runtime_children=runtime_children,
-            state_model=state_model or AgentStateModel(),
+            state_model=state_model or WorkerStateModel(),
         )
         self.channel = channel
         self.flow_factory = flow_factory
-        self._worker_placeholder = IcoRemotePlaceholderNode()
-        self._runtime_children.append(self._worker_placeholder)
+        self._runner_placeholder = IcoRemotePlaceholderNode()
+        self._runtime_children.append(self._runner_placeholder)
 
-    # ──────── Worker management ────────
+    # ──────── Runner management ────────
 
     def get_remote_flow_factory(self) -> Callable[[], IcoOperatorProtocol[I, O]]:
         """Get factory function for creating remote computation flow.
 
         Returns:
             Factory function that creates the computation flow to be executed
-            in the remote worker process.
+            in the remote runner process.
         """
         return self.flow_factory
 
     @abstractmethod
-    def get_remote_runtime_factory(self) -> Callable[[], IcoAgentWorker[I, O]]:
-        """Create factory function for remote worker runtime node.
+    def get_remote_runtime_factory(self) -> Callable[[], IcoRunner[I, O]]:
+        """Create factory function for remote runner runtime node.
 
         Abstract method that subclasses must implement to specify how
-        remote worker instances are created for distributed execution.
+        remote runner instances are created for distributed execution.
 
         Returns:
-            Factory function that creates IcoAgentWorker instances
+            Factory function that creates IcoRunner instances
             configured with appropriate channels and computation flows.
         """
         ...
 
-    def _activate_worker(self) -> None:
-        """Activate remote worker process and establish communication.
+    def _activate_runner(self) -> None:
+        """Activate remote runner process and establish communication.
 
-        Abstract hook for subclasses to implement worker process creation,
+        Abstract hook for subclasses to implement runner process creation,
         channel establishment, and communication initialization.
 
         Implementation Requirements:
-            • Spawn or connect to remote worker process
+            • Spawn or connect to remote runner process
             • Establish bidirectional communication channel
-            • Configure worker with computation flow and runtime tree
+            • Configure runner with computation flow and runtime tree
         """
         pass
 
-    def _deactivate_worker(self) -> None:
-        """Deactivate remote worker process and cleanup resources.
+    def _deactivate_runner(self) -> None:
+        """Deactivate remote runner process and cleanup resources.
 
-        Abstract hook for subclasses to implement worker process termination,
+        Abstract hook for subclasses to implement runner process termination,
         channel cleanup, and resource deallocation.
 
         Implementation Requirements:
-            • Gracefully terminate remote worker process
+            • Gracefully terminate remote runner process
             • Close communication channels and cleanup IPC resources
             • Release any allocated system resources
         """
@@ -311,17 +311,17 @@ class IcoAgent(
     # ──────── Data flow function ────────
 
     def _portal_fn(self, input: I) -> O:
-        """Portal function implementing data exchange with remote worker.
+        """Portal function implementing data exchange with remote runner.
 
         Core function that handles the distributed execution by coordinating
-        data transmission to remote worker and receiving computed results.
-        Manages agent state transitions during the communication process.
+        data transmission to remote runner and receiving computed results.
+        Manages worker state transitions during the communication process.
 
         Args:
-            input: Data item to send to remote worker for processing.
+            input: Data item to send to remote runner for processing.
 
         Returns:
-            Processed result received from remote worker.
+            Processed result received from remote runner.
 
         Communication Flow:
             1. Transition to SendingState and transmit input item
@@ -330,24 +330,24 @@ class IcoAgent(
             4. Transition to FaultState on any communication error
 
         State Management:
-            • sending(): During data transmission to worker
-            • waiting(): While waiting for worker response
+            • sending(): During data transmission to runner
+            • waiting(): While waiting for runner response
             • ready(): Upon successful completion
             • fault(): On any communication or processing error
 
         Raises:
-            Exception: Re-raises any communication or worker processing errors
+            Exception: Re-raises any communication or runner processing errors
                      after transitioning to fault state.
         """
         assert self.channel is not None
-        assert isinstance(self.state_model, AgentStateModel)
+        assert isinstance(self.state_model, WorkerStateModel)
 
         try:
-            # Send item to agent process
+            # Send item to worker process
             self.state_model.sending()
             self.channel.send(input)
 
-            # Wait for result from agent process
+            # Wait for result from worker process
             self.state_model.waiting()
             output = self.channel.wait_for_item()
 
@@ -366,53 +366,53 @@ class IcoAgent(
     def on_channel_command(self, command: IcoRuntimeCommand) -> None:
         """Handle commands received through communication channel.
 
-        Commands should not be received by the agent from the worker.
-        Worker-to-agent communication uses events, not commands.
+        Commands should not be received by the worker from the runner.
+        Runner-to-worker communication uses events, not commands.
 
         Raises:
-            Exception: Always raises as channel commands are invalid for agents.
+            Exception: Always raises as channel commands are invalid for workers.
         """
-        raise Exception("Channel commands should not be sent to the agent runtime.")
+        raise Exception("Channel commands should not be sent to the worker runtime.")
 
     def on_channel_event(self, event: IcoRuntimeEvent) -> None:
-        """Handle events received from remote worker through channel.
+        """Handle events received from remote runner through channel.
 
-        Processes events from the remote worker and integrates them into the
-        local runtime tree by bubbling them through the worker placeholder.
+        Processes events from the remote runner and integrates them into the
+        local runtime tree by bubbling them through the runner placeholder.
 
         Args:
-            event: Runtime event received from remote worker process.
+            event: Runtime event received from remote runner process.
 
         Event Integration:
-            • Events bubble through worker placeholder for proper tree routing
+            • Events bubble through runner placeholder for proper tree routing
             • Maintains event trace consistency across process boundaries
             • Enables distributed event propagation and monitoring
         """
-        # Ensure events from the worker are bubbled correctly in the runtime tree
-        self.bubble_event(event, from_child=self._worker_placeholder)
+        # Ensure events from the runner are bubbled correctly in the runtime tree
+        self.bubble_event(event, from_child=self._runner_placeholder)
 
     # ─────── Runtime API ────────
 
     def on_command(self, command: IcoRuntimeCommand) -> None:
         """Handle runtime commands with distributed execution coordination.
 
-        Orchestrates command processing between local agent and remote worker,
-        managing worker lifecycle and ensuring proper command propagation
+        Orchestrates command processing between local worker and remote runner,
+        managing runner lifecycle and ensuring proper command propagation
         across process boundaries.
 
         Args:
             command: Runtime command to process and potentially forward.
 
         Command Coordination:
-            • Pre-order commands: Process locally then forward to worker
-            • Post-order commands: Forward to worker then process locally
-            • Activate: Spawn worker before forwarding command
-            • Deactivate: Forward command then cleanup worker
+            • Pre-order commands: Process locally then forward to runner
+            • Post-order commands: Forward to runner then process locally
+            • Activate: Spawn runner before forwarding command
+            • Deactivate: Forward command then cleanup runner
 
-        Worker Lifecycle Management:
-            • Activation: Creates worker process and establishes channel
-            • Command forwarding: All commands sent to remote worker
-            • Deactivation: Graceful worker shutdown and resource cleanup
+        Runner Lifecycle Management:
+            • Activation: Creates runner process and establishes channel
+            • Command forwarding: All commands sent to remote runner
+            • Deactivation: Graceful runner shutdown and resource cleanup
         """
         is_ready = self.state.is_ready
         if command.broadcast_order == "pre":
@@ -423,9 +423,9 @@ class IcoAgent(
                 assert command.broadcast_order == "pre"
 
                 if not is_ready:
-                    # Spawn an agent in pre-order, before sending a command downstream
+                    # Spawn a worker in pre-order, before sending a command downstream
                     # assert self.channel is None
-                    self._activate_worker()
+                    self._activate_runner()
 
                 assert self.channel is not None
                 self.channel.send_command(command)
@@ -437,8 +437,8 @@ class IcoAgent(
 
                     self.channel.send_command(command)
 
-                    # Deactivate worker in post-order, to ensure proper shutdown
-                    self._deactivate_worker()
+                    # Deactivate runner in post-order, to ensure proper shutdown
+                    self._deactivate_runner()
 
                     # Close channel queues
                     self.channel.close()
@@ -466,22 +466,22 @@ class IcoAgent(
 
 
 # ────────────────────────────────────────────────
-# Remote worker process runtime node
+# Remote runner process runtime node
 # ────────────────────────────────────────────────
 
 
-class IcoAgentWorker(
+class IcoRunner(
     Generic[I, O],
     IcoRuntimeNode,
     ABC,
 ):
-    """Remote worker process runtime node for distributed execution.
+    """Remote runner process runtime node for distributed execution.
 
-    IcoAgentWorker represents the remote execution component of an agent,
+    IcoRunner represents the remote execution component of a worker,
     running in a separate process and executing the actual computation flow.
-    It coordinates with local IcoAgent through bidirectional channels.
+    It coordinates with local IcoWorker through bidirectional channels.
 
-    Worker Architecture:
+    Runner Architecture:
         • Process Isolation: Runs in separate process for parallel execution
         • Computation Flow: Executes actual IcoOperator computation
         • Runtime Integration: Participates in distributed runtime tree
@@ -489,25 +489,25 @@ class IcoAgentWorker(
 
     Execution Model:
         • Event Loop: Continuous run_loop() processing input items
-        • Blocking Receive: Waits for input items from local agent
+        • Blocking Receive: Waits for input items from local worker
         • Flow Processing: Executes computation through embedded flow
-        • Result Transmission: Sends output back to local agent
+        • Result Transmission: Sends output back to local worker
 
     Runtime Tree Integration:
         • Remote Participation: Part of distributed runtime tree
-        • Command Reception: Receives runtime commands from agent
-        • Event Generation: Bubbles events back to agent
-        • State Management: AgentWorkerStateModel with pending state
+        • Command Reception: Receives runtime commands from worker
+        • Event Generation: Bubbles events back to worker
+        • State Management: RunnerStateModel with pending state
 
     Communication Coordination:
-        • Channel Runtime Port: Worker serves as runtime endpoint
+        • Channel Runtime Port: Runner serves as runtime endpoint
         • Command Broadcasting: Distributes commands to embedded flow
-        • Event Forwarding: Sends events upstream to agent
+        • Event Forwarding: Sends events upstream to worker
         • Error Propagation: Fault events transmitted for recovery
 
     Lifecycle Management:
-        1. Initialization: Worker created with flow and channel
-        2. Pending State: Worker initializing but not yet active
+        1. Initialization: Runner created with flow and channel
+        2. Pending State: Runner initializing but not yet active
         3. Event Loop: Continuous processing of input items
         4. Termination: Graceful shutdown on deactivate command
 
@@ -518,7 +518,7 @@ class IcoAgentWorker(
         • Loop Continuation: Recovers from individual item processing errors
 
     Note:
-        IcoAgentWorker enables true distributed execution while maintaining
+        IcoRunner enables true distributed execution while maintaining
         unified runtime tree semantics and enabling fault-tolerant computing.
     """
 
@@ -535,21 +535,21 @@ class IcoAgentWorker(
         state_model: BaseStateModel | None = None,
         name: str | None = None,
     ) -> None:
-        """Initialize agent worker with computation flow and communication channel.
+        """Initialize runner with computation flow and communication channel.
 
-        Sets up the worker runtime node with embedded computation flow and
-        establishes bidirectional communication with the parent agent process.
+        Sets up the runner runtime node with embedded computation flow and
+        establishes bidirectional communication with the parent worker process.
 
         Args:
-            channel: Bidirectional communication channel (reversed direction from agent).
+            channel: Bidirectional communication channel (reversed direction from worker).
             flow_factory: Factory function to create the computation flow.
             runtime_parent: Parent runtime node (typically not used in separate process).
-            runtime_children: Additional runtime children for worker's subtree.
-            state_model: Custom state model (defaults to AgentWorkerStateModel).
-            name: Optional name for worker identification.
+            runtime_children: Additional runtime children for runner's subtree.
+            state_model: Custom state model (defaults to RunnerStateModel).
+            name: Optional name for runner identification.
 
-        Worker Setup:
-            • Runtime tree initialization with AgentWorkerStateModel
+        Runner Setup:
+            • Runtime tree initialization with RunnerStateModel
             • Computation flow creation and runtime integration
             • Channel runtime port configuration for command/event handling
             • Automatic discovery and connection of runtime nodes in flow
@@ -559,7 +559,7 @@ class IcoAgentWorker(
             runtime_name=name,
             runtime_parent=runtime_parent,
             runtime_children=runtime_children,
-            state_model=state_model or AgentWorkerStateModel(),
+            state_model=state_model or RunnerStateModel(),
         )
         self.flow = flow_factory()
         self.channel = channel
@@ -570,14 +570,14 @@ class IcoAgentWorker(
         discover_and_connect_runtime_nodes(self, self.flow)
 
     def run_loop(self) -> None:
-        """Main execution loop for remote worker process.
+        """Main execution loop for remote runner process.
 
         Implements the core event loop for distributed execution, continuously
-        processing input items received from the parent agent and returning
-        computed results. Manages worker lifecycle and handles errors gracefully.
+        processing input items received from the parent worker and returning
+        computed results. Manages runner lifecycle and handles errors gracefully.
 
         Execution Flow:
-            1. Pending State: Worker initializes and waits for activation
+            1. Pending State: Runner initializes and waits for activation
             2. Item Processing Loop:
                 - Wait for input item from channel (blocking)
                 - Process item through embedded computation flow
@@ -586,7 +586,7 @@ class IcoAgentWorker(
             3. Termination: Exit loop on deactivate command
 
         State Transitions:
-            • pending(): Initial state during worker startup
+            • pending(): Initial state during runner startup
             • running(): During computation flow execution
             • sending(): While transmitting results upstream
             • waiting(): Between items, ready for next input
@@ -597,21 +597,21 @@ class IcoAgentWorker(
             • Exception capture for each item processing
             • Fault event generation for error propagation
             • Loop continuation for recovery from individual item failures
-            • Graceful degradation without worker termination
+            • Graceful degradation without runner termination
 
         Termination Conditions:
             • Deactivate command: Graceful shutdown requested
-            • None item received: Channel closed by agent
+            • None item received: Channel closed by worker
             • Communication failure: Channel broken or process stopped
 
         Note:
             This method blocks indefinitely and should be run as the main
-            function in the worker process. It provides the execution
+            function in the runner process. It provides the execution
             foundation for distributed ICO computation.
         """
-        assert isinstance(self.state_model, AgentWorkerStateModel)
+        assert isinstance(self.state_model, RunnerStateModel)
 
-        # Agent is now pending activation
+        # Worker is now pending activation
         self.state_model.pending()
 
         while True:
@@ -643,51 +643,49 @@ class IcoAgentWorker(
     # ──────── Channel message handling ────────
 
     def on_channel_command(self, command: IcoRuntimeCommand) -> None:
-        """Handle runtime commands received from parent agent through channel.
+        """Handle runtime commands received from parent worker through channel.
 
-        Processes runtime commands received from the parent agent and broadcasts
+        Processes runtime commands received from the parent worker and broadcasts
         them to the embedded computation flow and runtime subtree.
 
         Args:
-            command: Runtime command from parent agent to process locally.
+            command: Runtime command from parent worker to process locally.
 
         Command Processing:
             • Broadcast to subtree: Commands propagated to embedded flow
-            • Local state management: Commands trigger worker state transitions
+            • Local state management: Commands trigger runner state transitions
             • Distributed coordination: Enables unified runtime tree control
         """
         self.broadcast_command(command)
 
     def on_channel_event(self, event: IcoRuntimeEvent) -> None:
-        """Handle events that should not be received by worker from agent.
+        """Handle events that should not be received by runner from worker.
 
-        Agent-to-worker communication uses commands, not events.
-        Events flow from worker to agent, not the reverse direction.
+        Worker-to-runner communication uses commands, not events.
+        Events flow from runner to worker, not the reverse direction.
 
         Raises:
-            Exception: Always raises as channel events are invalid for workers.
+            Exception: Always raises as channel events are invalid for runners.
         """
-        raise Exception(
-            "Channel events should not be sent to the agent worker runtime."
-        )
+        raise Exception("Channel events should not be sent to the runner runtime.")
 
     # ─────── Runtime API ────────
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        """Handle runtime events and forward them to parent agent.
+        """Handle runtime events and forward them to parent worker.
 
-        Processes events generated within the worker's runtime subtree
-        and forwards them to the parent agent through the communication channel.
+        Processes events generated within the runner's runtime subtree
+        and forwards them to the parent worker through the communication channel.
 
         Args:
-            event: Runtime event generated within worker's subtree.
+            event: Runtime event generated within runner's subtree.
 
         Returns:
             Event for continued local processing (same as input).
 
         Event Forwarding:
-            • Channel transmission: Events sent to parent agent
-            • Local processing: Standard event bubbling within worker
+            • Channel transmission: Events sent to parent worker
+            • Local processing: Standard event bubbling within runner
             • Distributed propagation: Events cross process boundaries
         """
         # Send event to upstream runtime

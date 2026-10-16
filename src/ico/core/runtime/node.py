@@ -51,7 +51,7 @@ class IcoRuntimeNode(ABC):
 
     Runtime Tree Embedding:
         The runtime tree embeds into computation flows in specific scenarios:
-        • Agents: Distributed execution across processes requires runtime coordination
+        • Workers: Distributed execution across processes requires runtime coordination
         • Progress Tracking: Monitoring execution progress needs runtime instrumentation
         • Resource Management: Complex resource allocation requires lifecycle control
         • Error Handling: Fault propagation and recovery needs runtime event system
@@ -74,9 +74,9 @@ class IcoRuntimeNode(ABC):
         • State events automatically bubble to parent nodes
 
     Integration Examples:
-        • IcoAgent: Embeds remote runtime node for multiprocess execution
+        • IcoWorker: Embeds remote runtime node for multiprocess execution
         • IcoProgress: Embeds runtime node for progress tracking during data flow
-        • IcoTool: Provides runtime services (logging, monitoring, visualization)
+        • IcoRuntimeTool: Provides runtime services (logging, monitoring, visualization)
         • IcoRuntime: Root runtime node that orchestrates entire execution tree
 
     Note:
@@ -475,7 +475,7 @@ class HasRemoteRuntime(Protocol):
         • Supports dynamic runtime tree expansion across process boundaries
 
     Note:
-        Used by agents and distributed execution components to integrate
+        Used by workers and distributed execution components to integrate
         remote runtime nodes into the local runtime tree structure.
     """
 

@@ -10,14 +10,14 @@ from ico.core.runtime.event import (
 from ico.core.runtime.printer import IcoPrinter, IcoPrintEvent
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.runtime.runtime_wrapper import wrap_runtime
-from ico.core.runtime.tool import IcoTool
+from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.sink import sink
 from ico.core.source import source
-from ico.runtime.agent.mp.mp_agent import MPAgent
+from ico.runtime.worker.mp.mp_worker import MPWorker
 
 
 @final
-class RichPrinterTool(IcoTool):
+class RichPrinterTool(IcoRuntimeTool):
     """
     Rich Console integration tool for ICO print output.
 
@@ -58,11 +58,11 @@ class RichPrinterTool(IcoTool):
         return super().on_forward_event(event)
 
 
-def create_agent_flow() -> IcoOperatorProtocol[int, int]:
+def create_worker_flow() -> IcoOperatorProtocol[int, int]:
     """
-    Create example flow for MPAgent with embedded printing.
+    Create example flow for MPWorker with embedded printing.
 
-    Demonstrates printer usage in distributed agent processes.
+    Demonstrates printer usage in distributed worker processes.
     Fresh printer instances avoid sharing runtime connections.
 
     Returns:
@@ -73,28 +73,28 @@ def create_agent_flow() -> IcoOperatorProtocol[int, int]:
 
     @wrap_runtime(printer)
     @operator()
-    def agent_double(x: int) -> int:
+    def worker_double(x: int) -> int:
         res = x * 2
         printer(f"Doubling {x} to get {res}")
         return res
 
     @wrap_runtime(printer)
     @operator()
-    def agent_shift(x: int) -> int:
+    def worker_shift(x: int) -> int:
         res = x + 1
         printer(f"Shifting {x} to get {res}")
         return res
 
-    return agent_double | agent_shift
+    return worker_double | worker_shift
 
 
 if __name__ == "__main__":
     """
-    Demo of RichPrinterTool with distributed printing across MPAgent.
+    Demo of RichPrinterTool with distributed printing across MPWorker.
 
     Shows print message collection from:
     - Main flow printer (sink)
-    - Agent flow printers (distributed workers)
+    - Worker flow printers (distributed workers)
     - All output unified through Rich console
     """
     printer = IcoPrinter()
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         """Sink with debug printing."""
         printer(f"Sink received: {x}")
 
-    flow = numbers | MPAgent(create_agent_flow).stream() | print_result
+    flow = numbers | MPWorker(create_worker_flow).stream() | print_result
     flow.name = "Example Flow"
 
     flow.describe()
