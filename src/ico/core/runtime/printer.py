@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import overload
-
-from typing_extensions import final
+from typing import final, overload
 
 from ico.core.operator import I, IcoOperator, O, wrap_operator
 from ico.core.runtime.event import IcoRuntimeEvent

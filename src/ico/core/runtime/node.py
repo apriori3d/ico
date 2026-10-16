@@ -3,9 +3,12 @@ from __future__ import annotations
 from abc import ABC
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import replace
-from typing import Protocol, TypeAlias
+from typing import TYPE_CHECKING, Protocol, TypeAlias, runtime_checkable
 
-from typing_extensions import Self, runtime_checkable
+if TYPE_CHECKING:
+    # typing.Self needs Python 3.11; typing_extensions is known to type
+    # checkers without being installed, and core depends only on rich.
+    from typing_extensions import Self
 
 from ico.core.runtime.command import (
     IcoActivateCommand,
