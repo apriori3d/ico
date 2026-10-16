@@ -206,6 +206,18 @@ poetry shell
 pip install git+https://github.com/apriori3d/ico.git
 ```
 
+Optional extras:
+
+| Extra      | Installs                     | Needed for                         |
+| ---------- | ---------------------------- | ---------------------------------- |
+| `notebook` | `ipywidgets`                 | Rich widgets in Jupyter            |
+| `examples` | `skrub`, `pydot`, `graphviz` | Running the skrub examples         |
+| `vision`   | `torch`, `torchvision`, ...  | CIFAR-10 examples                  |
+
+```
+pip install "ico[notebook] @ git+https://github.com/apriori3d/ico.git"
+```
+
 ## 📈 Future Development
 
 ### 🔮 Planned Features

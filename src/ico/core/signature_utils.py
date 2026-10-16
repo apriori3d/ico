@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import types
 from collections import OrderedDict
 from collections.abc import Callable
 from types import FunctionType
@@ -11,6 +12,7 @@ from typing import (
     Any,
     Generic,
     TypeVar,
+    Union,
     cast,
     get_args,
     get_origin,
@@ -104,9 +106,12 @@ def resolve_types_from_generic(
                 var_cls = replace_typevar(var_cls, generic_arg, cls_arg)
             resolving_vars[var] = var_cls
 
-    # Return resolved types for the requested vars, or None if they couldn't be resolved to concrete types.
+    # Return resolved types for the requested vars, or None if they couldn't be
+    # resolved to concrete types. Any TypeVar left counts as unresolved, not only
+    # the requested ones: subclasses may use their own TypeVars, e.g.
+    # IcoBatcher[IInv] -> IcoOperator[Iterator[IInv], ...].
     return [
-        t if type(t) is not TypeVar and not type_contain_any_typevar(t, *vars) else None
+        t if type(t) is not TypeVar and not type_contain_any_typevar(t) else None
         for t in resolving_vars.values()
     ]
 
@@ -195,6 +200,10 @@ def replace_typevar(
 
 # ──────── Flow Factory Signature Inference ────────
 
+# Errors raised by inspect.signature / get_type_hints for callables that
+# cannot be introspected.
+_INTROSPECTION_ERRORS = (ValueError, TypeError, NameError)
+
 
 def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     """Infer ICO signature from a flow factory function's return type.
@@ -220,9 +229,16 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
     if type(fn) is not FunctionType:  # type: ignore[comparison-overlap]
         fn = fn.__call__
 
-    hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
-    return_hint = hints.get("return", None)
-    i, o = get_args(return_hint)
+    try:
+        hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
+    except _INTROSPECTION_ERRORS:
+        return None
+
+    # Expect an annotated operator return type such as IcoOperator[I, O].
+    args = get_args(hints.get("return", None))
+    if len(args) != 2:
+        return None
+    i, o = args
 
     return IcoSignature(
         wrap_type_if_any(i),
@@ -275,8 +291,13 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
     else:
         fn = obj
 
-    sig = inspect.signature(fn)
-    hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
+    try:
+        sig = inspect.signature(fn)
+        hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", {}))
+    except _INTROSPECTION_ERRORS:
+        # E.g. builtins without signature metadata (print) or unresolvable
+        # forward references: the signature is simply not inferred.
+        return None
 
     params = list(sig.parameters.values())
 
@@ -372,16 +393,23 @@ def format_ico_type(tp: Any) -> str:
         - Union types → "T1 | T2 | ..."
         - Generic containers like Iterator, list
     """
-    if tp is type(Any):
+    # Signatures encode Any as type(Any) or type[Any] (e.g. the IcoChain fallback).
+    if tp is type(Any) or tp is Any or tp == type[Any]:
         return "Any"
 
     if tp is type(None):
         return "()"
 
-    origin = get_origin(tp)
+    origin: object = get_origin(tp)
 
     if origin is None:
         return getattr(tp, "__name__", str(tp))
+
+    if origin is Union or origin is types.UnionType:
+        # Inside a union "None" reads better than the "()" used for no value.
+        return " | ".join(
+            "None" if a is type(None) else format_ico_type(a) for a in get_args(tp)
+        )
 
     name = getattr(origin, "__name__", str(origin))
     args = get_args(tp)

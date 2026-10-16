@@ -49,9 +49,21 @@ class IcoProcessNodeRender(RowRenderer):
     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         assert isinstance(node, IcoProcess)
         process = cast(IcoProcess[Any], node)
-        return Text(
-            f"num_iter={process.num_iterations}", style=DescribeStyle.meta.value
-        )
+        if process.until is None:
+            info = f"num_iter={process.max_iterations}"
+        else:
+            until_name = _callable_name(process.until)
+            info = f"until={until_name}, max_iter={process.max_iterations}"
+        return Text(info, style=DescribeStyle.meta.value)
+
+
+def _callable_name(op: object) -> str:
+    """Name of a wrapped operator: explicit name, function name or class."""
+    name = cast(object, getattr(op, "name", None))
+    if isinstance(name, str) and name:
+        return name
+    fn_name = cast(object, getattr(getattr(op, "_fn", None), "__name__", None))
+    return fn_name if isinstance(fn_name, str) else type(op).__name__
 
 
 if __name__ == "__main__":

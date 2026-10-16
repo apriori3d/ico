@@ -6,9 +6,13 @@ from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.filter import IcoFilter
+from ico.core.fork import IcoFork
 from ico.core.node import IcoNode, IcoNodeProtocol
+from ico.core.partition import IcoPartition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
+from ico.core.route import IcoRoute
 from ico.core.runtime.agent import IcoAgent
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.progress import IcoProgress
@@ -84,6 +88,10 @@ class PlanRendererOptions(RendererOptions):
             IcoSink: "🏁",
             IcoProgress: "⏳",
             IcoEpoch: "🧠",
+            IcoFork: "🔀",
+            IcoRoute: "🚦",
+            IcoFilter: "🔍",
+            IcoPartition: "✂️ ",
         }
     )
     """Emoji icons for visual node type identification"""

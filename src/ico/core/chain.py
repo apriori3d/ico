@@ -70,6 +70,7 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
         self,
         left: IcoOperatorProtocol[I, O],
         right: IcoOperatorProtocol[O, O2],
+        strict: bool | None = None,
     ):
         """Initialize a chain from two compatible operators.
 
@@ -78,11 +79,34 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
                  match the input type of the right operator.
             right: Second operator in the chain (O → O2). Its input type O must
                   match the output type of the left operator.
+            strict: Check at runtime that left's output type is assignable to
+                  right's input type. ``None`` follows the current
+                  ``strict_signatures()`` context (off by default).
+
+        Raises:
+            IcoSignatureError: In strict mode, if the operator types are
+                incompatible. Links with uninferred signatures are skipped.
 
         Note:
             The chain automatically creates a composite name "left | right"
             and establishes parent-child relationships for proper tree structure.
         """
+        from ico.core.signature_check import (
+            IcoSignatureError,
+            chain_length,
+            check_link,
+            is_strict,
+        )
+        from ico.core.tree_utils import TreePathIndex
+
+        if strict if strict is not None else is_strict():
+            left_node, right_node = cast(IcoNode, left), cast(IcoNode, right)
+            # Relative to this chain: the final flow tree is not known yet.
+            step = TreePathIndex.create(chain_length(left_node))
+            issue = check_link(left_node, right_node, path=step, chain_relative=True)
+            if issue is not None and issue.is_error:
+                raise IcoSignatureError(issue)
+
         super().__init__(
             fn=self._chained_fn,
             name=f"{left} | {right}",
@@ -148,6 +172,7 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
 def chain(
     left: IcoOperatorProtocol[I, O],
     right: IcoOperatorProtocol[O, O2],
+    strict: bool | None = None,
 ) -> IcoChain[I, O, O2]:
     """Create a chain composition of two ICO operators.
 
@@ -158,6 +183,8 @@ def chain(
     Args:
         left: First operator in the chain (I → O).
         right: Second operator in the chain (O → O2).
+        strict: Check signature compatibility at runtime; ``None`` follows
+            the current ``strict_signatures()`` context.
 
     Returns:
         New IcoChain operator that represents the composition I → O2.
@@ -186,4 +213,4 @@ def chain(
         operator for type safety. The pipe operator | is generally preferred
         over this function for better readability: op1 | op2.
     """
-    return IcoChain(left, right)
+    return IcoChain(left, right, strict=strict)

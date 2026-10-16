@@ -31,13 +31,17 @@ keywords = ["machine-learning", "pipeline", "type-safety", "functional-programmi
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "rich>=14.2.0",
-    "ipywidgets>=8.1.8",
-    "skrub (>=0.7.2,<0.8.0)",
-    "pydot (>=4.0.1,<5.0.0)",
-    "graphviz (>=0.21,<0.22)"
 ]
 
 [project.optional-dependencies]
+notebook = [
+    "ipywidgets>=8.1.8",
+]
+examples = [
+    "skrub (>=0.7.2,<0.8.0)",
+    "pydot (>=4.0.1,<5.0.0)",
+    "graphviz (>=0.21,<0.22)",
+]
 vision = [
     "torch>=2.9.1",
     "torchvision>=0.24.1",
@@ -65,7 +69,7 @@ rich = "^14.2.0"
 torch = {version = "^2.9.1", optional = true}
 torchvision = {version = "^0.24.1", optional = true}
 matplotlib = {version = "^3.10.7", optional = true}
-ipywidgets = "^8.1.8"
+ipywidgets = {version = "^8.1.8", optional = true}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.18.2"
@@ -76,6 +80,7 @@ ipykernel = "^7.2.0"
 pyright = "^1.1.404"
 
 [tool.poetry.extras]
+notebook = ["ipywidgets"]
 vision = [
     "torch",
     "torchvision",

@@ -1,16 +1,25 @@
 # core
 from ico.core.async_operator import IcoAsyncOperator
-from ico.core.async_stream import IcoAsyncStream
+from ico.core.async_stream import (
+    IcoAsyncStream,
+    IcoStreamErrors,
+    ItemError,
+    RetryPolicy,
+)
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.context_operator import IcoContextOperator, context_operator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
+from ico.core.filter import IcoFilter, keep
+from ico.core.fork import IcoFork, fork
 from ico.core.identity import IcoIdentity
 from ico.core.node import HasRemoteFlow, IcoNode
 from ico.core.operator import IcoOperator, operator
+from ico.core.partition import IcoPartition, partition
 from ico.core.pipeline import IcoPipeline
-from ico.core.process import IcoProcess
+from ico.core.process import IcoProcess, IcoProcessLimitError
+from ico.core.route import IcoRoute, IcoRouteError, route
 
 # core/runtime
 from ico.core.runtime.exceptions import IcoRuntimeError
@@ -21,6 +30,12 @@ from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper, wrap_runtime
 from ico.core.signature import IcoSignature
+from ico.core.signature_check import (
+    IcoSignatureError,
+    SignatureIssue,
+    strict_signatures,
+    validate_signatures,
+)
 from ico.core.sink import IcoSink, sink
 from ico.core.source import IcoSource, source
 from ico.core.stream import IcoStream
@@ -32,6 +47,9 @@ from ico.describe.options import RendererOptions
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.rich_style import DescribeStyle
 from ico.describe.runtime.options import RuntimeRendererOptions
+
+# registry
+from ico.registry import IcoRegistry, register
 
 # runtime
 from ico.runtime.agent.mp.mp_agent import MPAgent
@@ -45,19 +63,36 @@ __all__ = [
     "HasRemoteFlow",
     "IcoAsyncOperator",
     "IcoAsyncStream",
+    "IcoStreamErrors",
+    "ItemError",
+    "RetryPolicy",
     "IcoBatcher",
     "IcoChain",
     "IcoContextOperator",
     "context_operator",
     "IcoContextPipeline",
     "IcoEpoch",
+    "IcoFilter",
+    "keep",
+    "IcoFork",
+    "fork",
     "IcoIdentity",
     "IcoNode",
     "IcoOperator",
     "operator",
     "IcoPipeline",
+    "IcoPartition",
+    "partition",
     "IcoProcess",
+    "IcoProcessLimitError",
+    "IcoRoute",
+    "IcoRouteError",
+    "route",
     "IcoSignature",
+    "IcoSignatureError",
+    "SignatureIssue",
+    "strict_signatures",
+    "validate_signatures",
     "IcoSink",
     "sink",
     "IcoSource",
@@ -77,6 +112,9 @@ __all__ = [
     "wrap_runtime",
     # runtime
     "MPAgent",
+    # registry
+    "IcoRegistry",
+    "register",
     # tools
     "RichPrinterTool",
     "RichProgressTool",

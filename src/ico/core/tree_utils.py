@@ -38,6 +38,19 @@ class TreePathIndex:
     Attributes:
         path_index: Tuple of integers representing the path from root to node.
 
+    Coordinate systems:
+        The same type addresses nodes in two different trees:
+
+        * the runtime tree (`IcoRuntimeNode._runtime_children`): traces of
+          runtime events (faults, progress, state, print) built while an
+          event bubbles up, and keys of runtime tools;
+        * the spec tree (`NodeSpec.children`, i.e. a flow as exported by
+          `to_spec`, with chains flattened into `seq` and registered
+          operators as leaves): locations of `build()` and signature
+          validation errors, resolvable with `NodeSpec.at(path)`.
+
+        A path is only meaningful together with the tree it was computed for.
+
     Note:
         Immutable design ensures thread safety and enables safe sharing
         across different traversal contexts.
@@ -405,3 +418,32 @@ class TreeWalker(Generic[T, C]):
                     )
                     for i, child in reversed(list(enumerate(children)))
                 ]
+
+
+def format_location(
+    reason: str,
+    path: TreePathIndex | None,
+    refs: tuple[str, str] | None = None,
+    *,
+    chain_relative: bool = False,
+) -> str:
+    """Format an error with its location in a spec tree.
+
+    Examples:
+        ``at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image``,
+        ``at root: Cannot resolve operator 'x@1'`` and, for a path relative to
+        a chain being composed, ``at chain step 2 (a → b): expected ...``.
+    """
+    if path is None:
+        location = ""
+    elif chain_relative:
+        location = f"at chain step {path}"
+    elif not path.path_index:
+        location = "at root"
+    else:
+        location = f"at {path}"
+
+    if refs is not None:
+        link = f"({refs[0]} → {refs[1]})"
+        return f"{location} {link}: {reason}" if location else f"{link}: {reason}"
+    return f"{location}: {reason}" if location else reason

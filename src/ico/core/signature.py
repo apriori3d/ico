@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import GenericAlias
-from typing import Any, get_origin
+from typing import Any, Union, get_origin
 
 # ────────────────────────────────────────────────
 # Signature descriptions
@@ -134,4 +134,7 @@ class IcoSignature:
 
 def is_supported_type(t: Any) -> bool:
     """Check if a type is supported for ICO signature inference."""
-    return isinstance(t, SignatureParamType) or isinstance(get_origin(t), type)
+    origin: object = get_origin(t)
+    return (
+        isinstance(t, SignatureParamType) or isinstance(origin, type) or origin is Union
+    )

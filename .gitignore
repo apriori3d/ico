@@ -76,3 +76,7 @@ htmlcov/
 
 data/
 # ───────────────────────────────────────────────
+# ───────────────────────────────────────────────
+#  Generated flow specs (keep committed fixtures under another name)
+# ───────────────────────────────────────────────
+*.spec.json

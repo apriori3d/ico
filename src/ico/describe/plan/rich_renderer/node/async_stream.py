@@ -46,7 +46,12 @@ class IcoAsyncStreamHeaderRender(StreamGroupPartRenderer):
     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text:
         assert isinstance(node, IcoAsyncStream)
         astream = cast(IcoAsyncStream[Any, Any], node)
-        return Text(f"pool_size={astream.pool_size}", style=DescribeStyle.meta.value)
+        info = [f"pool_size={astream.pool_size}"]
+        if astream.on_error != "raise":
+            info.append(f"on_error={astream.on_error}")
+        if astream.retry.max_retries > 0:
+            info.append(f"retry={astream.retry.max_retries}")
+        return Text(", ".join(info), style=DescribeStyle.meta.value)
 
 
 @operator()

@@ -34,12 +34,15 @@ jobs:
       uses: actions/cache@v3
       with:
         path: .venv
-        key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+        key: venv-${{ runner.os }}-${{ matrix.python-version }}-examples-${{ hashFiles('**/poetry.lock') }}
 
     - name: Install dependencies
       if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+      # mypy checks src/examples too, so install the "examples" extra
+      # (skrub, sklearn, numpy, ...). torch/torchvision are not needed:
+      # mypy ignores their missing imports and no test imports them.
       run: |
-        poetry install --no-interaction --no-ansi
+        poetry install --no-interaction --no-ansi --extras examples
 
     - name: Run linting with Ruff
       run: |
