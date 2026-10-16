@@ -97,11 +97,13 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
             check_link,
             is_strict,
         )
+        from ico.core.tree_utils import TreePathIndex
 
         if strict if strict is not None else is_strict():
             left_node, right_node = cast(IcoNode, left), cast(IcoNode, right)
-            step = chain_length(left_node) + 1
-            issue = check_link(left_node, right_node, step=step)
+            # Relative to this chain: the final flow tree is not known yet.
+            step = TreePathIndex.create(chain_length(left_node))
+            issue = check_link(left_node, right_node, path=step, chain_relative=True)
             if issue is not None and issue.is_error:
                 raise IcoSignatureError(issue)
 

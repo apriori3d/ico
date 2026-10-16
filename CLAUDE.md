@@ -52,10 +52,12 @@ spec export in `src/ico/spec`, tests in `src/tests`.
    - Out of scope: MCP server, acceptance gate, PR flow, entry points.
 9. [x] Agent-facing registry use instead of `find_path`: `search` finds
    direct converters by input and output type, agents see `entry.card()`;
-   chain type errors name the step, both refs and both types, e.g.
-   `step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image`
-   (strict mode, `validate_signatures`, `build`). `find_path` is deferred,
-   see `docs/design/registry.md`.
+   errors are located by a spec-tree `TreePathIndex` and name both refs and
+   both types, e.g.
+   `at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image`;
+   every `build()` error is a `SpecError` with `path`, `expected`, `got`,
+   `refs` (strict chains: `at chain step N`). `find_path` is deferred, see
+   `docs/design/registry.md`.
 10. [ ] `build(spec)` for context nodes: `IcoEpoch`, `IcoContextPipeline`
     and `IcoContextOperator`, so that training flows (not only data
     loaders) can be rebuilt from a spec.

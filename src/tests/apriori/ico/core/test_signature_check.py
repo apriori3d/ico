@@ -12,6 +12,7 @@ from ico.core.signature_check import (
     strict_signatures,
     validate_signatures,
 )
+from ico.core.tree_utils import TreePathIndex
 
 T = TypeVar("T")
 
@@ -178,8 +179,11 @@ def test_strict_rejects_mismatch() -> None:
     assert issue.kind == "mismatch"
     assert issue.output is str
     assert issue.input is int
-    assert issue.step == 2
-    assert str(exc_info.value) == "step 2 (to_str → double): expected int, got str"
+    assert issue.path == TreePathIndex.create(1)
+    assert issue.chain_relative
+    assert str(exc_info.value) == (
+        "at chain step 1 (to_str → double): expected int, got str"
+    )
 
 
 def test_strict_error_is_type_error() -> None:

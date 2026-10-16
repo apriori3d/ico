@@ -17,15 +17,17 @@ operator as its compact card (`entry.card()`):
 Two or three calls are usually enough, and at every step the agent applies
 task semantics that type compatibility alone cannot express.
 
-When a composed chain does not fit, the error names the failing step, both
-registry references and both types, so the agent can fix the exact link:
+When a composed chain does not fit, the error locates the failing node in
+the spec tree and names both registry references and both types, so the
+agent can fix the exact link:
 
 ```
-step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image
+at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image
 ```
 
-The same message is produced by strict mode, `validate_signatures()` and
-`build()` (wrapped in a `SpecError`).
+`build()` raises it as a `SpecError` with structured fields (`path`,
+`expected`, `got`, `refs`); `validate_signatures()` returns the same data in
+`SignatureIssue`. See "Error locations" in `spec.md`.
 
 ## Deferred: `find_path(from_type, to_type)`
 

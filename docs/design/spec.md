@@ -38,6 +38,39 @@ is lost. This cost is accepted for now.
 Training cannot be crystallized at all yet: the model, optimizer and device
 live in the training context, which is built by code, not by a spec.
 
+## Error locations
+
+Errors about a spec point at the failing node with a `TreePathIndex` in
+spec-tree coordinates: indices into `NodeSpec.children` from the root, as in
+the exported JSON (chains flattened into `seq`, registered operators as
+leaves). `spec.root.at(path)` returns the node.
+
+```
+at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image
+at 1: Cannot resolve operator 'tryon.missing@1': ...
+at root: Cannot build node of kind 'epoch' yet.
+```
+
+- Every `build()` error is a `SpecError` with structured fields for tools
+  such as an MCP server: `reason`, `path`, and for type errors `expected`,
+  `got` and `refs` (upstream and downstream registry references).
+- `validate_signatures(flow)` reports `SignatureIssue`s with the same paths:
+  the path of an issue in a Python flow is the path of the failing node in
+  `to_spec(flow)`.
+- Strict mode checks a chain while it is being composed, before the final
+  tree exists, so its path is relative to that chain and says so:
+  `at chain step 2 (...)`.
+
+`TreePathIndex` is used in two coordinate systems that must not be mixed:
+the runtime tree (traces of runtime events: faults, progress, state, print;
+keys of runtime tools) and the spec tree (build and validation errors). No
+separate type is introduced for now.
+
+Future step (not implemented): map runtime fault events to spec-tree paths,
+so that an agent fixes a failure at run time the same way as a build error.
+A fault trace locates a runtime node; translating it requires the mapping
+from runtime nodes to the spec nodes they were built from.
+
 ## Direction: resources and contexts
 
 Not implemented. This section is the agreed direction.

@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TypeAlias, cast
 
+from ico.core.tree_utils import TreePathIndex, format_location
+
 JsonValue: TypeAlias = (
     str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 )
@@ -30,7 +32,46 @@ def is_json_value(value: object) -> bool:
 
 
 class SpecError(ValueError):
-    """Raised when a flow cannot be represented as a spec."""
+    """A flow cannot be represented as a spec, or a spec cannot be built.
+
+    Carries structured fields so that tools (e.g. an MCP server) can return
+    them as JSON instead of parsing the message.
+
+    Attributes:
+        reason: What is wrong, without the location.
+        path: Location of the failing node in the spec tree
+            (see :meth:`NodeSpec.at`), or ``None`` when unknown.
+        expected: For type errors, the formatted type the node accepts.
+        got: For type errors, the formatted type it was given.
+        refs: For type errors, the upstream and downstream node names
+            (registry references for registered operators).
+    """
+
+    def __init__(
+        self,
+        reason: str,
+        *,
+        path: TreePathIndex | None = None,
+        expected: str | None = None,
+        got: str | None = None,
+        refs: tuple[str, str] | None = None,
+    ) -> None:
+        super().__init__(format_location(reason, path, refs))
+        self.reason = reason
+        self.path = path
+        self.expected = expected
+        self.got = got
+        self.refs = refs
+
+    def at(self, path: TreePathIndex) -> SpecError:
+        """The same error located at ``path``."""
+        return SpecError(
+            self.reason,
+            path=path,
+            expected=self.expected,
+            got=self.got,
+            refs=self.refs,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +99,20 @@ class NodeSpec:
     op: str | None = None
     params: dict[str, JsonValue] = field(default_factory=dict[str, JsonValue])
     children: tuple[NodeSpec, ...] = ()
+
+    def at(self, path: TreePathIndex) -> NodeSpec:
+        """The descendant at ``path`` (as reported by build and validation errors).
+
+        Raises:
+            SpecError: If the path does not exist in this tree.
+        """
+        node = self
+        for depth, index in enumerate(path.path_index):
+            if not 0 <= index < len(node.children):
+                prefix = TreePathIndex(path.path_index[:depth])
+                raise SpecError(f"no child {index}", path=prefix)
+            node = node.children[index]
+        return node
 
     def to_dict(self) -> dict[str, JsonValue]:
         """Convert to a compact JSON-compatible dict (empty fields omitted)."""

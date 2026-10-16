@@ -29,6 +29,7 @@ from ico.core.process import IcoProcess
 from ico.core.route import IcoRoute
 from ico.core.signature import IcoSignature
 from ico.core.stream import IcoStream
+from ico.core.tree_utils import TreePathIndex
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
 
 AnyOp: TypeAlias = IcoOperatorProtocol[Any, Any]
@@ -173,16 +174,47 @@ class BuildContext:
         fresh: Create new instances for every operator (used by
             :class:`SpecFactory` workers) instead of returning registered
             instances.
+
+    Every :class:`SpecError` raised while building a node is located at that
+    node's path in the spec tree (see :meth:`NodeSpec.at`).
     """
 
-    __slots__ = ("lookup", "fresh")
+    __slots__ = ("lookup", "fresh", "_stack")
 
     def __init__(self, lookup: Lookup, *, fresh: bool = False) -> None:
         self.lookup = lookup
         self.fresh = fresh
+        self._stack: list[tuple[NodeSpec, TreePathIndex]] = []
+
+    @property
+    def path(self) -> TreePathIndex:
+        """Spec-tree path of the node being built."""
+        return self._stack[-1][1] if self._stack else TreePathIndex()
 
     def build(self, spec: NodeSpec) -> IcoNodeProtocol:
         """Build a node: registered operators by reference, others by kind."""
+        path = self._child_path(spec)
+        self._stack.append((spec, path))
+        try:
+            return self._build(spec)
+        except SpecError as e:
+            if e.path is not None:
+                raise  # already located at a descendant
+            raise e.at(path) from None
+        finally:
+            self._stack.pop()
+
+    def _child_path(self, spec: NodeSpec) -> TreePathIndex:
+        if not self._stack:
+            return TreePathIndex()
+        parent, parent_path = self._stack[-1]
+        # Identity, not equality: equal sibling specs are common in a seq.
+        for index, child in enumerate(parent.children):
+            if child is spec:
+                return parent_path.add_child(index)
+        return parent_path
+
+    def _build(self, spec: NodeSpec) -> IcoNodeProtocol:
         if spec.op is not None:
             return self._resolve(spec)
 
@@ -204,7 +236,11 @@ class BuildContext:
     def factory(self, worker: NodeSpec) -> SpecFactory:
         """A picklable factory creating fresh copies of a worker subtree."""
         refs = sorted(_op_refs(worker))
-        return SpecFactory(worker, tuple(self._target(ref).snapshot() for ref in refs))
+        try:
+            targets = tuple(self._target(ref).snapshot() for ref in refs)
+        except SpecError as e:
+            raise e.at(self._child_path(worker)) from None
+        return SpecFactory(worker, targets)
 
     def _target(self, ref: str) -> _Target:
         from ico.registry.registry import parse_ref
@@ -367,15 +403,22 @@ def _children(spec: NodeSpec, count: int | None = None, *, at_least: int = 0) ->
 def build_seq(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, at_least=2)
     from ico.core.signature_check import check_link
+    from ico.core.signature_utils import format_ico_type
 
     steps = [ctx.op(child) for child in spec.children]
     # Check every link before composing, so that a spec written by an agent
-    # fails with the position, references and types of the bad step.
+    # fails with the location, references and types of the bad step.
     for position in range(1, len(steps)):
-        issue = check_link(steps[position - 1], steps[position], step=position + 1)
+        issue = check_link(steps[position - 1], steps[position])
         if issue is not None and issue.is_error:
-            where = f" '{spec.name}'" if spec.name else ""
-            raise SpecError(f"Type mismatch in seq{where}: {issue.message}")
+            expected, got = format_ico_type(issue.input), format_ico_type(issue.output)
+            raise SpecError(
+                f"expected {expected}, got {got}",
+                path=ctx.path.add_child(position),
+                expected=expected,
+                got=got,
+                refs=(issue.left, issue.right),
+            )
     node = cast(IcoNodeProtocol, reduce(chain, steps))
     if spec.name is not None:
         node.name = spec.name

@@ -30,10 +30,23 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Any, Literal, TypeVar, Union, get_args, get_origin
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
-from ico.core.node import IcoNodeProtocol, iterate_nodes
+from ico.core.node import IcoNodeProtocol
 from ico.core.signature import IcoSignature
+from ico.core.tree_utils import TreePathIndex, format_location
+
+if TYPE_CHECKING:
+    from ico.core.chain import IcoChain
 
 # ────────────────────────────────────────────────
 # Strict mode switch
@@ -86,8 +99,11 @@ class SignatureIssue:
             (``None`` when uninferred).
         input: Input type of ``right`` (``None`` when uninferred).
         node: Name of the fork or route for a conflict, ``None`` otherwise.
-        step: For a chain link, the 1-based position of ``right`` in the
-            flattened chain, so that an agent can locate the failing step.
+        path: Location of the node that rejected its input (``right``, or
+            the second conflicting branch) in spec-tree coordinates, i.e.
+            the node at ``to_spec(flow).root.at(path)``. ``None`` if unknown.
+        chain_relative: ``path`` is relative to a chain being composed (strict
+            mode), not to a whole flow: ``at chain step 2``.
 
     Node names are registry references (``"name@version"``) for registered
     operators, so an agent can relate an error to the spec it wrote.
@@ -99,7 +115,8 @@ class SignatureIssue:
     output: Any
     input: Any
     node: str | None = None
-    step: int | None = None
+    path: TreePathIndex | None = None
+    chain_relative: bool = False
 
     @property
     def is_error(self) -> bool:
@@ -110,19 +127,27 @@ class SignatureIssue:
         from ico.core.signature_utils import format_ico_type
 
         if self.kind == "conflict":
-            return (
+            reason = (
                 f"branches of '{self.node}': inputs {format_ico_type(self.output)} "
                 f"of '{self.left}' and {format_ico_type(self.input)} "
                 f"of '{self.right}' have no common type"
             )
-        # e.g. "step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
-        step = f"step {self.step} " if self.step is not None else ""
-        link = f"{step}({self.left} → {self.right})"
+            return format_location(
+                reason, self.path, chain_relative=self.chain_relative
+            )
+        # e.g. "at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
         if self.kind == "uninferred":
-            return f"{link}: signature could not be inferred, link not checked"
-        return (
-            f"{link}: expected {format_ico_type(self.input)}, "
-            f"got {format_ico_type(self.output)}"
+            reason = "signature could not be inferred, link not checked"
+        else:
+            reason = (
+                f"expected {format_ico_type(self.input)}, "
+                f"got {format_ico_type(self.output)}"
+            )
+        return format_location(
+            reason,
+            self.path,
+            (self.left, self.right),
+            chain_relative=self.chain_relative,
         )
 
     def __str__(self) -> str:
@@ -143,14 +168,19 @@ class IcoSignatureError(TypeError):
 
 
 def check_link(
-    left: IcoNodeProtocol, right: IcoNodeProtocol, *, step: int | None = None
+    left: IcoNodeProtocol,
+    right: IcoNodeProtocol,
+    *,
+    path: TreePathIndex | None = None,
+    chain_relative: bool = False,
 ) -> SignatureIssue | None:
     """Check that ``left``'s output can be fed into ``right``'s input.
 
     Args:
         left: Upstream node (a chain is checked at its last step).
         right: Downstream node (a chain is checked at its first step).
-        step: Position of ``right`` in the enclosing chain, for messages.
+        path: Location of ``right``, reported in the issue.
+        chain_relative: ``path`` is relative to a chain being composed.
 
     Returns:
         A :class:`SignatureIssue` on mismatch or when a signature is not
@@ -164,12 +194,24 @@ def check_link(
 
     if left_sig is None or right_sig is None:
         return SignatureIssue(
-            "uninferred", left_label, right_label, None, None, step=step
+            "uninferred",
+            left_label,
+            right_label,
+            None,
+            None,
+            path=path,
+            chain_relative=chain_relative,
         )
 
     if is_assignable(left_sig.o, right_sig.i) is False:
         return SignatureIssue(
-            "mismatch", left_label, right_label, left_sig.o, right_sig.i, step=step
+            "mismatch",
+            left_label,
+            right_label,
+            left_sig.o,
+            right_sig.i,
+            path=path,
+            chain_relative=chain_relative,
         )
 
     return None
@@ -191,7 +233,10 @@ def chain_length(node: IcoNodeProtocol) -> int:
 
 
 def check_branch_inputs(
-    branches: Sequence[IcoNodeProtocol], node_name: str
+    branches: Sequence[IcoNodeProtocol],
+    node_name: str,
+    *,
+    path: TreePathIndex | None = None,
 ) -> SignatureIssue | None:
     """Check that branches fed with the same item accept a common input type.
 
@@ -200,22 +245,34 @@ def check_branch_inputs(
     Branches with uninferred signatures are skipped. Two unrelated classes
     are treated as conflicting even though a common subclass might exist.
 
+    Args:
+        branches: The node's children that receive the same item.
+        node_name: Name of the fork or route, for messages.
+        path: Location of the fork or route; the issue points at the second
+            conflicting branch below it.
+
     Returns:
         A ``"conflict"`` issue for the first incompatible pair, else ``None``.
     """
     typed = [
-        (branch, sig)
-        for branch in branches
+        (index, branch, sig)
+        for index, branch in enumerate(branches)
         if (sig := _inferred_signature(branch)) is not None
     ]
-    for pos, (a, a_sig) in enumerate(typed):
-        for b, b_sig in typed[pos + 1 :]:
+    for pos, (_, a, a_sig) in enumerate(typed):
+        for b_index, b, b_sig in typed[pos + 1 :]:
             if (
                 is_assignable(a_sig.i, b_sig.i) is False
                 and is_assignable(b_sig.i, a_sig.i) is False
             ):
                 return SignatureIssue(
-                    "conflict", _label(a), _label(b), a_sig.i, b_sig.i, node_name
+                    "conflict",
+                    _label(a),
+                    _label(b),
+                    a_sig.i,
+                    b_sig.i,
+                    node_name,
+                    path=path.add_child(b_index) if path is not None else None,
                 )
     return None
 
@@ -227,27 +284,73 @@ def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
 
     Unlike strict mode this never raises: errors and warnings are returned
     so that a caller (e.g. an agent) can see all problems at once.
+
+    Issue paths are in spec-tree coordinates: chains are flattened into
+    sequences and registered operators are opaque leaves (not checked
+    inside), so ``to_spec(flow).root.at(issue.path)`` is the failing node.
     """
+    issues: list[SignatureIssue] = []
+    _validate_node(flow, TreePathIndex(), issues)
+    return issues
+
+
+def _validate_node(
+    node: IcoNodeProtocol, path: TreePathIndex, issues: list[SignatureIssue]
+) -> None:
     from ico.core.chain import IcoChain
     from ico.core.fork import IcoFork
     from ico.core.process import IcoProcess
     from ico.core.route import IcoRoute
+    from ico.registry.registry import get_meta
 
-    issues: list[SignatureIssue] = []
-    for node in iterate_nodes(flow):
-        issue: SignatureIssue | None = None
-        if isinstance(node, IcoChain):
-            left, right = node.children
-            issue = check_link(left, right, step=chain_length(left) + 1)
-        elif isinstance(node, IcoFork | IcoRoute):
-            issue = check_branch_inputs(node.children, node.name or "")
-        elif isinstance(node, IcoProcess) and len(node.children) == 2:
-            # Process with a stop condition: the body output feeds `until`.
-            body, until = node.children
-            issue = check_link(body, until)
-        if issue is not None:
-            issues.append(issue)
-    return issues
+    if get_meta(node) is not None:
+        return  # registered operators are opaque, like in a spec
+
+    children = _spec_children(node)
+    found: list[SignatureIssue | None] = []
+    if isinstance(node, IcoChain):
+        for position in range(1, len(children)):
+            found.append(
+                check_link(
+                    children[position - 1],
+                    children[position],
+                    path=path.add_child(position),
+                )
+            )
+    elif isinstance(node, IcoFork | IcoRoute):
+        found.append(check_branch_inputs(node.children, node.name or "", path=path))
+    elif isinstance(node, IcoProcess) and len(node.children) == 2:
+        # Process with a stop condition: the body output feeds `until`.
+        body, until = node.children
+        found.append(check_link(body, until, path=path.add_child(1)))
+    issues.extend(issue for issue in found if issue is not None)
+
+    for index, child in enumerate(children):
+        _validate_node(child, path.add_child(index), issues)
+
+
+def _spec_children(node: IcoNodeProtocol) -> list[IcoNodeProtocol]:
+    """Children as exported by ``to_spec``: chains flattened, one worker for
+    a factory-based async stream."""
+    from ico.core.async_stream import IcoAsyncStream
+    from ico.core.chain import IcoChain
+
+    if isinstance(node, IcoChain):
+        left, right = node.children
+        return [*_chain_steps(left), *_chain_steps(right)]
+    if isinstance(node, IcoAsyncStream) and node.pool_from_factory:
+        return list(node.children[:1])
+    return list(node.children)
+
+
+def _chain_steps(node: IcoNodeProtocol) -> list[IcoNodeProtocol]:
+    from ico.core.chain import IcoChain
+    from ico.registry.registry import get_meta
+
+    if get_meta(node) is not None or not isinstance(node, IcoChain):
+        return [node]
+    left, right = node.children
+    return [*_chain_steps(left), *_chain_steps(right)]
 
 
 def narrowest_type(types_: Sequence[Any]) -> Any | None:
@@ -285,12 +388,21 @@ def _boundary_node(
     The output of ``a | b`` is the output of ``b`` even if ``a`` is untyped,
     so links are checked between the innermost adjacent leaves.
     """
-    from ico.core.chain import IcoChain
-
-    while isinstance(node, IcoChain):
-        left, right = node.children
+    # A registered chain is an opaque operator: it is its own boundary.
+    while (chain := _open_chain(node)) is not None:
+        left, right = chain.children
         node = right if side == "output" else left
     return node
+
+
+def _open_chain(node: IcoNodeProtocol) -> IcoChain[Any, Any, Any] | None:
+    """The node as a chain to look into, or ``None`` (not a chain, or registered)."""
+    from ico.core.chain import IcoChain
+    from ico.registry.registry import get_meta
+
+    if get_meta(node) is not None or not isinstance(node, IcoChain):
+        return None
+    return cast(IcoChain[Any, Any, Any], node)
 
 
 def _inferred_signature(node: IcoNodeProtocol) -> IcoSignature | None:

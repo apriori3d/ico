@@ -5,14 +5,16 @@ from typing import Any, cast
 
 import pytest
 
+from ico.core.fork import fork
 from ico.core.operator import IcoOperator
 from ico.core.signature_check import (
     IcoSignatureError,
     strict_signatures,
     validate_signatures,
 )
+from ico.core.tree_utils import TreePathIndex
 from ico.registry import IcoRegistry, register
-from ico.spec import NodeSpec, PipelineSpec, SpecError, build
+from ico.spec import NodeSpec, PipelineSpec, SpecError, build, to_spec
 
 
 class Photo:
@@ -88,10 +90,10 @@ def test_search_by_input_only(registry: IcoRegistry) -> None:
     assert refs == ["tryon.mask@1", "tryon.segment@1"]
 
 
-# ─── Chain type errors ───
+# ─── Chain type errors: located in spec-tree coordinates ───
 
 
-def test_build_reports_step_refs_and_types(registry: IcoRegistry) -> None:
+def test_build_error_fields(registry: IcoRegistry) -> None:
     spec = PipelineSpec(
         root=NodeSpec(
             kind="seq",
@@ -102,10 +104,55 @@ def test_build_reports_step_refs_and_types(registry: IcoRegistry) -> None:
     with pytest.raises(SpecError) as exc_info:
         build(spec, registry)
 
-    assert str(exc_info.value) == (
-        "Type mismatch in seq 'tryon': "
-        "step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
+    error = exc_info.value
+    # Structured fields (what an MCP server returns as JSON), not the message.
+    assert error.path == TreePathIndex.create(2)
+    assert error.expected == "Mask"
+    assert error.got == "Image"
+    assert error.refs == ("tryon.segment@1", "tryon.render@1")
+    assert error.path is not None
+    assert spec.root.at(error.path).op == "tryon.render@1"
+    assert str(error) == (
+        "at 2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
     )
+
+
+def test_build_error_path_in_nested_spec(registry: IcoRegistry) -> None:
+    good = NodeSpec(kind="seq", children=(op("tryon.load@1"), op("tryon.mask@1")))
+    bad = NodeSpec(
+        kind="seq",
+        children=(op("tryon.load@1"), op("tryon.segment@1"), op("tryon.render@1")),
+    )
+    spec = PipelineSpec(root=NodeSpec(kind="fork", children=(good, bad)))
+
+    with pytest.raises(SpecError) as exc_info:
+        build(spec, registry)
+
+    error = exc_info.value
+    assert error.path == TreePathIndex.create(1, 2)
+    assert error.path is not None
+    assert spec.root.at(error.path).op == "tryon.render@1"
+    assert str(error).startswith("at 1.2 (tryon.segment@1 → tryon.render@1)")
+
+
+def test_every_build_error_is_located(registry: IcoRegistry) -> None:
+    spec = PipelineSpec(
+        root=NodeSpec(kind="seq", children=(op("tryon.load@1"), op("tryon.missing@1")))
+    )
+    with pytest.raises(SpecError) as exc_info:
+        build(spec, registry)
+
+    error = exc_info.value
+    assert error.path == TreePathIndex.create(1)
+    assert error.refs is None and error.expected is None and error.got is None
+    assert str(error).startswith("at 1: Cannot resolve operator 'tryon.missing@1'")
+
+
+def test_root_error_is_located_at_root(registry: IcoRegistry) -> None:
+    with pytest.raises(SpecError) as exc_info:
+        build(PipelineSpec(root=NodeSpec(kind="epoch")), registry)
+    assert exc_info.value.path == TreePathIndex()
+    assert str(exc_info.value).startswith("at root: ")
 
 
 def test_build_accepts_compatible_chain(registry: IcoRegistry) -> None:
@@ -119,7 +166,7 @@ def test_build_accepts_compatible_chain(registry: IcoRegistry) -> None:
     assert isinstance(flow(Photo()), Image)  # type: ignore[operator]
 
 
-def test_strict_chain_error_names_step_and_refs(registry: IcoRegistry) -> None:
+def test_strict_chain_path_is_chain_relative(registry: IcoRegistry) -> None:
     load, segment, render = (
         node(registry, ref)
         for ref in ("tryon.load@1", "tryon.segment@1", "tryon.render@1")
@@ -128,25 +175,46 @@ def test_strict_chain_error_names_step_and_refs(registry: IcoRegistry) -> None:
         _ = load | segment | render
 
     issue = exc_info.value.issue
-    assert issue.step == 3
+    assert issue.path == TreePathIndex.create(2)
+    assert issue.chain_relative
     assert str(exc_info.value) == (
-        "step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
+        "at chain step 2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
     )
 
 
-def test_validate_reports_step_of_every_link(registry: IcoRegistry) -> None:
-    def to_photo(x: int) -> Photo:
-        return Photo()
-
-    flow = (
-        IcoOperator(to_photo)
-        | node(registry, "tryon.load@1")
+def test_validate_paths_match_exported_spec(registry: IcoRegistry) -> None:
+    good = node(registry, "tryon.load@1") | node(registry, "tryon.mask@1")
+    bad = (
+        node(registry, "tryon.load@1")
         | node(registry, "tryon.segment@1")
         | node(registry, "tryon.render@1")
     )
+    flow = fork(good, bad)
+
     issues = validate_signatures(flow)
 
-    assert [(i.step, i.left, i.right) for i in issues] == [
-        (4, "tryon.segment@1", "tryon.render@1")
+    assert [(str(i.path), i.left, i.right) for i in issues] == [
+        ("1.2", "tryon.segment@1", "tryon.render@1")
     ]
-    assert issues[0].message.startswith("step 4 (tryon.segment@1 → tryon.render@1)")
+    assert to_spec(flow).root.at(issues[0].path).op == "tryon.render@1"  # type: ignore[arg-type]
+    assert issues[0].message == (
+        "at 1.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
+    )
+
+
+def test_validate_fork_conflict_points_at_branch(registry: IcoRegistry) -> None:
+    flow = fork(node(registry, "tryon.load@1"), node(registry, "tryon.render@1"))
+
+    (issue,) = validate_signatures(flow)
+
+    assert issue.kind == "conflict"
+    assert issue.path == TreePathIndex.create(1)
+    assert str(issue).startswith("at 1: branches of 'fork'")
+
+
+def test_node_spec_at_reports_missing_path() -> None:
+    root = NodeSpec(kind="seq", children=(op("a@1"), op("b@1")))
+    assert root.at(TreePathIndex()) is root
+    with pytest.raises(SpecError) as exc_info:
+        root.at(TreePathIndex.create(1, 0))
+    assert exc_info.value.path == TreePathIndex.create(1)
