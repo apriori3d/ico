@@ -113,7 +113,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
     Propose the full list of renames first; ask if a new name collides with
     existing code.
 
-15. [ ] Progress for external consumers: `JsonProgressTool`, a runtime tool
+15. [x] Progress for external consumers: `JsonProgressTool`, a runtime tool
     like `RichProgressTool` that renders nothing and instead emits
     throttled JSON progress snapshots to a callback, one per progress node
     update: `{"key": "<TreePathIndex>", "label": "...", "done", "total",
@@ -126,21 +126,22 @@ spec export in `src/ico/spec`, tests in `src/tests`.
     Throttle per node (default ≤ 2 updates/s) and always emit the final
     state.
 
-16. [ ] JSON backend for `describe` (plan view model), next to `RichText`:
-    a render-neutral tree built by the existing per-node-type renderer
-    registry. Each node: `label`, `sig`, `ref`, `badges` (e.g. `pool ×4`,
-    `until`, `on_error=skip`), `layout` (`sequence` / `parallel` / `loop` /
-    `leaf`), `children`, and `progress_key` for progress nodes, equal to
-    the key used by `JsonProgressTool` (matched by node identity in the
-    same built flow). Consumers render it without knowing node kinds:
-    the `ico-mcp` dashboard first, later a Jupyter view or Live Board.
-    JSON-compatible, with a schema test.
-
-Next: start `ico-mcp` (separate package) on top of items 10–16.
+Next: start `ico-mcp` (separate package) on top of items 10–15.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.
+- JSON backend for `describe` (plan view model), next to `RichText`:
+  a render-neutral tree built by the existing per-node-type renderer
+  registry. Each node: `label`, `sig`, `ref`, `badges` (e.g. `pool ×4`,
+  `until`, `on_error=skip`), `layout` (`sequence` / `parallel` / `loop` /
+  `leaf`), `children`, and `progress_key` for progress nodes, equal to
+  the key used by `JsonProgressTool` (matched by node identity in the
+  same built flow). Consumers render it without knowing node kinds:
+  the `ico-mcp` dashboard first, later a Jupyter view or Live Board.
+  JSON-compatible, with a schema test.
+  Do it together with the `ico-mcp` asynchronous runs and dashboard
+  (items 8–9 of the `ico-mcp` roadmap): it is only needed there.
 - `build(spec)` for context nodes (`IcoEpoch`, `IcoContextPipeline`,
   `IcoContextOperator`). Revisit when an agent needs to rebuild a training
   flow.
