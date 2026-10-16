@@ -90,7 +90,30 @@ spec export in `src/ico/spec`, tests in `src/tests`.
     - Result is a small dataclass with `to_dict()`: outputs, total,
       truncated, errors.
 
-Next: start `ico-mcp` (separate package) on top of items 10–13.
+14. [ ] Rename the agent/worker pair and runtime tools (before `ico-mcp`,
+    where "agent" means the LLM agent and "tool" means an MCP tool).
+    Full rename everywhere: code, tests, README, examples, notebooks,
+    docstrings and `docs/design`. No deprecated aliases. Pure rename, no
+    behavior changes; one PR.
+    - `IcoAgent` → `IcoWorker` (local side: operator in the flow, manages
+      the runner)
+    - `MPAgent` → `MPWorker`
+    - `IcoAgentWorker` → `IcoRunner` (remote side: executes the flow)
+    - `AgentStateModel` → `WorkerStateModel`,
+      `AgentWorkerStateModel` → `RunnerStateModel`
+    - modules: `core/runtime/agent.py` → `core/runtime/worker.py`,
+      `runtime/agent/mp/` → `runtime/worker/mp/`
+    - spec kind `"agent"` → `"worker"`
+    - `IcoTool` → `IcoRuntimeTool`, `IcoToolBox` → `IcoRuntimeToolBox`
+      (runtime observers, not MCP tools); related names such as
+      `IcoToolRegistrationProtocol` follow the same rule
+    - After the rename, `grep -ri "agent"` and `grep -rw "IcoTool"` over
+      `src/`, `README.md` and `docs/` must return nothing except intended
+      uses. List any remaining hits in the PR description.
+    Propose the full list of renames first; ask if a new name collides with
+    existing code.
+
+Next: start `ico-mcp` (separate package) on top of items 10–14.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
