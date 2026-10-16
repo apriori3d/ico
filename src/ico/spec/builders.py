@@ -366,7 +366,16 @@ def _children(spec: NodeSpec, count: int | None = None, *, at_least: int = 0) ->
 @spec_builder("seq")
 def build_seq(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, at_least=2)
+    from ico.core.signature_check import check_link
+
     steps = [ctx.op(child) for child in spec.children]
+    # Check every link before composing, so that a spec written by an agent
+    # fails with the position, references and types of the bad step.
+    for position in range(1, len(steps)):
+        issue = check_link(steps[position - 1], steps[position], step=position + 1)
+        if issue is not None and issue.is_error:
+            where = f" '{spec.name}'" if spec.name else ""
+            raise SpecError(f"Type mismatch in seq{where}: {issue.message}")
     node = cast(IcoNodeProtocol, reduce(chain, steps))
     if spec.name is not None:
         node.name = spec.name

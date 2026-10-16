@@ -91,10 +91,17 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
             The chain automatically creates a composite name "left | right"
             and establishes parent-child relationships for proper tree structure.
         """
-        from ico.core.signature_check import IcoSignatureError, check_link, is_strict
+        from ico.core.signature_check import (
+            IcoSignatureError,
+            chain_length,
+            check_link,
+            is_strict,
+        )
 
         if strict if strict is not None else is_strict():
-            issue = check_link(cast(IcoNode, left), cast(IcoNode, right))
+            left_node, right_node = cast(IcoNode, left), cast(IcoNode, right)
+            step = chain_length(left_node) + 1
+            issue = check_link(left_node, right_node, step=step)
             if issue is not None and issue.is_error:
                 raise IcoSignatureError(issue)
 

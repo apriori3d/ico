@@ -86,6 +86,11 @@ class SignatureIssue:
             (``None`` when uninferred).
         input: Input type of ``right`` (``None`` when uninferred).
         node: Name of the fork or route for a conflict, ``None`` otherwise.
+        step: For a chain link, the 1-based position of ``right`` in the
+            flattened chain, so that an agent can locate the failing step.
+
+    Node names are registry references (``"name@version"``) for registered
+    operators, so an agent can relate an error to the spec it wrote.
     """
 
     kind: IssueKind
@@ -94,6 +99,7 @@ class SignatureIssue:
     output: Any
     input: Any
     node: str | None = None
+    step: int | None = None
 
     @property
     def is_error(self) -> bool:
@@ -109,13 +115,14 @@ class SignatureIssue:
                 f"of '{self.left}' and {format_ico_type(self.input)} "
                 f"of '{self.right}' have no common type"
             )
-        link = f"'{self.left}' | '{self.right}'"
+        # e.g. "step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
+        step = f"step {self.step} " if self.step is not None else ""
+        link = f"{step}({self.left} → {self.right})"
         if self.kind == "uninferred":
             return f"{link}: signature could not be inferred, link not checked"
         return (
-            f"{link}: output {format_ico_type(self.output)} of '{self.left}' "
-            f"is not assignable to input {format_ico_type(self.input)} "
-            f"of '{self.right}'"
+            f"{link}: expected {format_ico_type(self.input)}, "
+            f"got {format_ico_type(self.output)}"
         )
 
     def __str__(self) -> str:
@@ -135,8 +142,15 @@ class IcoSignatureError(TypeError):
 # ────────────────────────────────────────────────
 
 
-def check_link(left: IcoNodeProtocol, right: IcoNodeProtocol) -> SignatureIssue | None:
+def check_link(
+    left: IcoNodeProtocol, right: IcoNodeProtocol, *, step: int | None = None
+) -> SignatureIssue | None:
     """Check that ``left``'s output can be fed into ``right``'s input.
+
+    Args:
+        left: Upstream node (a chain is checked at its last step).
+        right: Downstream node (a chain is checked at its first step).
+        step: Position of ``right`` in the enclosing chain, for messages.
 
     Returns:
         A :class:`SignatureIssue` on mismatch or when a signature is not
@@ -149,14 +163,31 @@ def check_link(left: IcoNodeProtocol, right: IcoNodeProtocol) -> SignatureIssue 
     left_label, right_label = _label(left_leaf), _label(right_leaf)
 
     if left_sig is None or right_sig is None:
-        return SignatureIssue("uninferred", left_label, right_label, None, None)
+        return SignatureIssue(
+            "uninferred", left_label, right_label, None, None, step=step
+        )
 
     if is_assignable(left_sig.o, right_sig.i) is False:
         return SignatureIssue(
-            "mismatch", left_label, right_label, left_sig.o, right_sig.i
+            "mismatch", left_label, right_label, left_sig.o, right_sig.i, step=step
         )
 
     return None
+
+
+def chain_length(node: IcoNodeProtocol) -> int:
+    """Number of steps of a node in a flattened chain (1 for non-chains).
+
+    Registered chains are opaque operators and count as one step.
+    """
+    from ico.core.chain import IcoChain
+    from ico.registry.registry import get_meta
+
+    # Check the metadata before isinstance narrows the node to a generic chain.
+    if get_meta(node) is not None or not isinstance(node, IcoChain):
+        return 1
+    left, right = node.children
+    return chain_length(left) + chain_length(right)
 
 
 def check_branch_inputs(
@@ -207,7 +238,7 @@ def validate_signatures(flow: IcoNodeProtocol) -> list[SignatureIssue]:
         issue: SignatureIssue | None = None
         if isinstance(node, IcoChain):
             left, right = node.children
-            issue = check_link(left, right)
+            issue = check_link(left, right, step=chain_length(left) + 1)
         elif isinstance(node, IcoFork | IcoRoute):
             issue = check_branch_inputs(node.children, node.name or "")
         elif isinstance(node, IcoProcess) and len(node.children) == 2:
@@ -270,7 +301,13 @@ def _inferred_signature(node: IcoNodeProtocol) -> IcoSignature | None:
 
 
 def _label(node: IcoNodeProtocol) -> str:
-    """Human-readable node name: explicit name, wrapped function name or class."""
+    """Node name for messages: registry reference, explicit name, function name
+    or class."""
+    from ico.registry.registry import get_meta
+
+    meta = get_meta(node)
+    if meta is not None:
+        return meta.ref
     if node.name:
         return node.name
     fn_name: str | None = getattr(getattr(node, "_fn", None), "__name__", None)

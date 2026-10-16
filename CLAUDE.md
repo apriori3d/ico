@@ -50,8 +50,12 @@ spec export in `src/ico/spec`, tests in `src/tests`.
    - `build(spec)` resolves `name@version` refs through the registry and
      rebuilds the flow; round trip `to_spec → build → to_spec` must be stable.
    - Out of scope: MCP server, acceptance gate, PR flow, entry points.
-9. [ ] `find_path(from_type, to_type)`: shortest operator chains between
-   types over the registry type graph.
+9. [x] Agent-facing registry use instead of `find_path`: `search` finds
+   direct converters by input and output type, agents see `entry.card()`;
+   chain type errors name the step, both refs and both types, e.g.
+   `step 3 (tryon.segment@1 → tryon.render@1): expected Mask, got Image`
+   (strict mode, `validate_signatures`, `build`). `find_path` is deferred,
+   see `docs/design/registry.md`.
 10. [ ] `build(spec)` for context nodes: `IcoEpoch`, `IcoContextPipeline`
     and `IcoContextOperator`, so that training flows (not only data
     loaders) can be rebuilt from a spec.

@@ -178,8 +178,8 @@ def test_strict_rejects_mismatch() -> None:
     assert issue.kind == "mismatch"
     assert issue.output is str
     assert issue.input is int
-    assert "output str of 'to_str'" in str(exc_info.value)
-    assert "input int of 'double'" in str(exc_info.value)
+    assert issue.step == 2
+    assert str(exc_info.value) == "step 2 (to_str → double): expected int, got str"
 
 
 def test_strict_error_is_type_error() -> None:
