@@ -9,7 +9,7 @@ from typing import Any, cast
 import pytest
 
 from ico.core.operator import IcoOperator
-from ico.registry import default_registry, load_operators
+from ico.registry import default_registry, get_meta, load_operators
 from ico.runtime.worker.mp.mp_worker import MPWorker
 
 DOUBLE = '''
@@ -175,6 +175,81 @@ def test_failed_reload_restores_previous_entries(package: Package) -> None:
 
     assert report.errors and report.errors[0][1].startswith("SyntaxError:")
     assert scale_of(f"{package.name}.scale@1")(1) == 2
+
+
+# ─── Status from location ───
+
+
+def test_status_overrides_module_default(package: Package) -> None:
+    package.write("double", DOUBLE)  # registered without a status: draft
+
+    report = load_operators(package.dir, status="stable")
+
+    entry = default_registry.get(f"{package.name}.double@1")
+    assert entry.meta.status == "stable"
+    assert entry.card()["status"] == "stable"
+    meta = get_meta(entry.node)
+    assert meta is not None and meta.status == "stable"
+    assert report.loaded == (f"{package.name}.double@1",)
+
+
+def test_status_overrides_explicit_status_in_code(package: Package) -> None:
+    package.write("scale", SCALE, status="stable", factor=2)
+
+    load_operators(package.dir, status="draft")
+
+    entry = default_registry.get(f"{package.name}.scale@1")
+    assert entry.meta.status == "draft"
+    meta = get_meta(entry.cls)
+    assert meta is not None and meta.status == "draft"
+
+
+def test_no_status_keeps_module_status(package: Package) -> None:
+    package.write("scale", SCALE, status="stable", factor=2)
+    load_operators(package.dir)
+    assert default_registry.get(f"{package.name}.scale@1").meta.status == "stable"
+
+
+def test_replace_follows_overridden_status(package: Package) -> None:
+    package.write("scale", SCALE, status="stable", factor=2)
+    load_operators(package.dir, status="draft")  # draft by location
+    package.write("scale", SCALE, status="stable", factor=5)
+
+    report = load_operators(package.dir, replace=True, status="draft")
+
+    assert report.errors == ()
+    assert scale_of(f"{package.name}.scale@1")(1) == 5
+    assert default_registry.get(f"{package.name}.scale@1").meta.status == "draft"
+
+
+def test_replace_refused_for_stable_location(package: Package) -> None:
+    package.write("scale", SCALE, status="draft", factor=2)
+    load_operators(package.dir, status="stable")
+    package.write("scale", SCALE, status="draft", factor=5)
+
+    report = load_operators(package.dir, replace=True, status="stable")
+
+    ((_, error),) = report.errors
+    assert "cannot replace non-draft operators" in error
+    assert scale_of(f"{package.name}.scale@1")(1) == 2
+
+
+def test_failed_reload_restores_overridden_status(package: Package) -> None:
+    package.write("scale", SCALE, status="stable", factor=2)
+    load_operators(package.dir, status="draft")
+    package.write("scale", "def oops(:\n")
+
+    report = load_operators(package.dir, replace=True, status="draft")
+
+    assert report.errors
+    assert default_registry.get(f"{package.name}.scale@1").meta.status == "draft"
+
+
+def test_rejects_unknown_status(package: Package) -> None:
+    package.write("double", DOUBLE)
+    with pytest.raises(ValueError, match="status must be one of"):
+        load_operators(package.dir, status="final")  # type: ignore[arg-type]
+    assert f"{package.name}.double" not in sys.modules  # nothing imported
 
 
 def test_rejects_non_package(tmp_path: Path) -> None:
