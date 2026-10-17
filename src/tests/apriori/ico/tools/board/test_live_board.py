@@ -7,7 +7,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from ico import IcoOperator, IcoRuntime, LiveBoardTool, PlanNodeView
+from ico import IcoOperator, IcoRuntime, LiveBoardTool, PlanView
 from ico.core.runtime.progress import IcoProgress
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
@@ -85,13 +85,10 @@ def test_max_finished_must_be_positive() -> None:
 
 def test_board_serves_page_runs_and_plan(board: tuple[BoardRuns, LiveBoard]) -> None:
     runs, live = board
-    plan: PlanNodeView = {
-        "label": "flow",
-        "sig": None,
-        "ref": None,
-        "badges": [],
-        "layout": "leaf",
-        "children": [],
+    plan: PlanView = {
+        "title": "flow",
+        "columns": ["Flow"],
+        "rows": [[[{"text": "upper", "style": "fn", "dim": False}]]],
     }
     run = runs.start("demo", plan)
 
@@ -140,8 +137,8 @@ def test_tool_adds_a_run_with_progress_and_plan(
         ("items", 4.0, 4.0)
     ]
     plan = get(live, f"/api/plan?run={run['id']}")
-    assert plan["label"] == "numbers flow"
-    assert [c["label"] for c in plan["children"]][0] == "IcoSource"
+    assert plan["title"] == "numbers flow"
+    assert "".join(s["text"] for s in plan["rows"][0][0]) == "📚IcoSource(numbers)"
 
 
 def test_tool_marks_a_faulted_run_failed() -> None:

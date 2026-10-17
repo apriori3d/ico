@@ -10,7 +10,9 @@
     --bg: #f6f6f3; --card: #ffffff; --text: #1d1d1b; --muted: #6d6d67;
     --line: #e2e2dc; --track: #ebebe5; --bar: #3b6fd8; --chip: #f0f0ea;
     --ok: #2f8a4c; --fail: #c4412f; --run: #3b6fd8;
-    --seq: #8a8a82; --par: #7a5bd0; --loop: #c27a1b;
+    --fn: #97683f; --type: #2f6fb0; --class: #0052cc; --keyword: #b31fb3;
+    --dimmed: #8c8c86; --meta: #0a7fc0; --textc: #2f8a46; --string: #c41a1a;
+    --signature: #0e7c86; --semantic: #7a3ff0; --tree: #a6a6a0;
     --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
@@ -18,7 +20,9 @@
       --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9b9b94;
       --line: #2f2f2c; --track: #2a2a27; --bar: #6d97ee; --chip: #292926;
       --ok: #5cbf7a; --fail: #ec7a68; --run: #6d97ee;
-      --seq: #77776f; --par: #a58ff0; --loop: #e0a24e;
+      --fn: #c39a72; --type: #569cd6; --class: #6ea8ff; --keyword: #e85ae8;
+      --dimmed: #8f8f88; --meta: #4fc1ff; --textc: #4eb169; --string: #f06a6a;
+      --signature: #3fd0d8; --semantic: #a07cf8; --tree: #66665f;
     }
   }
   * { box-sizing: border-box; }
@@ -68,27 +72,27 @@
   details.plan > summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   .graph { margin-top: 8px; overflow-x: auto; }
 
-  table.flow { border-collapse: collapse; font-size: 13px; }
-  /* height: 1px lets the cell fill the row, so nesting guides never break. */
-  table.flow td { padding: 0 24px 0 0; vertical-align: top; white-space: nowrap; height: 1px; }
-  table.flow td.sig {
-    font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 3px 0;
+  table.plan {
+    border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; line-height: 1.3;
   }
-  table.flow tr:hover td { background: var(--chip); }
-  .cell { display: flex; align-items: stretch; height: 100%; }
-  .guide { width: 16px; flex: none; border-left: 2px solid var(--seq); margin-left: 3px; }
-  .guide.parallel { border-left-color: var(--par); }
-  .guide.loop { border-left-color: var(--loop); }
-  .text { display: flex; align-items: baseline; gap: 6px; padding: 3px 0; }
-  .kind { font-size: 11px; color: var(--muted); }
-  .kind.parallel { color: var(--par); }
-  .kind.loop { color: var(--loop); }
-  .group > .text .nlabel { font-weight: 600; }
-  .ref { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-  .badge {
-    font-size: 11px; background: var(--chip); border-radius: 4px; padding: 0 5px;
-    font-family: var(--mono); color: var(--muted);
+  table.plan th {
+    text-align: left; font-weight: 600; color: var(--muted); padding: 0 28px 4px 0;
+    font-family: system-ui, -apple-system, sans-serif; font-size: 12px;
   }
+  table.plan td { padding: 0 28px 0 0; white-space: pre; vertical-align: top; }
+  table.plan tr:hover td { background: var(--chip); }
+  .s-fn { color: var(--fn); }
+  .s-type { color: var(--type); }
+  .s-class_ { color: var(--class); }
+  .s-keyword { color: var(--keyword); }
+  .s-dimmed { color: var(--dimmed); }
+  .s-meta { color: var(--meta); }
+  .s-text { color: var(--textc); }
+  .s-string { color: var(--string); }
+  .s-signature { color: var(--signature); }
+  .s-semantic_meta { color: var(--semantic); font-style: italic; }
+  .s-group, .s-tree { color: var(--tree); }
+  .dim { opacity: .55; }
 
   @media (max-width: 560px) {
     .bar { grid-template-columns: 1fr auto; }
@@ -166,33 +170,32 @@ function renderBar(node) {
   return row;
 }
 
-// ─── Plan: a table like the console plan, drawn from layouts only ───
-// The flow goes top to bottom on the left (nesting shown by guides), the
-// signatures are on the right. Node kinds are unknown here.
+// ─── Plan: the console plan rows, colored by DescribeStyle role ───
+// Node kinds are unknown here: rows and styles come from the server.
 
-const KIND = { parallel: "∥", loop: "↻" };
+function renderCell(cell, tag) {
+  const td = el(tag);
+  cell.forEach((segment) => {
+    let cls = segment.style ? "s-" + segment.style : "";
+    if (segment.dim) cls += " dim";
+    td.append(el("span", cls.trim() || null, segment.text));
+  });
+  return td;
+}
 
 function renderPlanTable(plan) {
-  const table = el("table", "flow");
+  const table = el("table", "plan");
+  const head = el("tr");
+  plan.columns.forEach((name) => head.append(el("th", null, name)));
+  const thead = el("thead");
+  thead.append(head);
   const body = el("tbody");
-  const visit = (node, guides) => {
-    const row = el("tr");
-    const cell = el("div", "cell" + (node.children.length ? " group" : ""));
-    guides.forEach((layout) => cell.append(el("span", "guide " + layout)));
-    const text = el("span", "text");
-    if (KIND[node.layout]) text.append(el("span", "kind " + node.layout, KIND[node.layout]));
-    text.append(el("span", "nlabel", node.label));
-    if (node.ref) text.append(el("span", "ref", node.ref));
-    node.badges.forEach((badge) => text.append(el("span", "badge", badge)));
-    cell.append(text);
-    const flow = el("td");
-    flow.append(cell);
-    row.append(flow, el("td", "sig", node.sig || ""));
-    body.append(row);
-    node.children.forEach((child) => visit(child, [...guides, node.layout]));
-  };
-  visit(plan, []);
-  table.append(body);
+  plan.rows.forEach((row) => {
+    const tr = el("tr");
+    row.forEach((cell) => tr.append(renderCell(cell, "td")));
+    body.append(tr);
+  });
+  table.append(thead, body);
   return table;
 }
 

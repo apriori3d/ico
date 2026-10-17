@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Literal, Protocol, TypedDict
 
-from ico.describe.plan.json_renderer import PlanNodeView
+from ico.describe.plan.json_renderer import PlanView
 
 RunState = Literal["running", "done", "failed"]
 
@@ -54,7 +54,7 @@ class BoardSource(Protocol):
         """Runs, newest first."""
         ...
 
-    def plan(self, run_id: str) -> PlanNodeView | None:
+    def plan(self, run_id: str) -> PlanView | None:
         """The plan of a run, if known."""
         ...
 
@@ -62,9 +62,7 @@ class BoardSource(Protocol):
 class BoardRun:
     """One run of a :class:`BoardRuns`; its methods are thread-safe."""
 
-    def __init__(
-        self, title: str, plan: PlanNodeView | None, lock: threading.Lock
-    ) -> None:
+    def __init__(self, title: str, plan: PlanView | None, lock: threading.Lock) -> None:
         self.id = secrets.token_hex(6)
         self.title = title
         self.plan = plan
@@ -118,7 +116,7 @@ class BoardRuns:
         self._runs: dict[str, BoardRun] = {}
         self._lock = threading.Lock()
 
-    def start(self, title: str, plan: PlanNodeView | None = None) -> BoardRun:
+    def start(self, title: str, plan: PlanView | None = None) -> BoardRun:
         """Add a running run; drops the oldest finished runs over the limit."""
         run = BoardRun(title, plan, self._lock)
         with self._lock:
@@ -133,7 +131,7 @@ class BoardRuns:
             runs = list(reversed(self._runs.values()))
         return [run.view() for run in runs]
 
-    def plan(self, run_id: str) -> PlanNodeView | None:
+    def plan(self, run_id: str) -> PlanView | None:
         with self._lock:
             run = self._runs.get(run_id)
         return run.plan if run is not None else None
