@@ -7,6 +7,7 @@ Example:
 
 from ico.spec.builders import BuildContext, SpecFactory, build, spec_builder
 from ico.spec.model import SPEC_VERSION, JsonValue, NodeSpec, PipelineSpec, SpecError
+from ico.spec.params import SpecParam, bind, spec_params
 from ico.spec.registry import (
     SpecContext,
     find_serializer,
@@ -19,8 +20,11 @@ from ico.spec.run import RunError, RunResult, run
 
 __all__ = [
     "BuildContext",
+    "bind",
     "build",
     "run",
+    "spec_params",
+    "SpecParam",
     "spec_builder",
     "SPEC_VERSION",
     "JsonValue",

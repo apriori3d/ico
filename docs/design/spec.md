@@ -267,3 +267,31 @@ returned with their spec paths.
 This is independent of resources (deferred): resources are heavy objects
 used by operators (models, datasets); inputs are the data flowing through
 the pipeline.
+
+## Pipeline parameters
+
+A saved spec fixes every param value; to run it again with another output
+directory or threshold, a parameter replaces the value:
+
+```json
+{"kind": "op", "op": "cut_clip@1",
+ "params": {"out_dir": {"$param": "out_dir"},
+            "ffmpeg": {"$param": "ffmpeg", "default": "ffmpeg"}}}
+```
+
+- `input` is the data of a run; parameters are its configuration. Both are
+  given per run (`run(spec, input, params={...})`, `build(..., params=)`);
+  the spec stays one document.
+- `ico.spec.bind` substitutes the values (and defaults) before the spec is
+  built, so operators receive ordinary constructor arguments and know
+  nothing of parameters. Parameters are not global state: they apply to
+  one run.
+- A parameter without `default` is required; `default` may be `null`. The
+  same parameter may set several params if they declare it identically
+  (same default; same type when the registry knows the operator param
+  types). Unknown and missing names are `SpecError`s listing every name.
+- `ico.spec.spec_params` lists what a spec accepts (name, type from the
+  registry, default, paths). A built flow exported with `to_spec` carries
+  the bound values: parameters belong to the spec document.
+- Only whole param values: no substitution inside strings or nested
+  values until a real need appears.

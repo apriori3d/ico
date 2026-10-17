@@ -9,7 +9,7 @@ starts with a loader from `str`.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
@@ -90,6 +90,7 @@ def run(
     registry: IcoRegistry | None = None,
     max_items: int = DEFAULT_MAX_ITEMS,
     tools: Sequence[IcoRuntimeTool] = (),
+    params: Mapping[str, JsonValue] | None = None,
 ) -> RunResult:
     """Build a spec and run it once.
 
@@ -104,6 +105,8 @@ def run(
         tools: Runtime tools attached to the run, e.g. a
             :class:`~ico.tools.progress.JsonProgressTool` that reports
             progress to the caller.
+        params: Values of the pipeline parameters of this run (see
+            :mod:`ico.spec.params`); defaults apply to the others.
 
     Returns:
         A :class:`RunResult`.
@@ -121,7 +124,9 @@ def run(
     from ico.core.async_stream import IcoStreamErrors
     from ico.core.runtime.runtime import IcoRuntime
     from ico.spec.builders import registry_context
+    from ico.spec.params import bind
 
+    spec = bind(spec, params)
     root = spec.root if isinstance(spec, PipelineSpec) else spec
     context = registry_context(registry)
     flow = cast(IcoOperatorProtocol[Any, Any], context.build(root))
