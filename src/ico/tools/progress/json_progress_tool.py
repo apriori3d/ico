@@ -22,7 +22,7 @@ ProgressSnapshot = dict[str, str | float | None]
 class _NodeProgress:
     key: str
     label: str
-    total: float
+    total: float | None
     done: float = 0.0
     started: float | None = None
     last_emit: float | None = None
@@ -48,6 +48,8 @@ class JsonProgressTool(IcoRuntimeTool):
       order, as in ``RichProgressTool``.
     - ``done`` / ``total``: as in ``RichProgressTool``, a node that reached
       its total starts again from zero on the next update (next iteration).
+      ``total`` is ``None`` for a node without a known count: it only
+      counts up, and ``eta`` stays ``None``.
     - ``rate``: items per second since the node (re)started; ``eta``:
       seconds left at that rate. Both are ``None`` while unknown.
 
@@ -144,7 +146,8 @@ class JsonProgressTool(IcoRuntimeTool):
 
         with self._lock:
             now = self.clock()
-            if state.started is None or (state.total > 0 and state.done >= state.total):
+            finished = state.total is not None and state.done >= state.total
+            if state.started is None or finished:
                 # First update, or the next iteration of a finished node.
                 state.done = 0.0
                 state.started = now
@@ -156,7 +159,11 @@ class JsonProgressTool(IcoRuntimeTool):
     def _emit(self, state: _NodeProgress, now: float) -> None:
         elapsed = now - state.started if state.started is not None else 0.0
         rate = state.done / elapsed if elapsed > 0 else None
-        eta = max(state.total - state.done, 0.0) / rate if rate else None
+        eta = (
+            max(state.total - state.done, 0.0) / rate
+            if rate and state.total is not None
+            else None
+        )
         state.last_emit = now
         state.dirty = False
         self.on_progress(_snapshot(state, rate, eta))

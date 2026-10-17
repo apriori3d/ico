@@ -57,7 +57,7 @@ def test_runs_keep_progress_in_flow_order_and_drop_old_finished() -> None:
     runs = BoardRuns(max_finished=2)
     first = runs.start("first")
     first.progress({"key": "1", "label": "b", "done": 0, "total": 4})
-    first.progress({"key": "0", "label": "a", "done": 1, "total": 2, "rate": 2.0})
+    first.progress({"key": "0", "label": "a", "done": 1, "total": None, "rate": 2.0})
     first.progress({"key": "1", "label": "b", "done": 3, "total": 4})
     first.finish(summary="2 outputs")
     for title in ("second", "third"):
@@ -74,6 +74,7 @@ def test_runs_keep_progress_in_flow_order_and_drop_old_finished() -> None:
     assert [p["key"] for p in first.view()["progress"]] == ["1", "0"]
     assert (first.view()["summary"], views[1]["summary"]) == ("2 outputs", None)
     assert first.view()["progress"][0]["done"] == 3
+    assert first.view()["progress"][1]["total"] is None
 
 
 def test_max_finished_must_be_positive() -> None:

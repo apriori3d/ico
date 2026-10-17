@@ -148,25 +148,36 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
 
     __slots__ = ("total",)
 
-    total: float  # Expected total number of items for progress calculation
+    total: float | None  # Expected number of items; None when unknown
 
     def __init__(
         self,
-        total: float,
+        total: float | None = None,
         *,
         name: str | None = None,
     ) -> None:
         """Initialize progress tracking node with expected total count.
 
         Args:
-            total: Expected total number of items that will flow through this node.
+            total: Expected total number of items that will flow through this
+                node, or ``None`` when the count is not known in advance
+                (tools then show a counter and a rate, without an ETA).
             name: Optional name for progress identification in monitoring tools.
+
+        Raises:
+            ValueError: If ``total`` is not positive: use ``None`` for an
+                unknown count, so that a wrong total is not hidden.
 
         Initialization:
             • Dual inheritance: Both IcoMonitor and runtime node setup
             • Total tracking: Expected count for progress percentage calculation
             • Name identification: Used by progress tools for display labeling
         """
+        if total is not None and total <= 0:
+            raise ValueError(
+                f"progress total must be positive, got {total!r}; "
+                "use no total for an unknown count"
+            )
         IcoMonitor.__init__(self, name=name)  # pyright: ignore[reportUnknownMemberType]
         self.total = total
 

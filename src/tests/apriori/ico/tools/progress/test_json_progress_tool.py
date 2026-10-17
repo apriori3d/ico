@@ -163,3 +163,18 @@ def test_worker_progress_has_own_keys() -> None:
         finals[str(snapshot["key"])] = float(snapshot["done"] or 0)
     assert 1 <= len(finals) <= 2  # one key per worker that processed items
     assert sum(finals.values()) == 6
+
+
+def test_unknown_total_counts_up_without_eta() -> None:
+    snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
+    progress: IcoProgress[int] = IcoProgress(name="scenes")
+    run(numbers(5) | progress.stream(), tool)
+
+    assert [s["done"] for s in snapshots] == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+    assert all(s["total"] is None and s["eta"] is None for s in snapshots)
+    assert snapshots[-1]["rate"] is not None
+
+
+def test_total_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="use no total"):
+        IcoProgress(total=0)

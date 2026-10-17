@@ -29,7 +29,7 @@ class NodeProgress(TypedDict):
     key: str
     label: str
     done: float
-    total: float
+    total: float | None
     rate: float | None
     eta: float | None
 
@@ -154,7 +154,7 @@ def _node(snapshot: ProgressSnapshot) -> NodeProgress:
         "key": str(snapshot.get("key")),
         "label": str(snapshot.get("label")),
         "done": number("done") or 0.0,
-        "total": number("total") or 0.0,
+        "total": number("total"),
         "rate": number("rate"),
         "eta": number("eta"),
     }

@@ -65,7 +65,7 @@ class RichProgressTool(IcoRuntimeTool):
 
     console: Console
     progress: Progress | None
-    _registered_nodes: list[tuple[TreePathIndex, float, str]]
+    _registered_nodes: list[tuple[TreePathIndex, float | None, str]]
     _tasks: dict[TreePathIndex, TaskID]
 
     def __init__(self, console: Console | None = None):
