@@ -11,7 +11,7 @@ Round trip ``to_spec(build(spec)) == spec`` holds for every buildable kind.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import reduce
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
@@ -331,7 +331,10 @@ class SpecFactory:
 
 
 def build(
-    spec: PipelineSpec | NodeSpec, registry: IcoRegistry | None = None
+    spec: PipelineSpec | NodeSpec,
+    registry: IcoRegistry | None = None,
+    *,
+    params: Mapping[str, JsonValue] | None = None,
 ) -> IcoNodeProtocol:
     """Rebuild a flow from a spec, resolving operators through a registry.
 
@@ -339,6 +342,9 @@ def build(
         spec: A spec document or a single node spec.
         registry: Registry for ``op`` references; defaults to
             :data:`ico.registry.default_registry`.
+        params: Values of the pipeline parameters (``{"$param": ...}``
+            references, see :mod:`ico.spec.params`); defaults apply to the
+            others.
 
     Returns:
         The rebuilt flow. Registered operator instances are returned as is
@@ -355,6 +361,9 @@ def build(
     Example:
         >>> flow = build(from_json(text))
     """
+    from ico.spec.params import bind
+
+    spec = bind(spec, params)
     root = spec.root if isinstance(spec, PipelineSpec) else spec
     return registry_context(registry).build(root)
 
