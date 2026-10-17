@@ -1,5 +1,7 @@
 from ico import IcoOperator, plan_view
+from ico.core.filter import IcoFilter, keep
 from ico.core.fork import fork
+from ico.core.partition import partition
 from ico.core.route import route
 from ico.describe.plan.json_renderer import PlanCell, PlanView
 
@@ -18,6 +20,14 @@ def length(text: str) -> int:
 
 def double(n: int) -> int:
     return n * 2
+
+
+def is_even(n: int) -> bool:
+    return n % 2 == 0
+
+
+def positive(n: int) -> bool:
+    return n > 0
 
 
 def first(text: str) -> str:
@@ -121,3 +131,45 @@ def test_nested_fork_keeps_its_branches() -> None:
         "│   length",
         "╰─▸ collect",
     ]
+
+
+def test_filter_shows_its_predicate_as_a_condition() -> None:
+    view = plan_view(keep(is_even, name="even"))
+
+    assert rows(view) == [
+        ("╭── keep where 🔍IcoFilter()", "Iterator[int] → Iterator[int]"),
+        ("│   is_even", "int → bool"),
+        ("╰─▸ yield kept", "Iterator[int]"),
+    ]
+    assert keywords(view) == ["keep where 🔍", "yield kept"]
+    assert text(view["rows"][0][2]) == "even"
+
+
+def test_filter_predicate_chain_stays_inside_the_group() -> None:
+    flow = [
+        line
+        for line, _ in rows(
+            plan_view(IcoFilter(IcoOperator(double) | IcoOperator(positive)))
+        )
+    ]
+
+    assert flow == [
+        "╭── keep where 🔍IcoFilter()",
+        "│   double",
+        "│   positive",
+        "╰─▸ yield kept",
+    ]
+
+
+def test_partition_splits_into_matched_and_rest() -> None:
+    view = plan_view(partition(is_even))
+
+    assert rows(view) == [
+        (
+            "╭── split by ✂️ IcoPartition()",
+            "Iterator[int] → tuple[list[int], list[int]]",
+        ),
+        ("│   is_even", "int → bool"),
+        ("╰─▸ collect matched, rest", "tuple[list[int], list[int]]"),
+    ]
+    assert keywords(view)[-1] == "collect matched, rest"
