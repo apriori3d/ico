@@ -54,6 +54,7 @@ from ico.registry import IcoRegistry, register
 
 # runtime
 from ico.runtime.worker.mp.mp_worker import MPWorker
+from ico.tools.board import LiveBoardTool
 
 # tools
 from ico.tools.printer.rich_printer_tool import RichPrinterTool
@@ -120,6 +121,7 @@ __all__ = [
     # tools
     "RichPrinterTool",
     "JsonProgressTool",
+    "LiveBoardTool",
     "RichProgressTool",
     "WorkerFlow",
     # describe
