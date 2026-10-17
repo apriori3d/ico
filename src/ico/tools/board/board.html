@@ -204,7 +204,8 @@ function renderPlan(run, card) {
   if (!run.has_plan) return;
   const details = el("details", "plan");
   details.open = openPlans.has(run.id);
-  details.append(el("summary", null, "Pipeline"));
+  const summary = el("summary", null, "Pipeline");
+  details.append(summary);
   const graph = el("div", "graph");
   details.append(graph);
   const fill = async () => {
@@ -212,8 +213,13 @@ function renderPlan(run, card) {
     const plan = plans.get(run.id);
     graph.replaceChildren(plan ? renderPlanTable(plan) : el("div", "kind", "no plan"));
   };
-  details.addEventListener("toggle", () => {
-    if (details.open) { openPlans.add(run.id); fill(); } else { openPlans.delete(run.id); }
+  // Handle the click itself, not the "toggle" event: toggle fires later,
+  // and the page may have been re-rendered by then, losing the state.
+  summary.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (openPlans.has(run.id)) openPlans.delete(run.id); else openPlans.add(run.id);
+    details.open = openPlans.has(run.id);
+    if (details.open) fill();
   });
   if (details.open) fill();
   card.append(details);
