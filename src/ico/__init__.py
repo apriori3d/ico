@@ -44,7 +44,7 @@ from ico.core.tree_utils import TraversalInfo, TreePathIndex, TreeWalker
 # describe
 from ico.describe.describer import describe
 from ico.describe.options import RendererOptions
-from ico.describe.plan.json_renderer import PlanNodeView, plan_view
+from ico.describe.plan.json_renderer import PlanView, plan_view
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.rich_style import DescribeStyle
 from ico.describe.runtime.options import RuntimeRendererOptions
@@ -125,7 +125,7 @@ __all__ = [
     # describe
     "describe",
     "plan_view",
-    "PlanNodeView",
+    "PlanView",
     "DescribeStyle",
     "PlanRendererOptions",
     "RendererOptions",
