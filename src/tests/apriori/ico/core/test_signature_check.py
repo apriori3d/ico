@@ -4,14 +4,19 @@ from typing import Any, Literal, Optional, Protocol, TypeVar, Union
 import pytest
 
 from ico.core.chain import IcoChain, chain
+from ico.core.identity import IcoIdentity
 from ico.core.operator import IcoOperator
+from ico.core.runtime.progress import IcoProgress
 from ico.core.signature_check import (
     IcoSignatureError,
+    chain_links,
     is_assignable,
     is_strict,
     strict_signatures,
     validate_signatures,
 )
+from ico.core.source import IcoSource
+from ico.core.stream import IcoStream
 from ico.core.tree_utils import TreePathIndex
 
 T = TypeVar("T")
@@ -263,3 +268,68 @@ def test_strict_does_not_raise_on_uninferred() -> None:
     with strict_signatures():
         flow = IcoOperator(to_str) | IcoOperator(identity) | IcoOperator(str_len)
     assert flow(100) == 3
+
+
+# ─── Untyped identity nodes ───
+
+
+def words() -> Iterator[str]:
+    yield "a"
+
+
+def upper(x: str) -> str:
+    return x.upper()
+
+
+def untyped_progress() -> IcoProgress[Any]:
+    # Built unparametrized, as from a spec.
+    progress: IcoProgress[Any] = IcoProgress(total=1)
+    return progress
+
+
+def test_validate_checks_links_across_untyped_progress() -> None:
+    flow = IcoSource(words) | untyped_progress() | IcoStream(upper)
+    assert validate_signatures(flow) == []
+
+
+def test_validate_reports_mismatch_across_untyped_progress() -> None:
+    flow = IcoOperator(to_str) | untyped_progress() | IcoOperator(double)
+    issues = validate_signatures(flow)
+
+    assert [(i.kind, i.left, i.right) for i in issues] == [
+        ("mismatch", "to_str", "double")
+    ]
+    assert issues[0].path == TreePathIndex((2,))
+
+
+def test_validate_skips_untyped_identity_at_flow_end() -> None:
+    noop: IcoIdentity[Any] = IcoIdentity()
+    flow = untyped_progress() | IcoOperator(to_str) | noop
+    assert validate_signatures(flow) == []
+
+
+def test_chain_links_skip_untyped_identity_nodes() -> None:
+    steps = [IcoOperator(to_str), untyped_progress(), IcoOperator(str_len)]
+    assert chain_links(steps) == [(0, 2)]
+
+
+def test_typed_progress_is_checked_like_an_operator() -> None:
+    # Typed as Any so that only the runtime check sees the mismatch.
+    progress: Any = IcoProgress[int](total=1)
+    flow = IcoOperator(to_str) | progress
+    assert [i.kind for i in validate_signatures(flow)] == ["mismatch"]
+
+
+def test_strict_checks_across_untyped_progress() -> None:
+    with strict_signatures():
+        _ = IcoOperator(to_str) | untyped_progress() | IcoOperator(str_len)
+        with pytest.raises(IcoSignatureError, match="to_str → double"):
+            _ = IcoOperator(to_str) | untyped_progress() | IcoOperator(double)  # type: ignore[arg-type]
+
+
+def test_structural_node_label_is_its_class() -> None:
+    # Typed as Any → Any so that only the runtime check sees the mismatch.
+    mistyped: IcoOperator[Any, Any] = IcoOperator(double)
+    flow = IcoStream(upper) | mistyped
+    issue = validate_signatures(flow)[0]
+    assert (issue.left, issue.right) == ("IcoStream", "double")

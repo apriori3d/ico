@@ -270,3 +270,17 @@ def test_build_node_spec_and_default_registry() -> None:
         from ico.registry import default_registry
 
         default_registry.unregister("tests.spec.build.neg@1")
+
+
+def test_seq_checks_links_across_progress() -> None:
+    progress = NodeSpec(kind="progress", params={"total": 1})
+    seq = NodeSpec(
+        kind="seq",
+        children=(
+            NodeSpec(kind="op", op="to_str@1"),
+            progress,
+            NodeSpec(kind="op", op="double@1"),
+        ),
+    )
+    with pytest.raises(SpecError, match=r"at 2 \(to_str@1 → double@1\)"):
+        build(PipelineSpec(root=seq), REGISTRY)

@@ -415,14 +415,14 @@ def _children(spec: NodeSpec, count: int | None = None, *, at_least: int = 0) ->
 @spec_builder("seq")
 def build_seq(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, at_least=2)
-    from ico.core.signature_check import check_link
+    from ico.core.signature_check import chain_links, check_link
     from ico.core.signature_utils import format_ico_type
 
     steps = [ctx.op(child) for child in spec.children]
     # Check every link before composing, so that a spec written by a worker
     # fails with the location, references and types of the bad step.
-    for position in range(1, len(steps)):
-        issue = check_link(steps[position - 1], steps[position])
+    for left, position in chain_links(steps):
+        issue = check_link(steps[left], steps[position])
         if issue is not None and issue.is_error:
             expected, got = format_ico_type(issue.input), format_ico_type(issue.output)
             raise SpecError(
