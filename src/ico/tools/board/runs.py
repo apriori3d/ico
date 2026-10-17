@@ -44,6 +44,7 @@ class RunView(TypedDict):
     elapsed: float
     progress: list[NodeProgress]
     error: str | None
+    summary: str | None
     has_plan: bool
 
 
@@ -68,6 +69,7 @@ class BoardRun:
         self.plan = plan
         self.state: RunState = "running"
         self.error: str | None = None
+        self.summary: str | None = None
         self._started = datetime.now(timezone.utc)
         self._clock = time.monotonic()
         self._duration: float | None = None
@@ -80,9 +82,14 @@ class BoardRun:
         with self._lock:
             self._progress[node["key"]] = node
 
-    def finish(self, error: str | None = None) -> None:
-        """Mark the run ``done``, or ``failed`` with an error message."""
+    def finish(self, error: str | None = None, *, summary: str | None = None) -> None:
+        """Mark the run ``done``, or ``failed`` with an error message.
+
+        ``summary`` is a one-line outcome shown under the progress, e.g.
+        ``"40 outputs · 0 item errors"``.
+        """
         with self._lock:
+            self.summary = summary
             self._duration = time.monotonic() - self._clock
             self.state = "failed" if error is not None else "done"
             self.error = error
@@ -102,6 +109,7 @@ class BoardRun:
                 "elapsed": round(elapsed, 3),
                 "progress": list(self._progress.values()),
                 "error": self.error,
+                "summary": self.summary,
                 "has_plan": self.plan is not None,
             }
 

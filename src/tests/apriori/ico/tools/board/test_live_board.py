@@ -59,7 +59,7 @@ def test_runs_keep_progress_in_flow_order_and_drop_old_finished() -> None:
     first.progress({"key": "1", "label": "b", "done": 0, "total": 4})
     first.progress({"key": "0", "label": "a", "done": 1, "total": 2, "rate": 2.0})
     first.progress({"key": "1", "label": "b", "done": 3, "total": 4})
-    first.finish()
+    first.finish(summary="2 outputs")
     for title in ("second", "third"):
         runs.start(title).finish("failed here")
     active = runs.start("active")
@@ -72,6 +72,7 @@ def test_runs_keep_progress_in_flow_order_and_drop_old_finished() -> None:
     assert runs.plan(first.id) is None
     assert active.view()["progress"] == []
     assert [p["key"] for p in first.view()["progress"]] == ["1", "0"]
+    assert (first.view()["summary"], views[1]["summary"]) == ("2 outputs", None)
     assert first.view()["progress"][0]["done"] == 3
 
 

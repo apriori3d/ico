@@ -51,6 +51,7 @@
   .state.failed { color: var(--fail); }
   .title { font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .summary { margin-top: 10px; color: var(--muted); font-size: 13px; }
   .error {
     margin-top: 10px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap;
     color: var(--fail); overflow-wrap: anywhere;
@@ -233,6 +234,7 @@ function renderRun(run) {
     run.progress.forEach((node) => bars.append(renderBar(node)));
     card.append(bars);
   }
+  if (run.summary) card.append(el("div", "summary", run.summary));
   if (run.error) card.append(el("div", "error", run.error));
   renderPlan(run, card);
   return card;
