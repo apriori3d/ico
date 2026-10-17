@@ -289,7 +289,9 @@ def untyped_progress() -> IcoProgress[Any]:
 
 def test_validate_checks_links_across_untyped_progress() -> None:
     flow = IcoSource(words) | untyped_progress() | IcoStream(upper)
-    assert validate_signatures(flow) == []
+    # The link is checked across the progress node; the only issue is the
+    # warning that the progress node counts the iterator once.
+    assert [i.kind for i in validate_signatures(flow)] == ["counts_iterator"]
 
 
 def test_validate_reports_mismatch_across_untyped_progress() -> None:
@@ -351,3 +353,34 @@ def test_stream_body_starting_with_progress_is_typed() -> None:
 
     assert IcoStream(body).signature.format() == "Iterator[str] → Iterator[str]"
     assert validate_signatures(flow) == []
+
+
+# ─── Progress after an iterator ───
+
+
+def test_progress_after_an_iterator_is_a_warning() -> None:
+    flow = IcoSource(words) | untyped_progress() | IcoStream(upper)
+    [issue] = validate_signatures(flow)
+
+    assert (issue.kind, issue.is_error) == ("counts_iterator", False)
+    assert (issue.left, issue.right) == ("IcoSource", "IcoProgress")
+    assert issue.path == TreePathIndex((1,))
+    assert "counts the whole Iterator[str] as one item" in issue.message
+    assert "wrap it in a stream" in issue.message
+
+
+def test_typed_progress_on_an_iterator_is_a_warning() -> None:
+    progress = IcoProgress[Iterator[str]](total=1)
+    flow = IcoSource(words) | progress | IcoStream(upper)
+    assert [i.kind for i in validate_signatures(flow)] == ["counts_iterator"]
+
+
+def test_progress_inside_a_stream_counts_items() -> None:
+    flow = IcoSource(words) | IcoStream(untyped_progress() | IcoOperator(upper))
+    assert validate_signatures(flow) == []
+
+
+def test_progress_wrapped_in_a_stream_after_an_iterator() -> None:
+    flow = IcoSource(words) | IcoStream(untyped_progress())
+    kinds = [i.kind for i in validate_signatures(flow)]
+    assert "counts_iterator" not in kinds

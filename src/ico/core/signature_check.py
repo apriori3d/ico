@@ -31,6 +31,7 @@ as compatible.
 from __future__ import annotations
 
 import types
+from collections import abc
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -84,7 +85,7 @@ def is_strict() -> bool:
 # Issues and errors
 # ────────────────────────────────────────────────
 
-IssueKind = Literal["mismatch", "conflict", "uninferred"]
+IssueKind = Literal["mismatch", "conflict", "uninferred", "counts_iterator"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,7 +98,10 @@ class SignatureIssue:
             ``"conflict"`` (error) when two branches ``left`` and ``right``
             of a fork or route accept input types with no common type;
             ``"uninferred"`` (warning) when a signature could not be
-            inferred, so the link was not checked.
+            inferred, so the link was not checked;
+            ``"counts_iterator"`` (warning) when a progress node ``right``
+            receives a whole iterator from ``left`` (``output``): it counts
+            the iterator as one item, not its items.
         left: Name of the upstream node (or the first conflicting branch).
         right: Name of the downstream node (or the second conflicting branch).
         output: Output type of ``left``; for a conflict, its input type
@@ -125,7 +129,7 @@ class SignatureIssue:
 
     @property
     def is_error(self) -> bool:
-        return self.kind != "uninferred"
+        return self.kind not in ("uninferred", "counts_iterator")
 
     @property
     def message(self) -> str:
@@ -143,6 +147,11 @@ class SignatureIssue:
         # e.g. "at 0.2 (tryon.segment@1 → tryon.render@1): expected Mask, got Image"
         if self.kind == "uninferred":
             reason = "signature could not be inferred, link not checked"
+        elif self.kind == "counts_iterator":
+            reason = (
+                f"progress counts the whole {format_ico_type(self.output)} as one "
+                "item; wrap it in a stream to count the items"
+            )
         else:
             reason = (
                 f"expected {format_ico_type(self.input)}, "
@@ -352,6 +361,7 @@ def _validate_node(
             found.append(
                 check_link(children[left], children[right], path=path.add_child(right))
             )
+        found.extend(_progress_on_iterators(children, path))
     elif isinstance(node, IcoFork | IcoRoute):
         found.append(check_branch_inputs(node.children, node.name or "", path=path))
     elif isinstance(node, IcoProcess) and len(node.children) == 2:
@@ -362,6 +372,64 @@ def _validate_node(
 
     for index, child in enumerate(children):
         _validate_node(child, path.add_child(index), issues)
+
+
+def _progress_on_iterators(
+    steps: Sequence[IcoNodeProtocol], path: TreePathIndex
+) -> list[SignatureIssue | None]:
+    """Progress steps of a chain that receive a whole iterator.
+
+    A progress node counts the items that pass it; after a step that
+    returns an iterator it sees one item. Its input type is its own when
+    typed, else the output of the nearest step before it.
+    """
+    from ico.core.runtime.progress import IcoProgress
+
+    found: list[SignatureIssue | None] = []
+    for index, step in enumerate(steps):
+        if not isinstance(cast(object, step), IcoProgress):
+            continue
+        source = _feeding_step(steps, index)
+        own = _inferred_signature(step)
+        if own is not None:
+            received: Any = own.i
+        elif source is not None and (sig := _inferred_signature(source)) is not None:
+            received = sig.o
+        else:
+            continue
+        if get_origin(received) in _ITERATORS:
+            found.append(
+                SignatureIssue(
+                    "counts_iterator",
+                    _label(source) if source is not None else "",
+                    _label(step),
+                    received,
+                    None,
+                    path=path.add_child(index),
+                )
+            )
+    return found
+
+
+_ITERATORS: tuple[object, ...] = (
+    abc.Iterator,
+    abc.Iterable,
+    abc.Generator,
+    abc.AsyncIterator,
+    abc.AsyncIterable,
+)
+
+
+def _feeding_step(
+    steps: Sequence[IcoNodeProtocol], index: int
+) -> IcoNodeProtocol | None:
+    """The output boundary of the nearest step before ``index`` that is not
+    an untyped identity."""
+    for previous in reversed(steps[:index]):
+        leaf = _boundary_node(previous, side="output")
+        if not is_transparent(leaf):
+            return leaf
+    return None
 
 
 def _spec_children(node: IcoNodeProtocol) -> list[IcoNodeProtocol]:
