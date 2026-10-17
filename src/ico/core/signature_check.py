@@ -18,6 +18,11 @@ or per node with ``chain(a, b, strict=True)`` / ``fork(..., strict=True)``
 input type). :func:`validate_signatures`
 reports every issue in an already built flow without raising.
 
+Untyped identity nodes (``IcoIdentity`` and subclasses such as
+``IcoProgress``, built as ``IcoProgress[Any]`` from a spec) pass items
+through unchanged, so links are checked across them, between their
+neighbours.
+
 Compatibility is checked conservatively: anything that cannot be decided
 (``Any``, TypeVars, Literal, Callable, non-runtime protocols, ...) is treated
 as compatible.
@@ -184,10 +189,13 @@ def check_link(
 
     Returns:
         A :class:`SignatureIssue` on mismatch or when a signature is not
-        inferred, ``None`` when the link is compatible or undecidable.
+        inferred, ``None`` when the link is compatible or undecidable, or
+        when one side is an untyped identity node (see :func:`chain_links`).
     """
     left_leaf = _boundary_node(left, side="output")
     right_leaf = _boundary_node(right, side="input")
+    if is_transparent(left_leaf) or is_transparent(right_leaf):
+        return None  # checked across the identity node, between neighbours
     left_sig = _inferred_signature(left_leaf)
     right_sig = _inferred_signature(right_leaf)
     left_label, right_label = _label(left_leaf), _label(right_leaf)
@@ -215,6 +223,37 @@ def check_link(
         )
 
     return None
+
+
+def chain_links(steps: Sequence[IcoNodeProtocol]) -> list[tuple[int, int]]:
+    """Links to check in a sequence of chain steps, as index pairs.
+
+    Untyped identity nodes are skipped: a link joins the nearest steps
+    around them, so ``a | progress | b`` is checked as ``a → b``.
+
+    Example:
+        >>> chain_links([a, progress, b])  # [(0, 2)]
+    """
+    links: list[tuple[int, int]] = []
+    previous: int | None = None
+    for index, step in enumerate(steps):
+        if is_transparent(_boundary_node(step, side="input")):
+            continue
+        if previous is not None:
+            links.append((previous, index))
+        previous = index
+    return links
+
+
+def is_transparent(node: IcoNodeProtocol) -> bool:
+    """Whether a node is an untyped identity, skipped by link checks."""
+    from ico.core.identity import IcoIdentity
+    from ico.registry.registry import get_meta
+
+    # Check the metadata before isinstance narrows the node to a generic identity.
+    if get_meta(node) is not None or _inferred_signature(node) is not None:
+        return False
+    return isinstance(node, IcoIdentity)
 
 
 def chain_length(node: IcoNodeProtocol) -> int:
@@ -309,13 +348,9 @@ def _validate_node(
     children = _spec_children(node)
     found: list[SignatureIssue | None] = []
     if isinstance(node, IcoChain):
-        for position in range(1, len(children)):
+        for left, right in chain_links(children):
             found.append(
-                check_link(
-                    children[position - 1],
-                    children[position],
-                    path=path.add_child(position),
-                )
+                check_link(children[left], children[right], path=path.add_child(right))
             )
     elif isinstance(node, IcoFork | IcoRoute):
         found.append(check_branch_inputs(node.children, node.name or "", path=path))
@@ -389,10 +424,14 @@ def _boundary_node(
     so links are checked between the innermost adjacent leaves.
     """
     # A registered chain is an opaque operator: it is its own boundary.
-    while (chain := _open_chain(node)) is not None:
-        left, right = chain.children
-        node = right if side == "output" else left
-    return node
+    chain = _open_chain(node)
+    if chain is None:
+        return node
+    left, right = chain.children
+    near, far = (right, left) if side == "output" else (left, right)
+    leaf = _boundary_node(near, side)
+    # Look past an untyped identity: `a | progress` outputs what `a` does.
+    return _boundary_node(far, side) if is_transparent(leaf) else leaf
 
 
 def _open_chain(node: IcoNodeProtocol) -> IcoChain[Any, Any, Any] | None:
@@ -422,7 +461,11 @@ def _label(node: IcoNodeProtocol) -> str:
         return meta.ref
     if node.name:
         return node.name
-    fn_name: str | None = getattr(getattr(node, "_fn", None), "__name__", None)
+    fn: object = getattr(node, "_fn", None)
+    if cast(object, getattr(fn, "__self__", None)) is node:
+        # Structural node implemented by its own method (`_stream_fn`, ...).
+        return type(node).__name__
+    fn_name: str | None = getattr(fn, "__name__", None)
     return fn_name or str(node)
 
 
