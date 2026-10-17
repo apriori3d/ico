@@ -532,7 +532,11 @@ def build_progress(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
 
     _children(spec, 0)
     # Not parametrized, like batcher and identity: specs carry no Python types.
-    node: IcoProgress[Any] = IcoProgress(total=_number(spec, "total"), name=spec.name)
+    total = _number(spec, "total") if "total" in spec.params else None
+    try:
+        node: IcoProgress[Any] = IcoProgress(total=total, name=spec.name)
+    except ValueError as e:
+        raise SpecError(str(e)) from None
     return node
 
 

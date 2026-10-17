@@ -71,6 +71,7 @@ BATCHER: IcoBatcher[Any] = IcoBatcher(4, drop_last=True)
 SMALL_BATCHER: IcoBatcher[Any] = IcoBatcher(2)
 NOOP: IcoIdentity[Any] = IcoIdentity(name="noop")
 PROGRESS: IcoProgress[Any] = IcoProgress(total=10, name="items")
+UNCOUNTED: IcoProgress[Any] = IcoProgress(name="scenes")
 
 
 def roundtrip(flow: IcoNodeProtocol) -> tuple[PipelineSpec, IcoNodeProtocol]:
@@ -136,6 +137,7 @@ def test_build_returns_registered_instances() -> None:
         pytest.param(BATCHER, id="batcher"),
         pytest.param(NOOP, id="identity"),
         pytest.param(PROGRESS, id="progress"),
+        pytest.param(UNCOUNTED, id="progress-unknown-total"),
     ],
 )
 def test_roundtrip(flow: IcoNodeProtocol) -> None:
@@ -284,3 +286,12 @@ def test_seq_checks_links_across_progress() -> None:
     )
     with pytest.raises(SpecError, match=r"at 2 \(to_str@1 → double@1\)"):
         build(PipelineSpec(root=seq), REGISTRY)
+
+
+def test_progress_total_is_optional_but_positive() -> None:
+    spec, _ = roundtrip(UNCOUNTED)
+    assert spec.root.params == {}
+
+    zero = NodeSpec(kind="progress", params={"total": 0})
+    with pytest.raises(SpecError, match="use no total for an unknown count"):
+        build(PipelineSpec(root=zero), REGISTRY)

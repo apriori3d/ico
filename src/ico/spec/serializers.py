@@ -210,7 +210,7 @@ def serialize_progress(node: IcoProgress[object], ctx: SpecContext) -> NodeSpec:
         kind="progress",
         name=node.name,
         sig=node_signature(node),
-        params={"total": node.total},
+        params={"total": node.total} if node.total is not None else {},
     )
 
 
