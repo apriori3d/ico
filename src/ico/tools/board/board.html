@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>ICO Live Board</title>
+<style>
+  :root {
+    --bg: #f6f6f3; --card: #ffffff; --text: #1d1d1b; --muted: #6d6d67;
+    --line: #e2e2dc; --track: #ebebe5; --bar: #3b6fd8; --chip: #f0f0ea;
+    --ok: #2f8a4c; --fail: #c4412f; --run: #3b6fd8;
+    --fn: #97683f; --type: #2f6fb0; --class: #0052cc; --keyword: #b31fb3;
+    --dimmed: #8c8c86; --meta: #0a7fc0; --textc: #2f8a46; --string: #c41a1a;
+    --signature: #0e7c86; --semantic: #7a3ff0; --tree: #a6a6a0;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #9b9b94;
+      --line: #2f2f2c; --track: #2a2a27; --bar: #6d97ee; --chip: #292926;
+      --ok: #5cbf7a; --fail: #ec7a68; --run: #6d97ee;
+      --fn: #c39a72; --type: #569cd6; --class: #6ea8ff; --keyword: #e85ae8;
+      --dimmed: #8f8f88; --meta: #4fc1ff; --textc: #4eb169; --string: #f06a6a;
+      --signature: #3fd0d8; --semantic: #a07cf8; --tree: #66665f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 650; }
+  #conn { color: var(--muted); font-size: 12px; }
+  #conn.lost { color: var(--fail); }
+  .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+
+  .run {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .state {
+    font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: .04em;
+    padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor;
+  }
+  .state.running { color: var(--run); }
+  .state.done { color: var(--ok); }
+  .state.failed { color: var(--fail); }
+  .title { font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .time { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .error {
+    margin-top: 10px; font-family: var(--mono); font-size: 12px; white-space: pre-wrap;
+    color: var(--fail); overflow-wrap: anywhere;
+  }
+
+  .bars { margin-top: 12px; display: grid; gap: 8px; }
+  .bar {
+    display: grid; grid-template-columns: minmax(90px, 220px) 1fr auto;
+    align-items: center; gap: 10px; font-variant-numeric: tabular-nums;
+  }
+  .bar .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .fill { height: 100%; background: var(--bar); transition: width .3s; }
+  .fill.full { background: var(--ok); }
+  .fill.unknown { width: 100%; opacity: .3; }
+  .nums { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  details.plan { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  details.plan > summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .graph { margin-top: 8px; overflow-x: auto; }
+
+  table.plan {
+    border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; line-height: 1.3;
+  }
+  table.plan th {
+    text-align: left; font-weight: 600; color: var(--muted); padding: 0 28px 4px 0;
+    font-family: system-ui, -apple-system, sans-serif; font-size: 12px;
+  }
+  table.plan td { padding: 0 28px 0 0; white-space: pre; vertical-align: top; }
+  table.plan tr:hover td { background: var(--chip); }
+  .s-fn { color: var(--fn); }
+  .s-type { color: var(--type); }
+  .s-class_ { color: var(--class); }
+  .s-keyword { color: var(--keyword); }
+  .s-dimmed { color: var(--dimmed); }
+  .s-meta { color: var(--meta); }
+  .s-text { color: var(--textc); }
+  .s-string { color: var(--string); }
+  .s-signature { color: var(--signature); }
+  .s-semantic_meta { color: var(--semantic); font-style: italic; }
+  .s-group, .s-tree { color: var(--tree); }
+  .dim { opacity: .55; }
+
+  @media (max-width: 560px) {
+    .bar { grid-template-columns: 1fr auto; }
+    .track { grid-column: 1 / -1; grid-row: 2; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>ICO Live Board</h1><span id="conn">connecting…</span></header>
+  <div id="runs"></div>
+</main>
+<script>
+"use strict";
+
+// All data access goes through this adapter, so that the page can be hosted
+// elsewhere (e.g. as an MCP App) by replacing getStatus and getPlan.
+const token = new URLSearchParams(location.search).get("token") || "";
+async function getJson(path) {
+  const sep = path.includes("?") ? "&" : "?";
+  const response = await fetch(path + sep + "token=" + encodeURIComponent(token), {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return response.json();
+}
+const getStatus = () => getJson("api/runs");
+const getPlan = (runId) => getJson("api/plan?run=" + encodeURIComponent(runId));
+
+const POLL_MS = 1000;
+const plans = new Map();     // run id → plan view (fetched once)
+const openPlans = new Set(); // run ids whose plan is expanded
+let newestSeen = null;
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+
+function num(value) {
+  if (value === null || value === undefined) return "";
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function duration(seconds) {
+  if (seconds === null || seconds === undefined) return "";
+  if (seconds < 60) return seconds.toFixed(seconds < 10 ? 1 : 0) + "s";
+  const m = Math.floor(seconds / 60), s = Math.round(seconds % 60);
+  if (m < 60) return m + "m " + s + "s";
+  return Math.floor(m / 60) + "h " + (m % 60) + "m";
+}
+
+// ─── Progress bars ───
+
+function renderBar(node) {
+  const row = el("div", "bar");
+  row.append(el("div", "label", node.label));
+  const track = el("div", "track");
+  const fill = el("div", "fill");
+  if (node.total > 0) {
+    const share = Math.min(1, node.done / node.total);
+    fill.style.width = 100 * share + "%";
+    if (share >= 1) fill.classList.add("full");
+  } else {
+    fill.classList.add("unknown");
+  }
+  track.append(fill);
+  row.append(track);
+  const parts = [node.total > 0 ? num(node.done) + "/" + num(node.total) : num(node.done)];
+  if (node.rate) parts.push(num(node.rate) + "/s");
+  if (node.eta) parts.push("eta " + duration(node.eta));
+  row.append(el("div", "nums", parts.join(" · ")));
+  return row;
+}
+
+// ─── Plan: the console plan rows, colored by DescribeStyle role ───
+// Node kinds are unknown here: rows and styles come from the server.
+
+function renderCell(cell, tag) {
+  const td = el(tag);
+  cell.forEach((segment) => {
+    let cls = segment.style ? "s-" + segment.style : "";
+    if (segment.dim) cls += " dim";
+    td.append(el("span", cls.trim() || null, segment.text));
+  });
+  return td;
+}
+
+function renderPlanTable(plan) {
+  const table = el("table", "plan");
+  const head = el("tr");
+  plan.columns.forEach((name) => head.append(el("th", null, name)));
+  const thead = el("thead");
+  thead.append(head);
+  const body = el("tbody");
+  plan.rows.forEach((row) => {
+    const tr = el("tr");
+    row.forEach((cell) => tr.append(renderCell(cell, "td")));
+    body.append(tr);
+  });
+  table.append(thead, body);
+  return table;
+}
+
+function renderPlan(run, card) {
+  if (!run.has_plan) return;
+  const details = el("details", "plan");
+  details.open = openPlans.has(run.id);
+  details.append(el("summary", null, "Pipeline"));
+  const graph = el("div", "graph");
+  details.append(graph);
+  const fill = async () => {
+    if (!plans.has(run.id)) plans.set(run.id, await getPlan(run.id));
+    const plan = plans.get(run.id);
+    graph.replaceChildren(plan ? renderPlanTable(plan) : el("div", "kind", "no plan"));
+  };
+  details.addEventListener("toggle", () => {
+    if (details.open) { openPlans.add(run.id); fill(); } else { openPlans.delete(run.id); }
+  });
+  if (details.open) fill();
+  card.append(details);
+}
+
+// ─── Runs ───
+
+function renderRun(run) {
+  const card = el("section", "run");
+  const head = el("div", "head");
+  head.append(el("span", "state " + run.state, run.state));
+  head.append(el("span", "title", run.title));
+  const started = new Date(run.started).toLocaleTimeString();
+  head.append(el("span", "time", started + " · " + duration(run.elapsed)));
+  card.append(head);
+  if (run.progress.length) {
+    const bars = el("div", "bars");
+    run.progress.forEach((node) => bars.append(renderBar(node)));
+    card.append(bars);
+  }
+  if (run.error) card.append(el("div", "error", run.error));
+  renderPlan(run, card);
+  return card;
+}
+
+function render(status) {
+  const root = document.getElementById("runs");
+  // The newest run shows its plan expanded once.
+  const newest = status.runs[0];
+  if (newest && newest.id !== newestSeen) {
+    newestSeen = newest.id;
+    openPlans.add(newest.id);
+  }
+  const scroll = window.scrollY;
+  root.replaceChildren();
+  if (!status.runs.length) {
+    root.append(el("div", "empty", "No runs yet."));
+    return;
+  }
+  status.runs.forEach((run) => root.append(renderRun(run)));
+  window.scrollTo(0, scroll);
+}
+
+async function poll() {
+  const conn = document.getElementById("conn");
+  try {
+    render(await getStatus());
+    conn.textContent = "live";
+    conn.className = "";
+  } catch (error) {
+    conn.textContent = "disconnected (" + error.message + ")";
+    conn.className = "lost";
+  }
+  setTimeout(poll, POLL_MS);
+}
+
+poll();
+</script>
+</body>
+</html>

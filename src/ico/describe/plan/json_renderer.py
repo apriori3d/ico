@@ -1,155 +1,145 @@
-"""JSON backend of ``describe`` for flows: a render-neutral plan view.
+"""JSON backend of ``describe`` for flows: the console plan as data.
 
-:func:`plan_view` builds a JSON-compatible tree from the same traversal and
-per-node-type renderers as the RichText plan renderer, so a consumer (e.g.
-a browser board) can render a flow without knowing node kinds::
+:func:`plan_view` runs the RichText plan renderer, with all its per-node
+renderers, group keywords (``for each in`` … ``yield``, ``parallel in``,
+``iterate in`` … ``emit``, ``send to`` … ``receive``) and tree lines, but
+collects the rows as data instead of printing a table. Each cell is a list
+of styled segments; ``style`` names a :class:`DescribeStyle` role, so a
+consumer (e.g. a browser board) colors the plan like the console without
+knowing node kinds::
 
-    {"label": "IcoAsyncStream", "sig": "Iterator[int] → Iterator[str]",
-     "ref": None, "badges": ["pool_size=4"], "layout": "parallel",
-     "children": [...]}
-
-- ``label``: the node name, else the function name of a plain operator,
-  else the class name.
-- ``sig``: the signature as in the Signature column, ``None`` for nodes
-  without one.
-- ``ref``: ``"name@version"`` for registered operators. They are opaque
-  leaves, as in a spec.
-- ``badges``: node settings as the console shows them in parentheses
-  (``pool_size=4``, ``until=done, max_iter=10`` → two badges).
-- ``layout``: how to draw the children: ``sequence`` (one after another),
-  ``parallel`` (side by side), ``loop`` (repeated) or ``leaf``.
-
-Structural nodes (chains, pipelines) are flattened into their parent, like
-in the console plan.
+    {"title": "Training", "columns": ["Flow", "Signature", "Name"],
+     "rows": [[[{"text": "╭── ", "style": "group", "dim": false},
+                {"text": "for each in ", "style": "keyword", "dim": false}, ...],
+               [{"text": "Iterator[int]", "style": "signature", "dim": false}],
+               []], ...]}
 """
 
 from __future__ import annotations
 
-from dataclasses import replace
-from typing import Literal, TypedDict
+from typing import TypedDict
 
-from ico.core.async_stream import IcoAsyncStream
-from ico.core.context_operator import IcoContextOperator
-from ico.core.epoch import IcoEpoch
-from ico.core.fork import IcoFork
+from rich.style import Style
+from rich.text import Text
+
 from ico.core.node import IcoNodeProtocol
-from ico.core.operator import IcoOperator
-from ico.core.partition import IcoPartition
-from ico.core.process import IcoProcess
-from ico.core.route import IcoRoute
 from ico.describe.plan.options import PlanRendererOptions
-from ico.describe.plan.rich_renderer.group_renderer import GroupRenderer
+from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 from ico.describe.plan.rich_renderer.render_target import create_plan_walker
-from ico.describe.plan.rich_renderer.renderer_registry import select_renderer
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
-from ico.describe.utils import import_all_renderers
-from ico.registry.registry import get_meta
-
-Layout = Literal["sequence", "parallel", "loop", "leaf"]
+from ico.describe.rich_style import DescribeStyle
 
 
-class PlanNodeView(TypedDict):
-    """One node of a plan view; JSON-compatible."""
+class PlanSegment(TypedDict):
+    """A run of text with one style; JSON-compatible."""
 
-    label: str
-    sig: str | None
-    ref: str | None
-    badges: list[str]
-    layout: Layout
-    children: list[PlanNodeView]
+    text: str
+    style: str | None
+    """A ``DescribeStyle`` member name (``keyword``, ``class_``, ``fn``,
+    ``signature``, ``group``, ...), ``None`` for plain text."""
+    dim: bool
 
 
-_PARALLEL: tuple[type[object], ...] = (IcoAsyncStream, IcoFork, IcoRoute, IcoPartition)
-_LOOP: tuple[type[object], ...] = (IcoProcess, IcoEpoch)
-_PLAIN_OPERATORS: tuple[type[object], ...] = (IcoOperator, IcoContextOperator)
+PlanCell = list[PlanSegment]
+
+
+class PlanView(TypedDict):
+    """The console plan of a flow: a title, column names and rows of cells."""
+
+    title: str
+    columns: list[str]
+    rows: list[list[PlanCell]]
 
 
 def plan_view(
     node: IcoNodeProtocol, options: PlanRendererOptions | None = None
-) -> PlanNodeView:
-    """The plan of a flow as a JSON-compatible tree.
+) -> PlanView:
+    """The console plan of a flow as JSON-compatible rows of styled segments.
 
     Args:
-        node: The flow; the root is never flattened.
-        options: Plan options; only ``renderers_paths``, ``show_remote_flows``,
-            ``flatten_node_type`` and ``callable_format`` apply. By default
-            sources are not called to query their size.
+        node: The flow.
+        options: Plan options as for ``describe``; by default sources are not
+            called to query their size.
 
     Example:
         >>> view = plan_view(source | batcher | stream)
-        >>> view["layout"], [c["label"] for c in view["children"]]
-        ('sequence', ['IcoSource', 'IcoBatcher', 'IcoStream'])
+        >>> "".join(s["text"] for s in view["rows"][0][0])
+        '📚IcoSource(numbers)'
     """
-    return _PlanViewBuilder(
-        options or PlanRendererOptions(query_iterable_size=False)
-    ).view(node)
+    options = options or PlanRendererOptions(query_iterable_size=False)
+    return _RowCollector(options).collect(node)
 
 
-class _PlanViewBuilder:
+class _RowCollector(PlanRenderer):
+    """The plan renderer, keeping rows instead of printing a table."""
+
     def __init__(self, options: PlanRendererOptions) -> None:
-        self.options = replace(options, show_node_icons=False)
-        self.walker = create_plan_walker(
-            expand_remote_flows=self.options.show_remote_flows
-        )
-        self._rows: dict[type[object], RowRenderer] = {}
-        for path in self.options.renderers_paths:
-            import_all_renderers(path)
+        super().__init__(options=options)
+        self._rows: list[list[PlanCell]] = []
 
-    def view(self, node: IcoNodeProtocol) -> PlanNodeView:
-        meta = get_meta(node)
-        children = [] if meta is not None else self._children(node)
-        args = self._args(node)
-        plain = type(node) in _PLAIN_OPERATORS
-        signature = RowRenderer(self.options).render_signature_column(node).plain
+    def collect(self, root: IcoNodeProtocol) -> PlanView:
+        self._rows = []
+        walker = create_plan_walker(expand_remote_flows=self.options.show_remote_flows)
+        walker.walk(root, visit_fn=self.render_node, order="pre_post")
         return {
-            "label": node.name or (args if plain and args else type(node).__name__),
-            "sig": signature or None,
-            "ref": meta.ref if meta is not None else None,
-            "badges": [] if plain or not args else args.split(", "),
-            "layout": _layout(node, has_children=bool(children)),
-            "children": [self.view(child) for child in children],
+            "title": root.name or type(root).__name__,
+            "columns": list(self.options.columns),
+            "rows": self._rows,
         }
 
-    def _children(self, node: IcoNodeProtocol) -> list[IcoNodeProtocol]:
-        """Children with structural nodes replaced by their own children."""
-        out: list[IcoNodeProtocol] = []
-        for child in self.walker.get_children_fn(node):
-            if (
-                type(child) in self.options.flatten_node_type
-                and get_meta(child) is None
-            ):
-                out.extend(self._children(child))
-            else:
-                out.append(child)
-        return out
-
-    def _args(self, node: IcoNodeProtocol) -> str:
-        """Settings shown in parentheses by the console renderer."""
-        row = self._row(type(node))
-        text = row._render_node_args_info(node)  # pyright: ignore[reportPrivateUsage]  # the console's own settings text
-        return text.plain if text is not None else ""
-
-    def _row(self, node_type: type[object]) -> RowRenderer:
-        """The row renderer the console uses for a node's own line."""
-        row = self._rows.get(node_type)
-        if row is None:
-            renderer_class = select_renderer(node_type)
-            renderer = renderer_class(self.options) if renderer_class else None
-            if isinstance(renderer, RowRenderer):
-                row = renderer
-            elif isinstance(renderer, GroupRenderer):
-                row = renderer.header_renderer
-            else:  # default or custom renderers
-                row = RowRenderer(self.options)
-            self._rows[node_type] = row
-        return row
+    def render_row(
+        self,
+        row_renderer: RowRenderer,
+        node: IcoNodeProtocol,
+        indent: Text | None = None,
+    ) -> None:
+        columns = [row_renderer.render(node, column) for column in self.options.columns]
+        indentation = self._gather_indentation(indent)
+        if indentation:
+            columns[0] = indentation + columns[0]
+        self._rows.append([_segments(text) for text in columns])
 
 
-def _layout(node: IcoNodeProtocol, *, has_children: bool) -> Layout:
-    if not has_children:
-        return "leaf"
-    if isinstance(node, _PARALLEL):
-        return "parallel"
-    if isinstance(node, _LOOP):
-        return "loop"
-    return "sequence"
+def _style_key(style: str | Style) -> str:
+    return str(Style.parse(style) if isinstance(style, str) else style)
+
+
+# Style → role name; the first member wins for equal styles (group, tree).
+_ROLES: dict[str, str] = {}
+for _member in DescribeStyle:
+    _ROLES.setdefault(_style_key(_member.value), _member.name)
+
+
+def _role(style: str | Style) -> tuple[str | None, bool]:
+    """The ``DescribeStyle`` role of a style and whether it dims the text."""
+    parsed = Style.parse(style) if isinstance(style, str) else style
+    if parsed.dim and parsed.color is None:
+        return None, True  # e.g. ``stylize("dim", ...)``: dims, keeps the color
+    return _ROLES.get(_style_key(parsed)), bool(parsed.dim)
+
+
+def _segments(text: Text) -> PlanCell:
+    """Split a Rich text into runs of one role, as the console colors it.
+
+    Later spans win over earlier ones and over the base style; a plain
+    ``dim`` span only dims.
+    """
+    plain = text.plain
+    bounds = sorted({0, len(plain), *(b for s in text.spans for b in (s.start, s.end))})
+    base_role, base_dim = _role(text.style)
+    out: PlanCell = []
+    for start, end in zip(bounds, bounds[1:], strict=False):
+        if start >= len(plain):
+            break
+        role, dim = base_role, base_dim
+        for span in text.spans:
+            if span.start <= start and end <= span.end:
+                span_role, span_dim = _role(span.style)
+                role = span_role or role
+                dim = dim or span_dim
+        piece = plain[start:end]
+        if out and out[-1]["style"] == role and out[-1]["dim"] == dim:
+            out[-1]["text"] += piece
+        else:
+            out.append({"text": piece, "style": role, "dim": dim})
+    return out

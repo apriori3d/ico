@@ -1,16 +1,19 @@
 import json
 from collections.abc import Iterator
-from typing import Any, get_args
+from typing import Any
 
-from ico import IcoOperator, IcoSource, PlanNodeView, plan_view
+from rich.console import Console
+
+from ico import IcoOperator, IcoSource, PlanView, plan_view
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.batcher import IcoBatcher
-from ico.core.fork import fork
 from ico.core.process import IcoProcess
 from ico.core.runtime.progress import IcoProgress
 from ico.core.stream import IcoStream
-from ico.describe.plan.json_renderer import Layout
-from ico.registry import IcoRegistry, register
+from ico.describe.plan.json_renderer import PlanCell
+from ico.describe.plan.options import PlanRendererOptions
+from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
+from ico.describe.rich_style import DescribeStyle
 
 # ─── Fixtures ───
 
@@ -23,10 +26,6 @@ def upper(text: str) -> str:
     return text.upper()
 
 
-def lower(text: str) -> str:
-    return text.lower()
-
-
 def halve(x: float) -> float:
     return x / 2
 
@@ -35,101 +34,91 @@ def small(x: float) -> bool:
     return x < 1
 
 
-def nodes(view: PlanNodeView) -> Iterator[PlanNodeView]:
-    yield view
-    for child in view["children"]:
-        yield from nodes(child)
+def text(cell: PlanCell) -> str:
+    return "".join(segment["text"] for segment in cell)
 
 
-# ─── Schema ───
+def styled(cell: PlanCell, style: str) -> list[str]:
+    return [s["text"].strip() for s in cell if s["style"] == style]
 
 
-def test_every_node_has_the_schema_fields() -> None:
-    flow = (
-        IcoSource(words)
-        | IcoProgress[Iterator[str]](total=2, name="items")
-        | IcoStream(upper)
-        | IcoBatcher[str](batch_size=2)
-    )
+def flow_column(view: PlanView) -> list[str]:
+    return [text(row[0]) for row in view["rows"]]
+
+
+def stream_flow() -> Any:
+    progress = IcoProgress[str](total=2, name="items")
+    flow = IcoSource(words) | IcoStream(progress | IcoOperator(upper))
+    pool = IcoAsyncStream(lambda: IcoOperator(upper), pool_size=4, on_error="skip")
+    return flow | pool | IcoBatcher[str](batch_size=2)
+
+
+# ─── Rows ───
+
+
+def test_rows_are_the_console_plan() -> None:
+    flow = stream_flow()
     view = plan_view(flow)
 
-    layouts = set(get_args(Layout))
-    for node in nodes(view):
-        assert set(node) == {"label", "sig", "ref", "badges", "layout", "children"}
-        assert isinstance(node["label"], str) and node["label"]
-        assert node["sig"] is None or isinstance(node["sig"], str)
-        assert node["ref"] is None or isinstance(node["ref"], str)
-        assert all(isinstance(badge, str) for badge in node["badges"])
-        assert node["layout"] in layouts
-    as_json: Any = json.loads(json.dumps(view))
-    assert as_json == view
+    console = Console(record=True, width=300, color_system=None)
+    PlanRenderer(PlanRendererOptions(query_iterable_size=False), console).render(flow)
+    printed = console.export_text()
+
+    assert view["columns"] == ["Flow", "Signature", "Name"]
+    assert view["title"] == flow.name
+    for row in view["rows"]:
+        assert all(text(cell) in printed for cell in row)
+    assert flow_column(view) == [
+        "📚IcoSource(words)",
+        "╭── for each in 🎞️ IcoStream()",
+        "│   ⏳IcoProgress()",
+        "│   upper",
+        "╰─▸ yield",
+        "╭── parallel in 🚀IcoAsyncStream(pool_size=4, on_error=skip)",
+        "│   upper",
+        "╰─▸ yield",
+        "📦IcoBatcher(batch_size=2)",
+    ]
 
 
-# ─── Layouts ───
+def test_segments_carry_describe_roles() -> None:
+    view = plan_view(stream_flow())
+    rows = view["rows"]
+    roles = {member.name for member in DescribeStyle}
+
+    for row in rows:
+        for cell in row:
+            for segment in cell:
+                assert segment["style"] is None or segment["style"] in roles
+    header, footer = rows[1][0], rows[4][0]
+    assert styled(header, "group") == ["╭──"]
+    assert styled(header, "keyword")[0].startswith("for each in")
+    assert styled(footer, "keyword") == ["yield"]
+    assert styled(rows[0][0], "fn") == ["words"]
+    assert styled(rows[5][0], "meta") == ["pool_size=4, on_error=skip"]
+    assert styled(rows[2][2], "text") == ["items"]
+    assert text(rows[0][1]) == "() → Iterator[str]"
+    assert "signature" in {s["style"] for s in rows[0][1]}
 
 
-def test_chain_is_flattened_into_a_sequence() -> None:
-    flow = (
-        IcoSource(words)
-        | IcoProgress[Iterator[str]](total=2, name="items")
-        | IcoStream(upper)
-    )
-    view = plan_view(flow)
+def test_common_signature_prefix_is_dimmed_like_the_console() -> None:
+    view = plan_view(stream_flow())
+    signature = view["rows"][3][1]  # upper: str → str
 
-    assert view["layout"] == "sequence"
-    assert [c["label"] for c in view["children"]] == ["IcoSource", "items", "IcoStream"]
-    source, progress, stream = view["children"]
-    assert (source["sig"], source["badges"]) == ("() → Iterator[str]", ["words"])
-    assert progress["sig"] == "Iterator[str] → Iterator[str]"
-    assert stream["layout"] == "sequence"
-    assert [c["label"] for c in stream["children"]] == ["upper"]
+    assert text(signature) == "str → str"
+    assert all(s["dim"] for s in signature if s["style"] == "signature")
 
 
-def test_async_stream_and_fork_are_parallel() -> None:
-    astream = IcoAsyncStream(
-        lambda: IcoOperator(upper), pool_size=4, on_error="skip", name="pool"
-    )
-    forked = fork(IcoOperator(upper), IcoOperator(lower))
-
-    stream_view, fork_view = plan_view(astream), plan_view(forked)
-
-    assert (stream_view["label"], stream_view["layout"]) == ("pool", "parallel")
-    assert stream_view["badges"] == ["pool_size=4", "on_error=skip"]
-    assert [c["label"] for c in stream_view["children"]] == ["upper"]
-    assert fork_view["layout"] == "parallel"
-    assert [c["label"] for c in fork_view["children"]] == ["upper", "lower"]
-    assert fork_view["sig"] == "str → tuple[str, str]"
-
-
-def test_process_is_a_loop_with_its_settings() -> None:
+def test_process_group_keywords() -> None:
     process = IcoProcess(IcoOperator(halve), until=IcoOperator(small), max_iterations=9)
     view = plan_view(process)
 
-    assert view["layout"] == "loop"
-    assert view["badges"] == ["until=small", "max_iter=9"]
-    assert [c["label"] for c in view["children"]] == ["halve", "small"]
+    assert flow_column(view)[0].startswith("╭── iterate in ")
+    assert "until=small, max_iter=9" in flow_column(view)[0]
+    assert flow_column(view)[-1] == "╰─▸ emit"
 
 
-def test_leaf_settings_are_badges() -> None:
-    view = plan_view(IcoBatcher[int](batch_size=8))
-    assert (view["layout"], view["badges"]) == ("leaf", ["batch_size=8"])
-
-
-# ─── Registered operators ───
-
-
-def test_registered_operator_is_an_opaque_leaf_with_its_ref() -> None:
-    registry = IcoRegistry()
-    shout = register("shout", 1, registry=registry)(
-        IcoOperator(upper) | IcoOperator(lower)
-    )
-    view = plan_view(IcoSource(words) | IcoStream(shout))
-
-    [inner] = view["children"][1]["children"]
-    assert (inner["ref"], inner["layout"], inner["children"]) == ("shout@1", "leaf", [])
-
-
-def test_sources_are_not_called_by_default() -> None:
+def test_view_is_json_and_sources_are_not_called() -> None:
     calls: list[int] = []
 
     def counted() -> list[int]:
@@ -137,5 +126,6 @@ def test_sources_are_not_called_by_default() -> None:
         return [1, 2]
 
     view = plan_view(IcoSource(counted))
+
     assert calls == []
-    assert view["badges"] == ["counted"]
+    assert json.loads(json.dumps(view)) == view

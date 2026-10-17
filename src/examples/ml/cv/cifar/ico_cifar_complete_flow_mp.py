@@ -49,6 +49,7 @@ from ico import (
     IcoProgress,
     IcoRuntime,
     IcoSource,
+    LiveBoardTool,
     MPWorker,
     RichProgressTool,
     operator,
@@ -628,6 +629,8 @@ if __name__ == "__main__":
     # 📊 **Performance Monitoring:**
     # RichProgressTool shows real-time progress from all parallel workers,
     # demonstrating concurrent data loading and processing capabilities.
+    # LiveBoardTool shows the same progress and the pipeline graph in the
+    # browser; its URL is printed to stderr.
 
-    runtime = IcoRuntime(cifar_flow, tools=[RichProgressTool()])
+    runtime = IcoRuntime(cifar_flow, tools=[RichProgressTool(), LiveBoardTool()])
     runtime.activate().run().deactivate()
