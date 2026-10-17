@@ -333,3 +333,21 @@ def test_structural_node_label_is_its_class() -> None:
     flow = IcoStream(upper) | mistyped
     issue = validate_signatures(flow)[0]
     assert (issue.left, issue.right) == ("IcoStream", "double")
+
+
+def test_chain_signature_passes_through_untyped_identity() -> None:
+    before = untyped_progress() | IcoOperator(to_str)
+    after = IcoOperator(to_str) | untyped_progress()
+    both = untyped_progress() | untyped_progress()
+
+    assert before.signature.format() == after.signature.format() == "int → str"
+    assert before.signature.infered and after.signature.infered
+    assert not both.signature.infered
+
+
+def test_stream_body_starting_with_progress_is_typed() -> None:
+    body = untyped_progress() | IcoOperator(upper)
+    flow = IcoSource(words) | IcoStream(body)
+
+    assert IcoStream(body).signature.format() == "Iterator[str] → Iterator[str]"
+    assert validate_signatures(flow) == []

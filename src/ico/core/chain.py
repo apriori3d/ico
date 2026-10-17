@@ -149,10 +149,19 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
 
         Note:
             If either operator has an uninfered signature, the chain signature
-            will also be uninfered with Any types for safety.
+            will also be uninfered with Any types for safety. An untyped
+            identity node (e.g. ``IcoProgress`` built from a spec) passes items
+            through, so ``progress | op`` and ``op | progress`` have the
+            signature of ``op``.
         """
+        from ico.core.signature_check import is_transparent
+
         left = self._left.signature
         right = self._right.signature
+        if is_transparent(self._left):
+            return right
+        if is_transparent(self._right):
+            return left
 
         if left.infered and right.infered:
             return IcoSignature(

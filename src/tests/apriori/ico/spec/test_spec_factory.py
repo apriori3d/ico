@@ -2,14 +2,14 @@
 
 import os
 import pickle
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
 from ico.core.async_stream import IcoAsyncStream, RetryPolicy
+from ico.core.batcher import IcoBatcher
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
-from ico.core.runtime.progress import IcoProgress
 from ico.core.source import IcoSource
 from ico.registry import IcoRegistry, register
 from ico.runtime.worker.mp.mp_worker import MPWorker
@@ -158,9 +158,10 @@ def test_rebuilt_worker_runs_in_another_process() -> None:
 
 
 def make_untyped_worker() -> IcoOperator[int, int]:
-    # An unparametrized progress node makes the worker signature uninferred.
-    progress: IcoProgress[int] = IcoProgress(total=3)
-    return cast(IcoOperator[int, int], progress | inc)
+    # An unparametrized batcher makes the worker signature uninferred (an
+    # untyped progress node no longer does: chains pass through it).
+    batcher: IcoBatcher[Any] = IcoBatcher(3)
+    return cast(IcoOperator[int, int], inc | cast(Any, batcher))
 
 
 def test_worker_with_uninferred_worker_roundtrip() -> None:
