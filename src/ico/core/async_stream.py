@@ -13,6 +13,7 @@ from typing import Any, Generic, Literal, TypeAlias, TypeVar, final, overload
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.operator import I, IcoOperator, O
+from ico.core.runtime.cancel import check_cancelled
 from ico.core.runtime.worker import IcoWorkerDied
 from ico.core.signature import IcoSignature
 
@@ -475,6 +476,8 @@ class IcoAsyncStream(
         error: Exception | None = None
         try:
             for item in input_stream:
+                # Cancelled: stop scheduling; items in progress finish.
+                check_cancelled()
                 await ordering_buffer_ready.wait()
                 await in_queue.put((count, item))
                 count += 1

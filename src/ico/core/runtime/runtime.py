@@ -8,6 +8,7 @@ from dataclasses import replace
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperatorProtocol
 from ico.core.plan_keys import assign_plan_keys
+from ico.core.runtime.cancel import IcoCancelToken, cancellable
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
@@ -140,6 +141,7 @@ class IcoRuntime(IcoRuntimeNode):
     ]  # Complete computation flow (Source → Sink)
     toolbox: IcoRuntimeToolBox  # Tool container for runtime monitoring
     plan_root: IcoNodeProtocol  # The flow whose plan keys events carry
+    cancel_token: IcoCancelToken  # Stops the run between items when set
 
     def __init__(
         self,
@@ -151,6 +153,7 @@ class IcoRuntime(IcoRuntimeNode):
         state_model: BaseStateModel | None = None,
         tools: Sequence[IcoRuntimeTool] | None = None,
         plan_root: IcoNodeProtocol | None = None,
+        cancel: IcoCancelToken | None = None,
     ) -> None:
         """Initialize runtime coordinator with computation flow and tool integration.
 
@@ -164,6 +167,8 @@ class IcoRuntime(IcoRuntimeNode):
             plan_root: The flow whose plan keys the runtime nodes and their
                 events get (``node``), when ``closure`` wraps it (as
                 ``ico.spec.run`` does); ``closure`` by default.
+            cancel: The token that cancels the run (``IcoRuntime.cancel``
+                sets it too); a new one by default.
 
         Initialization Process:
             1. **ToolBox Creation**: Create tool container with provided tools
@@ -200,6 +205,7 @@ class IcoRuntime(IcoRuntimeNode):
         discover_and_connect_runtime_nodes(self, closure)
         # Plan keys before the tools register the nodes.
         self.plan_root = plan_root if plan_root is not None else closure
+        self.cancel_token = cancel if cancel is not None else IcoCancelToken()
         assign_plan_keys(self.plan_root)
 
         self.toolbox = IcoRuntimeToolBox(runtime=self, tools=tools)
@@ -287,6 +293,12 @@ class IcoRuntime(IcoRuntimeNode):
     # Flow execution coordination
     # ────────────────────────────────────────────────
 
+    def cancel(self, reason: str = "cancelled") -> None:
+        """Stop the run between items, from any thread: the item in progress
+        finishes, ``run`` raises ``IcoCancelled``. Deactivate as usual
+        afterwards; workers stop cleanly."""
+        self.cancel_token.cancel(reason)
+
     def run(self) -> IcoRuntime:
         """Execute complete computation flow with runtime coordination and monitoring.
 
@@ -345,7 +357,8 @@ class IcoRuntime(IcoRuntimeNode):
         """
         try:
             self.state_model.running()
-            self.closure(None)
+            with cancellable(self.cancel_token):
+                self.closure(None)
             self.state_model.ready()
             return self
 
