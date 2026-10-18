@@ -11,6 +11,7 @@ from ico.core.context_operator import IcoContextOperator
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
 from ico.core.runtime.worker import IcoWorker
+from ico.describe.plan.keys import ROOT_KEY, child_key, plan_nodes, remote_flow_key
 from ico.tools.profiler.probe import NodeProbe
 from ico.tools.profiler.remote import RunnerProfiler
 from ico.tools.profiler.table import ProfileTable
@@ -19,8 +20,6 @@ if TYPE_CHECKING:
     from ico.tools.profiler.tool import ProfilerTool
 
 F = TypeVar("F", bound=IcoNodeProtocol)
-
-ROOT_KEY = "0"
 
 
 def instrument(flow: F, profiler: ProfilerTool) -> F:
@@ -33,7 +32,8 @@ def instrument(flow: F, profiler: ProfilerTool) -> F:
         flow = instrument(flow, profiler)
         IcoRuntime(flow, tools=[profiler]).activate().run().deactivate()
 
-    Keys are the paths of the nodes in the plan: the root is ``0`` and the
+    Keys are the plan keys of the nodes (:mod:`ico.describe.plan.keys`,
+    the ``keys`` of :func:`~ico.plan_view`): the root is ``0`` and the
     ``i``-th child of ``k`` is ``k.i``. The members of an async stream pool
     built from a factory share the key of the first member, as the plan
     shows one of them, so their measurements merge.
@@ -66,11 +66,14 @@ def instrument_table(
     with ``IcoProfileEvent``.
     """
     seen: set[int] = set()
-
-    def visit(node: IcoNodeProtocol, key: str, member: bool) -> None:
+    for planned in plan_nodes(flow, root_key=root_key):
+        node, key = planned.node, planned.key
         if id(node) in seen:
-            return
+            continue  # a node used at several places: its first key
         seen.add(id(node))
+        member = planned.parent is not None and isinstance(
+            planned.parent.node, IcoAsyncStream
+        )
         if isinstance(node, IcoOperator | IcoContextOperator | IcoAsyncOperator):
             operator = cast(
                 IcoOperator[Any, Any]
@@ -90,26 +93,15 @@ def instrument_table(
             _instrument_worker(cast(IcoWorker[Any, Any], node), key, table, interval)
         if isinstance(node, IcoAsyncStream):
             stream = cast(IcoAsyncStream[Any, Any], node)
-            members = [
-                (child, f"{key}.0" if stream.pool_from_factory else f"{key}.{i}")
-                for i, child in enumerate(node.children)
-            ]
-            keys = tuple(dict.fromkeys(k for _, k in members))
+            members = range(1 if stream.pool_from_factory else len(node.children))
+            keys = tuple(child_key(key, i) for i in members)
             table.layout.pools[key] = (keys, stream.pool_size)
-            for child, child_key in members:
-                visit(child, child_key, True)
-            return
-        for i, child in enumerate(node.children):
-            visit(child, f"{key}.{i}", False)
-
-    visit(flow, root_key, False)
 
 
 def _instrument_worker(
     worker: IcoWorker[Any, Any], key: str, table: ProfileTable, interval: float | None
 ) -> None:
-    # The runner's flow is the worker's last child in the plan.
-    remote = f"{key}.{len(worker.children)}"
+    remote = remote_flow_key(key, worker)
     table.layout.workers[key] = remote
     probe = RunnerProfiler(remote, table.metrics, interval)
     current = worker.runner_probe

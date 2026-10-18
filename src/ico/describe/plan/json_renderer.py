@@ -25,8 +25,6 @@ from rich.text import Text
 from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
-from ico.describe.plan.rich_renderer.render_target import create_plan_walker
-from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 from ico.describe.rich_style import DescribeStyle
 
 
@@ -49,6 +47,10 @@ class PlanView(TypedDict):
     title: str
     columns: list[str]
     rows: list[list[PlanCell]]
+    keys: list[str | None]
+    """The plan key of the node of each row (``0.1.0``, see
+    :mod:`ico.describe.plan.keys`); ``None`` for closing rows (``yield``,
+    ``collect``, ...) and rows of nodes already keyed by another row."""
 
 
 def plan_view(
@@ -76,28 +78,21 @@ class _RowCollector(PlanRenderer):
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(options=options)
         self._rows: list[list[PlanCell]] = []
+        self._keys: list[str | None] = []
 
     def collect(self, root: IcoNodeProtocol) -> PlanView:
-        self._rows = []
-        walker = create_plan_walker(expand_remote_flows=self.options.show_remote_flows)
-        walker.walk(root, visit_fn=self.render_node, order="pre_post")
+        self._rows, self._keys = [], []
+        self.walk(root)
         return {
             "title": root.name or type(root).__name__,
             "columns": list(self.options.columns),
             "rows": self._rows,
+            "keys": self._keys,
         }
 
-    def render_row(
-        self,
-        row_renderer: RowRenderer,
-        node: IcoNodeProtocol,
-        indent: Text | None = None,
-    ) -> None:
-        columns = [row_renderer.render(node, column) for column in self.options.columns]
-        indentation = self._gather_indentation(indent)
-        if indentation:
-            columns[0] = indentation + columns[0]
+    def add_row(self, columns: list[Text], key: str | None) -> None:
         self._rows.append([_segments(text) for text in columns])
+        self._keys.append(key)
 
 
 def _style_key(style: str | Style) -> str:

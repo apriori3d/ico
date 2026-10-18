@@ -91,6 +91,7 @@ def test_board_serves_page_runs_and_plan(board: tuple[BoardRuns, LiveBoard]) -> 
         "title": "flow",
         "columns": ["Flow"],
         "rows": [[[{"text": "upper", "style": "fn", "dim": False}]]],
+        "keys": ["0"],
     }
     run = runs.start("demo", plan)
 

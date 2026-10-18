@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeAlias
+from typing import TypeAlias, cast
 
 from rich.console import Console
 from rich.table import Table
@@ -9,6 +9,7 @@ from rich.text import Text
 from ico.core.node import (
     IcoNodeProtocol,
 )
+from ico.describe.plan.keys import ROOT_KEY, child_key, path_key
 from ico.describe.plan.options import (
     PlanRendererOptions,
 )
@@ -44,6 +45,12 @@ class PlanRenderer:
 
     _table: Table | None
     _group_indents: list[Text]
+    _walk_keys: list[str]
+    """Plan key of the root of every walk in progress (the main walk and the
+    subtrees of custom renderers)."""
+    _rendering: list[tuple[IcoNodeProtocol, str]]
+    """The nodes being rendered, innermost last, with their plan keys."""
+    _used_keys: set[str]
     _default_renderer: RowRenderer
     _default_group_renderer: GroupRenderer
     _selected_renderers: dict[type[IcoNodeProtocol], RendererTypes]
@@ -61,6 +68,9 @@ class PlanRenderer:
         self._default_group_renderer = GroupRenderer(options=self.options)
         self._table = None
         self._group_indents = []
+        self._walk_keys = []
+        self._rendering = []
+        self._used_keys = set()
         self._selected_renderers = {}
 
         for path in self.options.renderers_paths:
@@ -76,18 +86,42 @@ class PlanRenderer:
     def render(self, root: IcoNodeProtocol) -> None:
         """Render complete ICO node tree to console."""
         self._table = self._create_table()
-
-        tree_walker = create_plan_walker(
-            expand_remote_flows=self.options.show_remote_flows
-        )
-        tree_walker.walk(
-            root,
-            visit_fn=self.render_node,
-            order="pre_post",  # Need post order to close groups
-        )
+        self.walk(root)
 
         self.console.rule(f"[bold blue]Flow plan: {root.name}", style="dim blue")
         self.console.print(self._table)
+
+    def walk(self, root: IcoNodeProtocol, key: str = ROOT_KEY) -> None:
+        """Render ``root`` (keyed ``key``) and its subtree."""
+        if not self._walk_keys:
+            self._used_keys = set()
+        self._walk_keys.append(key)
+        try:
+            create_plan_walker(expand_remote_flows=self.options.show_remote_flows).walk(
+                root,
+                visit_fn=self.render_node,
+                order="pre_post",  # Need post order to close groups
+            )
+        finally:
+            self._walk_keys.pop()
+
+    def render_subtree(self, child: IcoNodeProtocol) -> None:
+        """Render a child of the node being rendered with its subtree."""
+        node, key = self._rendering[-1]
+        index = _index(node.children, child)
+        if index is None:
+            raise ValueError(f"{child!r} is not a child of {node!r}")
+        self.walk(child, child_key(key, index))
+
+    def _key_of(self, node: IcoNodeProtocol) -> str | None:
+        """The plan key of the node being rendered or of one of its children."""
+        if not self._rendering:
+            return None
+        current, key = self._rendering[-1]
+        if node is current:
+            return key
+        index = _index(current.children, node)
+        return child_key(key, index) if index is not None else None
 
     def _select_renderer(self, node: IcoNodeProtocol) -> RendererTypes:
         """Select appropriate renderer for node type via registry lookup."""
@@ -111,6 +145,16 @@ class PlanRenderer:
 
     def render_node(self, node_info: PlanTraversalInfo) -> None:
         """Render individual node using pre/post order traversal logic."""
+        if node_info.current_order == "pre":
+            key = path_key(self._walk_keys[-1], node_info.path)
+            self._rendering.append((node_info.node, key))
+        try:
+            self._render_node(node_info)
+        finally:
+            if node_info.current_order == "post":
+                self._rendering.pop()
+
+    def _render_node(self, node_info: PlanTraversalInfo) -> None:
         node = node_info.node
 
         if node_info.current_order == "pre":
@@ -169,6 +213,7 @@ class PlanRenderer:
                 renderer.footer_renderer,
                 node,
                 indent=Text("╰─▸ ", style=DescribeStyle.group.value),
+                keyed=False,
             )
 
     def push_group_indent(self, indent: Text) -> None:
@@ -184,16 +229,30 @@ class PlanRenderer:
         row_renderer: RowRenderer,
         node: IcoNodeProtocol,
         indent: Text | None = None,
+        *,
+        keyed: bool = True,
     ) -> None:
-        """Render single table row with proper indentation."""
-        assert self._table is not None
+        """Render single table row with proper indentation.
 
+        The row gets the plan key of ``node`` unless ``keyed`` is false or
+        another row already has it.
+        """
         columns = [row_renderer.render(node, column) for column in self.options.columns]
 
         indentation = self._gather_indentation(indent)
         if indentation:
             columns[0] = indentation + columns[0]
 
+        key = self._key_of(node) if keyed else None
+        if key is not None and key in self._used_keys:
+            key = None
+        if key is not None:
+            self._used_keys.add(key)
+        self.add_row(columns, key)
+
+    def add_row(self, columns: list[Text], key: str | None) -> None:
+        """Add a rendered row; ``key`` is its node's plan key, if any."""
+        assert self._table is not None
         self._table.add_row(*columns)
 
     def _gather_indentation(self, indent: Text | None = None) -> Text | None:
@@ -212,3 +271,11 @@ class PlanRenderer:
                 full_indent += group_indent
 
         return full_indent
+
+
+def _index(children: object, child: IcoNodeProtocol) -> int | None:
+    """The position of ``child`` among ``children`` (by identity)."""
+    for i, candidate in enumerate(cast(list[IcoNodeProtocol], children)):
+        if candidate is child:
+            return i
+    return None

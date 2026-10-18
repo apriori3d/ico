@@ -185,20 +185,32 @@ Properties:
 
 ### 4.1 Node keys
 
-A metric key is the path of the node in the **plan walker's** tree
-(`create_plan_walker(expand_remote_flows=True)`), as dotted child
-indices:
+A metric key is the **plan key** of the node, defined once in
+`ico.describe.plan.keys` and shared by the plan renderers and the
+profiler. Keys are dotted child indices in the plan's tree (`plan_children`):
 
 - A pool built from a factory is flattened to its first member, as the
   plan does. All members of a factory pool therefore have one key, and
   their aggregates merge into one row of the plan.
-- The remote flow of a worker is the worker's last child, as in the plan
-  walker.
+- The remote flow of a worker is the worker's last child
+  (`remote_flow_key`).
 
-`plan_view` gets a parallel list `keys: list[str | None]`, one per row
-(`None` for footer rows such as `yield`). A consumer then joins profile
-rows to plan rows without knowing node kinds. Progress keys stay runtime
-paths; they are unrelated.
+`plan_nodes(flow)` yields every node with its key, including all members
+of a factory pool; `instrument` walks it.
+
+`plan_view` has a parallel list `keys: list[str | None]`, one per row.
+- `None` marks closing rows (`yield`, `collect`, `emit`, …) and rows of
+  nodes already keyed by another row.
+- A branch label (`├─▸ case 'b'`) or an epoch part header has the key of
+  its subtree only when the subtree has no row of its own (a chain).
+
+A consumer joins profile rows to plan rows without knowing node kinds.
+
+The plan engine assigns keys during its single walk. Custom renderers
+(fork, route, epoch) call `plan.render_subtree(child)` instead of walking
+their parts with walkers of their own, so keys stay exact inside them.
+
+Progress keys stay runtime paths; they are unrelated.
 
 ### 4.2 Runner processes
 
