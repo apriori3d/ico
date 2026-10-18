@@ -13,33 +13,6 @@ from ico.core.runtime.toolbox import IcoRuntimeToolBox
 from ico.core.runtime.utils import discover_and_connect_runtime_nodes
 
 # ────────────────────────────────────────────────
-# Event forwarding protocol
-# ────────────────────────────────────────────────
-
-
-class OnForwardEventProtocol:
-    """Protocol for objects that can receive forwarded runtime events.
-
-    Simple protocol enabling external listeners to receive runtime events
-    forwarded from IcoRuntime execution. Used for lightweight event monitoring
-    without full IcoRuntimeTool infrastructure.
-
-    Integration:
-        • Event Reception: Receives events via on_forward_event()
-        • Lightweight Design: Simple protocol without runtime tree integration
-        • External Monitoring: Enables monitoring from outside runtime hierarchy
-    """
-
-    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
-        """Handle forwarded runtime event.
-
-        Args:
-            event: Runtime event forwarded from IcoRuntime execution.
-        """
-        ...
-
-
-# ────────────────────────────────────────────────
 # Main runtime execution coordinator
 # ────────────────────────────────────────────────
 
@@ -86,15 +59,14 @@ class IcoRuntime(IcoRuntimeNode):
 
     Tool Integration System:
         • **Managed Tools**: Tools registered through ToolBox for full runtime integration
-        • **Event Listeners**: Lightweight OnForwardEventProtocol listeners for simple monitoring
-        • **Event Distribution**: All runtime events forwarded to both systems
+        • **Event Distribution**: All runtime events forwarded to the tools
         • **Tool Lifecycle**: Automatic tool management through runtime lifecycle
 
     Execution Lifecycle:
         1. **Initialization**: Runtime tree discovery and connection
         2. **Activation**: State transition to ready (optional explicit activation)
         3. **Execution**: Flow execution with runtime coordination
-        4. **Monitoring**: Real-time event forwarding to tools and listeners
+        4. **Monitoring**: Real-time event forwarding to tools
         5. **Completion**: State transition back to ready or fault on exception
 
     State Management Integration:
@@ -104,9 +76,9 @@ class IcoRuntime(IcoRuntimeNode):
         • **Idle State**: Runtime inactive and available for cleanup
 
     Event Forwarding Architecture:
-        All runtime events bubble through IcoRuntime and get forwarded to:
-        1. **ToolBox**: Distributes to all registered tools
-        2. **Event Listeners**: Direct forwarding to protocol listeners
+        All runtime events bubble through IcoRuntime and get forwarded to
+        the ToolBox, which distributes them to all registered tools (a
+        temporary subscriber is added and removed as a tool).
         This enables comprehensive monitoring without affecting computation flow.
 
     Runtime Discovery Process:
@@ -161,7 +133,6 @@ class IcoRuntime(IcoRuntimeNode):
         None, None
     ]  # Complete computation flow (Source → Sink)
     toolbox: IcoRuntimeToolBox  # Tool container for runtime monitoring
-    event_listeners: list[OnForwardEventProtocol] = []  # External event listeners
 
     def __init__(
         self,
@@ -225,11 +196,10 @@ class IcoRuntime(IcoRuntimeNode):
     # ────────────────────────────────────────────────
 
     def on_event(self, event: IcoRuntimeEvent) -> IcoRuntimeEvent | None:
-        """Handle and distribute runtime events to tools and listeners.
+        """Handle and distribute runtime events to the tools.
 
-        Overrides IcoRuntimeNode.on_event to add comprehensive event distribution
-        to both managed tools and external event listeners, enabling multi-channel
-        runtime monitoring and management.
+        Overrides IcoRuntimeNode.on_event to forward every event to the
+        toolbox, which distributes it to all tools.
 
         Args:
             event: Runtime event bubbled up from computation nodes.
@@ -240,12 +210,10 @@ class IcoRuntime(IcoRuntimeNode):
         Event Distribution Process:
             1. **Parent Processing**: Call super().on_event() for standard runtime tree handling
             2. **Tool Distribution**: Forward event to toolbox for distribution to all tools
-            3. **Listener Notification**: Forward event to all registered external listeners
-            4. **Event Return**: Return processed event for continued runtime tree flow
+            3. **Event Return**: Return processed event for continued runtime tree flow
 
         Distribution Channels:
             • **ToolBox Channel**: event → toolbox.on_forward_event() → all tools
-            • **Listener Channel**: event → listener.on_forward_event() (direct)
 
         Event Types Handled:
             • IcoProgressEvent: Progress updates from computation nodes
@@ -255,16 +223,10 @@ class IcoRuntime(IcoRuntimeNode):
 
         Multi-Channel Benefits:
             • **Tool Integration**: Full runtime tree integration with comprehensive tooling
-            • **Lightweight Monitoring**: Simple protocol listeners for basic monitoring
-            • **Event Redundancy**: Multiple monitoring channels for robustness
-            • **Flexible Architecture**: Support for both integrated and external monitoring
         """
         super().on_event(event)
 
         self.toolbox.on_forward_event(event)
-
-        for listener in self.event_listeners:
-            listener.on_forward_event(event)
 
         return event
 
@@ -278,7 +240,7 @@ class IcoRuntime(IcoRuntimeNode):
         Provides coordinated execution of the encapsulated computation flow with
         comprehensive state management, exception handling, and runtime tree coordination.
         All runtime events generated during execution are captured and distributed
-        to monitoring tools and listeners.
+        to monitoring tools.
 
         Returns:
             Self reference for method chaining (fluent interface).
@@ -302,7 +264,7 @@ class IcoRuntime(IcoRuntimeNode):
             • Progress events bubble up from IcoProgress nodes
             • State change events propagate through runtime hierarchy
             • Exception events captured and distributed to error handling tools
-            • All events forwarded to tools and listeners for real-time monitoring
+            • All events forwarded to tools for real-time monitoring
 
         Execution Safety:
             • **Exception Transparency**: All computation exceptions preserved and re-raised

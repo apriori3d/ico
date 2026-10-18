@@ -1,15 +1,16 @@
-from typing import TypeAlias, cast, overload
+from typing import TypeAlias, overload
 
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
     RuntimeTraversalInfo,
 )
-from ico.core.runtime.runtime import IcoRuntime, OnForwardEventProtocol
+from ico.core.runtime.runtime import IcoRuntime
 from ico.core.runtime.state import (
     IcoRuntimeState,
     IcoStateEvent,
@@ -79,6 +80,13 @@ class RuntimeTreeRenderer(IcoRuntimeTool):
             table.add_column(column, no_wrap=True)
         return table
 
+    def on_command(self, command: IcoRuntimeCommand) -> None:
+        # While subscribed to collect states, the renderer is a tool of the
+        # runtime it draws: it does not report a state of its own.
+        if isinstance(command, IcoStateRequestCommand):
+            return
+        super().on_command(command)
+
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         super().on_forward_event(event)
 
@@ -98,13 +106,14 @@ class RuntimeTreeRenderer(IcoRuntimeTool):
         # Use tool api to collect state from all nodes
         if collect_state:
             assert isinstance(node, IcoRuntime)
-            self_forward_event: OnForwardEventProtocol = cast(
-                OnForwardEventProtocol, self
-            )
-            node.event_listeners.append(self_forward_event)
             self._node_states = {}
-            node.broadcast_command(IcoStateRequestCommand.create())
-            node.event_listeners.remove(self_forward_event)
+            # Subscribe as a temporary tool of this runtime only, and always
+            # unsubscribe, also when a node fails to answer.
+            node.toolbox.add_tool(self)
+            try:
+                node.broadcast_command(IcoStateRequestCommand.create())
+            finally:
+                node.toolbox.remove_tool(self)
 
         self._table = self._create_table()
 
