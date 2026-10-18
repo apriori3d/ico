@@ -12,6 +12,7 @@ from typing import (
 )
 
 from ico.core.node import IcoNode, IcoNodeProtocol
+from ico.core.probe import IcoProbe
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
@@ -91,6 +92,8 @@ class IcoOperator(Generic[I, O], IcoNode):
     # Note:  __slots__ is not used here to allow dynamic inference of ICO-signature attributes
 
     _fn: Callable[[I], O]
+    _probe: IcoProbe | None = None
+    """Called instead of ``_fn`` when set (see :mod:`ico.core.probe`)."""
 
     def __init__(
         self,
@@ -128,7 +131,10 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             The output value of type O after applying the wrapped function.
         """
-        return self._fn(item)
+        probe = self._probe
+        if probe is None:
+            return self._fn(item)
+        return cast(O, probe.call(self._fn, item))
 
     @property
     def fn(self) -> Callable[[I], O]:

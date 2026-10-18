@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, Generic
+from typing import Any, Generic, cast
 
 from ico.core.node import IcoNode
 from ico.core.operator import (
     I,
     O,
 )
+from ico.core.probe import IcoProbe
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
@@ -51,6 +52,8 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
     """
 
     fn: Callable[[I], Awaitable[O]]
+    _probe: IcoProbe | None = None
+    """Called instead of ``fn`` when set (see :mod:`ico.core.probe`)."""
 
     def __init__(
         self,
@@ -91,7 +94,10 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
             This method must be awaited since it delegates to the async function.
             Used to make the operator callable: await operator(item).
         """
-        return await self.fn(item)
+        probe = self._probe
+        if probe is None:
+            return await self.fn(item)
+        return cast(O, await probe.call_async(self.fn, item))
 
     # ────────────────────────────────────────────────
     # Signature interface
