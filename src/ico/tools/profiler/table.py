@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TypedDict, final
 
@@ -295,7 +295,15 @@ def profiles(
     for key in sorted(layout.nodes, key=_path):
         info = layout.nodes[key]
         node = merged.get(key, empty)
-        own = _own(metrics, layout, merged, key, node)
+        own = _without_runner(metrics, layout, merged, key, node.own, lambda r: r.total)
+        startup_own = _without_runner(
+            metrics,
+            layout,
+            merged,
+            key,
+            node.startup_own,
+            lambda r: [s.sum for s in r.startup],
+        )
         views: dict[str, MetricView] = {}
         for i, metric in enumerate(metrics):
             view = node.events[i].view(metric.scale)
@@ -313,7 +321,7 @@ def profiles(
                 "items": node.items,
                 "errors": node.errors,
                 "metrics": views,
-                "startup": _phase(metrics, node.startup, node.startup_own),
+                "startup": _phase(metrics, node.startup, startup_own),
                 "end": _phase(metrics, node.end, node.end_own),
                 "utilization": _utilization(layout, merged, key),
                 "transfer": _transfer(metrics, layout, merged, key, wall),
@@ -322,25 +330,27 @@ def profiles(
     return out
 
 
-def _own(
+def _without_runner(
     metrics: Sequence[IcoMetric],
     layout: Layout,
     merged: dict[str, NodeAggregate],
     key: str,
-    node: NodeAggregate,
+    values: list[int],
+    runner: Callable[[NodeAggregate], list[int]],
 ) -> list[int]:
     """Self values of a node. A worker portal waits while its runner works
     in another process, where the runner's frames cannot nest in the
-    portal's: its self excludes the time of the runner's flow (for metrics
-    that are not thread-bound; its CPU time is its own anyway), leaving the
-    transfer."""
-    own = list(node.own)
+    portal's: its self (and self startup) exclude the runner's flow (for
+    metrics that are not thread-bound; its CPU time is its own anyway),
+    leaving the transfer."""
+    out = list(values)
     remote = merged.get(layout.workers.get(key, ""))
     if remote is not None:
+        subtract = runner(remote)
         for i, metric in enumerate(metrics):
             if not metric.thread_bound:
-                own[i] = max(own[i] - remote.total[i], 0)
-    return own
+                out[i] = max(out[i] - subtract[i], 0)
+    return out
 
 
 def _path(key: str) -> tuple[int, ...]:

@@ -193,8 +193,10 @@ def _info(node: NodeProfile) -> str:
         parts.append(f"transfer {duration(node['transfer'])}")
     startup = node["startup"]
     wall = startup.get("wall") if startup is not None else None
-    # Its own setup only: not the startup of the upstream it pulled.
-    if wall is not None and wall["self"] >= STARTUP_MIN:
+    # Its own setup only: not the startup of the upstream it pulled; not for
+    # a node with a single event (a sink), which would be all startup.
+    single = node["calls"] + node["items"] <= 1
+    if wall is not None and wall["self"] >= STARTUP_MIN and not single:
         parts.append(f"startup {duration(wall['self'])}")
     events = node["metrics"].get("wall")
     if (

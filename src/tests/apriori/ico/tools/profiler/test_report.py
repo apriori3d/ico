@@ -97,7 +97,8 @@ def test_cells_of_a_lazy_chain() -> None:
     assert "startup" not in each["info"]  # the source's startup is not its own
 
     sink = cells[keys["sink"]]
-    assert (sink["count"], sink["p95"]) == ("1", "")  # one call: no p95
+    # One call: no p95, and no startup (its only call would be all startup).
+    assert (sink["count"], sink["p95"], sink["info"]) == ("1", "", "")
 
 
 def test_self_startup_excludes_the_upstream() -> None:
