@@ -140,7 +140,7 @@ class MPQueueReceiveEndpoint(Generic[O], IcoReceiveEndpoint[O]):
         """
         self.queue = main_queue
 
-    def receive(self) -> DataMessage[O] | RuntimeMessage:
+    def receive(self, timeout: float | None = None) -> DataMessage[O] | RuntimeMessage:
         """Receive next message from multiprocessing queue (blocking).
 
         Returns:
@@ -161,7 +161,7 @@ class MPQueueReceiveEndpoint(Generic[O], IcoReceiveEndpoint[O]):
             Multiple threads can safely call receive() on same endpoint.
             Each thread will receive different messages (round-robin).
         """
-        return self.queue.get()
+        return self.queue.get(timeout=timeout)
 
     def close(self) -> None:
         """Close queue and cleanup resources.
