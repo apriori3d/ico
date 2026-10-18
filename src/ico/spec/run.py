@@ -9,6 +9,7 @@ starts with a loader from `str`.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
@@ -166,7 +167,14 @@ def run(
     )
     runtime = IcoRuntime(closure, tools=tools)
     errors: list[RunError] = []
-    runtime.activate()
+    try:
+        runtime.activate()
+    except BaseException:
+        # Stop what did start (e.g. the runners of the workers activated
+        # before one that failed to start); the activation error wins.
+        with contextlib.suppress(Exception):
+            runtime.deactivate()
+        raise
     try:
         runtime.run()
     except IcoStreamErrors as e:

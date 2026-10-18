@@ -25,6 +25,13 @@ from ico.runtime.worker.mp.mp_channel import (
 # ────────────────────────────────────────────────────────────────────────────
 
 
+DEFAULT_START_TIMEOUT = 300.0
+"""Seconds a runner has to start by default: enough to import heavy
+frameworks and load a model, short of an endless hang."""
+ABORT_GRACE = 5.0
+"""Seconds a runner that did not start has to exit after ``terminate``."""
+
+
 @final
 class MPWorker(Generic[I, O], IcoWorker[I, O]):
     """Multiprocessing-based distributed worker for ICO computation execution.
@@ -181,6 +188,7 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
         flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         *,
         name: str | None = None,
+        start_timeout: float | None = DEFAULT_START_TIMEOUT,
     ) -> None:
         """Initialize multiprocessing worker with computation flow factory.
 
@@ -188,6 +196,10 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
             flow_factory: Factory function creating computation flow in runner process.
                          Must be pickleable for cross-process transmission.
             name: Optional worker identifier for debugging and monitoring.
+            start_timeout: Seconds the runner process has to start (import
+                modules, build its flow, acknowledge activation); ``None``
+                for no limit. A runner that hangs is stopped and activation
+                raises ``IcoWorkerStartTimeout``.
 
         Initialization Process:
             1. **Parent Initialization**: Call IcoWorker.__init__ with None channel
@@ -224,6 +236,7 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
             # runtime_children=[printer],
         )
 
+        self.start_timeout = start_timeout
         self._mp_context = get_context("spawn")
         # Create channel to ensure subtree_factory can access channel
         self.channel = self._create_channel()
@@ -357,6 +370,17 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
 
     def runner_alive(self) -> bool:
         return self.is_alive
+
+    def _abort_runner(self) -> None:
+        """Stop a runner process that did not start in time."""
+        process = self._runner_process
+        if process is None or not process.is_alive():
+            return
+        process.terminate()
+        _wait_for_exit(process, timeout=ABORT_GRACE)
+        if process.is_alive():
+            process.kill()
+            _wait_for_exit(process, timeout=ABORT_GRACE)
 
     def _deactivate_runner(self) -> None:
         """Gracefully shutdown runner process and cleanup resources.

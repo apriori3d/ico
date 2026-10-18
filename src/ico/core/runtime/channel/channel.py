@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from queue import Empty
@@ -303,13 +304,22 @@ class IcoChannel(Generic[I, O], ABC):
             self._wait_for_ack(message.id)
 
     def send_command(
-        self, payload: IcoRuntimeCommand, wait_for_ack: bool = True
+        self,
+        payload: IcoRuntimeCommand,
+        wait_for_ack: bool = True,
+        *,
+        timeout: float | None = None,
     ) -> None:
         """Send runtime command with optional acknowledgment.
 
         Args:
             payload: Runtime command to send to remote process.
             wait_for_ack: Wait for delivery confirmation from receiver.
+            timeout: Seconds to wait for the acknowledgment; ``None`` waits
+                as long as the peer is alive.
+
+        Raises:
+            TimeoutError: No acknowledgment within ``timeout``.
 
         Command Distribution:
             Enables distributed runtime tree coordination by forwarding
@@ -320,7 +330,7 @@ class IcoChannel(Generic[I, O], ABC):
 
         # Runtime command may be updated by peer runtime
         if wait_for_ack:
-            self._wait_for_ack(message.id)
+            self._wait_for_ack(message.id, timeout)
 
     def send_event(self, payload: IcoRuntimeEvent, wait_for_ack: bool = True) -> None:
         """Send runtime event with optional acknowledgment.
@@ -344,16 +354,19 @@ class IcoChannel(Generic[I, O], ABC):
         self._message_id += 1
         self.sender.send(message)
 
-    def _wait_for_ack(self, pending_message_id: int) -> None:
+    def _wait_for_ack(
+        self, pending_message_id: int, timeout: float | None = None
+    ) -> None:
         """Wait for acknowledgment message with matching ID.
 
         Args:
             pending_message_id: Expected acknowledgment message ID.
+            timeout: Seconds to wait; ``None`` for no limit.
 
         Raises:
             RuntimeError: If wrong message type or mismatched ID received.
         """
-        input_item = self.wait_for_message()
+        input_item = self.wait_for_message(timeout)
 
         if not isinstance(input_item, AcknowledgeMessage):
             raise RuntimeError(
@@ -388,11 +401,21 @@ class IcoChannel(Generic[I, O], ABC):
             )
         return message.payload
 
-    def wait_for_message(self) -> DataMessage[O] | AcknowledgeMessage | None:
+    def wait_for_message(
+        self, timeout: float | None = None
+    ) -> DataMessage[O] | AcknowledgeMessage | None:
         """Wait for message and handle runtime commands/events from peer.
 
         Core message processing loop that handles all incoming message types
         while waiting for specific expected messages (data or acknowledgments).
+
+        Args:
+            timeout: Seconds to wait for a data message or an acknowledgment
+                (messages handled meanwhile do not extend it); ``None`` for no
+                limit.
+
+        Raises:
+            TimeoutError: Nothing expected arrived within ``timeout``.
 
         Returns:
             DataMessage: Computation data from remote process
@@ -415,16 +438,29 @@ class IcoChannel(Generic[I, O], ABC):
             • Unexpected message types raise RuntimeError
             • Timeout behavior controlled by ignore_receive_timeouts flag
         """
+        deadline = None if timeout is None else time.monotonic() + timeout
         while True:
             check_peer = self.check_peer
+            poll = (
+                self.poll_interval
+                if check_peer is not None or deadline is not None
+                else None
+            )
+            if deadline is not None:
+                assert poll is not None
+                poll = max(min(poll, deadline - time.monotonic()), 0.0)
             try:
-                input_message = self.receiver.receive(
-                    timeout=self.poll_interval if check_peer is not None else None
-                )
+                input_message = self.receiver.receive(timeout=poll)
 
             except (TimeoutError, Empty):
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise TimeoutError(
+                        f"no message from the peer within {timeout:g} s"
+                    ) from None
                 if check_peer is not None:
                     check_peer()  # raises when the peer is gone
+                    continue
+                if deadline is not None:
                     continue
                 if self.ignore_receive_timeouts:
                     continue

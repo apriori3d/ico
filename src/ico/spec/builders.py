@@ -652,17 +652,40 @@ def build_worker(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
         )
 
     _children(spec, 1)
+    start_timeout = _start_timeout(spec)
     factory = ctx.factory(spec.children[0])
     # Parametrize with the worker types so the worker signature is inferred,
     # as it was from the original factory's return annotation.
     signature = factory.probe_signature()
     if signature.infered:
         return MPWorker[signature.i, signature.o](  # type: ignore[name-defined]
-            cast(Callable[[], AnyOp], factory), name=spec.name
+            cast(Callable[[], AnyOp], factory),
+            name=spec.name,
+            start_timeout=start_timeout,
         )
     # Unparametrized, like the original worker: MPWorker[Any, Any] would report
     # an inferred "Any → Any" signature and break the round trip.
     worker: MPWorker[Any, Any] = MPWorker(
-        cast(Callable[[], AnyOp], factory), name=spec.name
+        cast(Callable[[], AnyOp], factory),
+        name=spec.name,
+        start_timeout=start_timeout,
     )
     return worker
+
+
+def _start_timeout(spec: NodeSpec) -> float | None:
+    """``start_timeout`` of a worker: a positive number, or ``null`` for no
+    limit; ``MPWorker``'s default when absent."""
+    from ico.runtime.worker.mp.mp_worker import DEFAULT_START_TIMEOUT
+
+    if "start_timeout" not in spec.params:
+        return DEFAULT_START_TIMEOUT
+    value = spec.params["start_timeout"]
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
+        raise SpecError(
+            f"Param 'start_timeout' of 'worker' must be a positive number or "
+            f"null, got {value!r}."
+        )
+    return float(value)
