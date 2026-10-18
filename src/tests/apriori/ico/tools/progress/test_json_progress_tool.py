@@ -1,5 +1,5 @@
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from typing import Any
 
 import pytest
@@ -11,6 +11,7 @@ from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
+from ico.core.stream import IcoStream
 from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.tools.progress.json_progress_tool import JsonProgressTool, ProgressSnapshot
 
@@ -178,3 +179,99 @@ def test_unknown_total_counts_up_without_eta() -> None:
 def test_total_must_be_positive() -> None:
     with pytest.raises(ValueError, match="use no total"):
         IcoProgress(total=0)
+
+
+# ─── Totals from the stream's input ───
+
+
+def videos() -> IcoSource[int]:
+    """Two "videos" with 3 and 2 scenes."""
+
+    def provide() -> Iterable[int]:
+        return [3, 2]
+
+    return IcoSource(provide)
+
+
+def scenes_list(n: int) -> Iterator[int]:
+    return iter(list(range(n)))  # knows its length
+
+
+def scenes_gen(n: int) -> Iterator[int]:
+    yield from range(n)  # does not
+
+
+def scenes_flow(
+    produce: Any, progress: IcoProgress[int]
+) -> IcoOperator[int, list[int]]:
+    def collect_all(items: Iterator[int]) -> list[int]:
+        return list(items)
+
+    return IcoOperator(produce) | IcoStream(progress) | IcoOperator(collect_all)  # type: ignore[return-value]
+
+
+def by_iteration(snapshots: list[ProgressSnapshot]) -> list[tuple[Any, Any]]:
+    return [(s["done"], s["total"]) for s in snapshots]
+
+
+def test_a_stream_gives_its_length_to_a_progress_without_total() -> None:
+    snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
+    progress: IcoProgress[int] = IcoProgress(name="scenes")
+    run(videos() | scenes_flow(scenes_list, progress).stream(), tool)
+
+    assert by_iteration(snapshots) == [
+        (0.0, None),  # initial
+        (0.0, 3),  # first video: 3 scenes
+        (1.0, 3),
+        (2.0, 3),
+        (3.0, 3),
+        (0.0, 2),  # second video: 2 scenes
+        (1.0, 2),
+        (2.0, 2),
+    ]
+    assert snapshots[3]["eta"] is not None
+
+
+def test_a_generator_gives_no_total() -> None:
+    snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
+    progress: IcoProgress[int] = IcoProgress(name="scenes")
+    run(videos() | scenes_flow(scenes_gen, progress).stream(), tool)
+
+    assert all(s["total"] is None for s in snapshots)
+    assert [s["done"] for s in snapshots][-1] == 5.0  # counts across videos
+
+
+def test_a_fixed_total_is_kept() -> None:
+    snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
+    progress: IcoProgress[int] = IcoProgress(total=10, name="scenes")
+    run(videos() | scenes_flow(scenes_list, progress).stream(), tool)
+
+    assert all(s["total"] == 10 for s in snapshots)
+
+
+def test_only_the_stream_s_own_counters_get_its_length() -> None:
+    inner: IcoProgress[int] = IcoProgress(name="inner")
+
+    def numbers_of(n: int) -> Iterator[int]:
+        return iter(list(range(n)))
+
+    nested = IcoStream(IcoOperator(numbers_of) | IcoStream(inner))  # type: ignore[arg-type]
+    outer = IcoStream(nested)  # type: ignore[arg-type]
+
+    assert IcoStream(inner)._counters() == [inner]  # pyright: ignore[reportPrivateUsage]
+    assert outer._counters() == []  # pyright: ignore[reportPrivateUsage]
+
+
+def make_scene_worker() -> IcoOperator[int, list[int]]:
+    progress: IcoProgress[int] = IcoProgress(name="Worker scenes")
+    return scenes_flow(scenes_list, progress)
+
+
+def test_worker_progress_gets_its_total() -> None:
+    snapshots, tool = collect(max_rate=1000)
+    pool = IcoAsyncStream(lambda: MPWorker(make_scene_worker), pool_size=1)
+    run(videos() | pool, tool)
+
+    totals = [s["total"] for s in snapshots if s["total"] is not None]
+    assert totals and set(totals) <= {3, 2}
+    assert (snapshots[-1]["done"], snapshots[-1]["total"]) == (2.0, 2)

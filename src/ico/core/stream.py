@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import operator
 from collections.abc import Callable, Iterator
-from typing import Generic, final
+from typing import TYPE_CHECKING, Any, Generic, cast, final
 
 from ico.core.operator import (
     I,
@@ -11,6 +12,9 @@ from ico.core.operator import (
     wrap_operator,
 )
 from ico.core.signature import IcoSignature
+
+if TYPE_CHECKING:
+    from ico.core.runtime.progress import IcoProgress
 
 
 @final
@@ -102,8 +106,35 @@ class IcoStream(
             This is the function used by __call__. It provides lazy evaluation
             by yielding items one at a time as they're requested.
         """
+        counters = self._counters()
+        if counters:
+            length = operator.length_hint(items, -1)
+            if length >= 0:
+                for counter in counters:
+                    counter.start(length)
         for item in items:
             yield self.body(item)
+
+    def _counters(self) -> list[IcoProgress[Any]]:
+        """Progress nodes without a total among the body's own steps (not
+        inside nested streams or forks): they count this stream's items."""
+        from ico.core.chain import IcoChain
+        from ico.core.runtime.progress import IcoProgress
+        from ico.registry.registry import get_meta
+
+        found: list[IcoProgress[Any]] = []
+
+        def visit(node: object) -> None:
+            if get_meta(node) is None and isinstance(node, IcoChain):
+                for child in cast(IcoChain[Any, Any, Any], node).children:
+                    visit(child)
+            elif isinstance(node, IcoProgress):
+                progress = cast(IcoProgress[Any], node)
+                if progress.total is None:
+                    found.append(progress)
+
+        visit(self.body)
+        return found
 
     @property
     def signature(self) -> IcoSignature:

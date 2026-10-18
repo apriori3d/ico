@@ -14,6 +14,7 @@ from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.progress import (
     IcoProgress,
     IcoProgressEvent,
+    IcoProgressTotalEvent,
 )
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.runtime.tool import IcoRuntimeTool
@@ -177,6 +178,13 @@ class RichProgressTool(IcoRuntimeTool):
             - Event processing serialized by ICO runtime
         """
         super().on_forward_event(event)
+
+        if isinstance(event, IcoProgressTotalEvent):
+            assert self.progress is not None
+            task_id = self._tasks.get(event.trace.reverse())
+            if task_id is not None:
+                self.progress.reset(task_id, total=event.total)
+            return None
 
         if isinstance(event, IcoProgressEvent):
             assert (

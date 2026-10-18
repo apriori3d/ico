@@ -52,6 +52,22 @@ class IcoProgressEvent(IcoRuntimeEvent):
         return IcoProgressEvent(trace=TreePathIndex(), advance=advance)
 
 
+@final
+@dataclass(slots=True, frozen=True)
+class IcoProgressTotalEvent(IcoRuntimeEvent):
+    """A progress node without a fixed total learnt the number of items of
+    its next iteration (e.g. the length of the iterator its stream got).
+
+    Progress tools set the node's total and start its count from zero.
+    """
+
+    total: float
+
+    @staticmethod
+    def create(total: float) -> IcoProgressTotalEvent:
+        return IcoProgressTotalEvent(trace=TreePathIndex(), total=total)
+
+
 # ────────────────────────────────────────────────
 # Progress monitoring node
 # ────────────────────────────────────────────────
@@ -204,3 +220,14 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         """
         super()._before_call(item)
         self.bubble_event(IcoProgressEvent.create(advance=1))
+
+    def start(self, total: float) -> None:
+        """Start an iteration of ``total`` items, for a node without a fixed
+        total (a node with one keeps it).
+
+        ``IcoStream`` calls it with the length of its input iterator when
+        Python knows it (``iter(list)``, ``iter(range(...))``), so a node
+        counting the stream's items shows a percentage and an ETA.
+        """
+        if self.total is None:
+            self.bubble_event(IcoProgressTotalEvent.create(total))
