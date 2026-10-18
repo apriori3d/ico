@@ -317,3 +317,23 @@ if __name__ == "__main__":
     import pytest
 
     sys.exit(pytest.main([__file__]))
+
+
+Report = dict[str, str | int | list[int]]
+
+
+class _Summarize(IcoOperator[Report, str]):
+    def __init__(self) -> None:
+        super().__init__(fn=self._apply)
+
+    def _apply(self, report: Report) -> str:
+        return str(report)
+
+
+def test_class_operator_with_pep604_unions_in_its_base() -> None:
+    signature = _Summarize().signature
+
+    assert signature.infered
+    assert signature.format() == "dict[str, str | int | list[int]] → str"
+    flow = IcoOperator[str, Report](lambda s: {"title": s}) | _Summarize()
+    assert flow("x") == "{'title': 'x'}"

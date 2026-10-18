@@ -3,7 +3,9 @@
 # mypy: disable-error-code=misc
 from __future__ import annotations
 
+import functools
 import inspect
+import operator
 import types
 from collections import OrderedDict
 from collections.abc import Callable
@@ -195,6 +197,9 @@ def replace_typevar(
         return value
 
     replaced_args = tuple(replace_typevar(arg, var, replacement) for arg in args)
+    if origin is types.UnionType:
+        # ``int | str`` (PEP 604) cannot be subscripted, unlike typing.Union.
+        return functools.reduce(operator.or_, replaced_args)
     return origin[replaced_args]  # type: ignore
 
 
