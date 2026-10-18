@@ -20,7 +20,7 @@ from ico.tools.profiler import (
     ProfileSnapshot,
     instrument,
 )
-from ico.tools.profiler.remote import ProfiledFlowFactory, ProfileHost
+from ico.tools.profiler.remote import ProfileHost, RunnerProfiler
 from ico.tools.profiler.table import Layout, NodeAggregate, NodeInfo, ProfileTable
 
 # Module-level: spawned runner processes import this module.
@@ -86,7 +86,14 @@ def test_a_worker_flow_is_profiled_in_its_runner() -> None:
 
     # The portal's wall time not spent in the runner's flow.
     transfer = portal["transfer"]
-    assert transfer is not None and 0 <= transfer < portal["metrics"]["wall"]["total"]
+    wall = portal["metrics"]["wall"]
+    assert transfer is not None and 0 <= transfer < wall["total"]
+    # The portal waits while the runner works: its self is the transfer,
+    # also for its first call (the runner's first call is its own startup).
+    assert wall["self"] == transfer
+    startup = portal["startup"]
+    assert startup is not None
+    assert startup["wall"]["self"] < startup["wall"]["total"]
 
     [main, runner] = snapshot["processes"]
     assert main["source"] == "main" and runner["source"] != "main"
@@ -145,23 +152,24 @@ def test_worker_signature_and_plan_with_remote_flows_are_unchanged() -> None:
     instrument(flow, ProfilerTool(interval=None))
     assert (plan_view(flow, options), worker.signature) == before
     assert worker.flow_factory is make_flow
-    assert isinstance(worker.runner_flow_factory, ProfiledFlowFactory)
+    assert isinstance(worker.runner_probe, RunnerProfiler)
 
 
-def test_instrumenting_twice_wraps_the_runner_factory_once() -> None:
+def test_instrumenting_twice_sets_the_runner_probe_once() -> None:
     worker = make_worker()
     profiler = ProfilerTool(interval=None)
     instrument(worker, profiler)
-    factory = worker.runner_flow_factory
+    probe = worker.runner_probe
     instrument(worker, profiler)
-    assert worker.runner_flow_factory is factory
+    assert worker.runner_probe is probe
 
 
-def test_the_runner_factory_and_events_pickle() -> None:
+def test_the_runner_probe_and_events_pickle() -> None:
     worker = make_worker()
     instrument(worker, ProfilerTool(interval=None))
-    factory = pickle.loads(pickle.dumps(worker.runner_flow_factory))
-    host = factory()
+    probe = pickle.loads(pickle.dumps(worker.runner_probe))
+    host = probe.wrap(make_flow())
+    assert isinstance(host, ProfileHost)
     assert host(3) == 6
 
     node = NodeAggregate(2)

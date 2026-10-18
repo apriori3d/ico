@@ -2,7 +2,7 @@ import asyncio
 import operator
 import time
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -37,6 +37,11 @@ def inc(x: int) -> int:
 @register("prof.double", 1, registry=REGISTRY)
 def double(x: int) -> int:
     return x * 2
+
+
+def registered() -> list[IcoOperator[Any, Any]]:
+    """The shared registered nodes of this module."""
+    return [cast(IcoOperator[Any, Any], op) for op in (inc, double)]
 
 
 class Clock:
@@ -121,8 +126,10 @@ def test_items_startup_end_and_self_time_of_a_lazy_chain() -> None:
     work = nodes["work"]
     assert (work["calls"], work["items"]) == (3, 0)
     assert work["metrics"]["wall"]["mean"] == 7
+    assert work["metrics"]["wall"]["count"] == 2  # the first call is startup
     assert work["metrics"]["wall"]["self"] == 21
-    assert work["startup"] is None
+    assert work["startup"] is not None
+    assert work["startup"]["wall"]["count"] == 1
 
     # The source is pulled by the stream: its time is the source's, not the
     # stream's, although the source is not a child of the stream.
@@ -191,6 +198,26 @@ def test_plan_and_signature_are_unchanged() -> None:
     assert (plan_view(flow), flow.signature) == before
 
 
+def test_spec_export_is_unchanged() -> None:
+    flow = IcoStream(inc | double)
+    before = to_spec(flow)
+    try:
+        instrument(flow, ProfilerTool(interval=None))
+        assert to_spec(flow) == before
+    finally:
+        for node in registered():
+            node.probe = None  # registered nodes are shared
+
+
+def test_another_profiler_takes_the_nodes_over() -> None:
+    first, second = ProfilerTool(interval=None), ProfilerTool(interval=None)
+    op = instrument(IcoOperator(double), first)
+    instrument(op, second)
+    op(1)
+    assert first.snapshot()["nodes"][0]["calls"] == 0
+    assert second.snapshot()["nodes"][0]["calls"] == 1
+
+
 def test_instrumenting_twice_measures_once() -> None:
     profiler = ProfilerTool(interval=None)
     op = instrument(instrument(IcoOperator(inc), profiler), profiler)
@@ -240,7 +267,7 @@ def test_context_and_async_operators() -> None:
     flow = instrument(IcoSource(numbers) | pool | IcoSink(ignore), profiler)
     node = by_label(activate_run(flow, profiler))["fetch"]
     assert node["calls"] == 3
-    assert node["metrics"]["wall"]["count"] == 3
+    assert node["metrics"]["wall"]["count"] == 2  # and the first call: startup
     assert node["metrics"]["cpu"]["count"] == 0  # thread-bound: not measured
 
 
@@ -309,3 +336,11 @@ def test_spec_run_with_a_profiler() -> None:
     assert nodes["prof.inc@1"]["calls"] == 1
     assert nodes["prof.double@1"]["key"] == "0.1"
     assert profiler.snapshot()["final"]
+
+
+def test_profiled_spec_runs_do_not_touch_registered_nodes() -> None:
+    profilers = [ProfilerTool(interval=None), ProfilerTool(interval=None)]
+    for profiler in profilers:
+        run(to_spec(inc | double), 3, registry=REGISTRY, profiler=profiler)
+        assert by_label(profiler.snapshot())["prof.inc@1"]["calls"] == 1
+    assert all(node.probe is None for node in registered())

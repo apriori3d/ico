@@ -17,7 +17,7 @@ from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
 from ico.describe.plan.rich_renderer.render_target import (
     PlanRenderTarget,
-    create_plan_walker,
+    flattened,
 )
 from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from ico.describe.plan.rich_renderer.row_renderer import (
@@ -75,44 +75,29 @@ class IcoEpochRenderer(CustomRenderer):
 
         plan.render_row(self._row_renderer, epoch)
 
-        # Use tree walker to render nested epoch elements
-        tree_walker = create_plan_walker(
-            expand_remote_flows=self.options.show_remote_flows
-        )
-
-        # Render epoch source part
+        # Render epoch source part; a part's header row has its key when the
+        # part has no row of its own (a chain).
         plan.render_row(
             self._source_header_renderer,
             epoch.source,
             indent=Text("╭── ", style=DescribeStyle.group.value),
+            keyed=flattened(self.options, epoch.source),
         )
-
-        # Render source flow
         plan.push_group_indent(Text("│   "))
-
-        tree_walker.walk(
-            epoch.source,
-            visit_fn=plan.render_node,
-            order="pre_post",  # Need post order to close groups
-        )
-
-        # Clear group indent
+        plan.render_subtree(epoch.source)
         plan.pop_group_indent()
 
         # Render context operator part
-        plan.render_row(self._context_header_renderer, epoch.context_operator)
-
-        # Render context operator flow
-        plan.push_group_indent(Text("│   "))
-
-        tree_walker.walk(
+        plan.render_row(
+            self._context_header_renderer,
             epoch.context_operator,
-            visit_fn=plan.render_node,
-            order="pre_post",  # Need post order to close groups
+            keyed=flattened(self.options, epoch.context_operator),
         )
+        plan.push_group_indent(Text("│   "))
+        plan.render_subtree(epoch.context_operator)
         plan.pop_group_indent()
 
-        plan.render_row(self._footer_renderer, epoch)
+        plan.render_row(self._footer_renderer, epoch, keyed=False)
 
 
 @source()

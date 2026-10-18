@@ -12,6 +12,7 @@ from ico.core.runtime.progress import IcoProgress
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.tools.board import BoardRuns, LiveBoard
+from ico.tools.profiler import instrument
 
 # ─── Helpers ───
 
@@ -91,6 +92,7 @@ def test_board_serves_page_runs_and_plan(board: tuple[BoardRuns, LiveBoard]) -> 
         "title": "flow",
         "columns": ["Flow"],
         "rows": [[[{"text": "upper", "style": "fn", "dim": False}]]],
+        "keys": ["0"],
     }
     run = runs.start("demo", plan)
 
@@ -154,3 +156,45 @@ def test_tool_marks_a_faulted_run_failed() -> None:
 
     [run] = runs.runs()
     assert (run["title"], run["state"]) == ("boom", "failed")
+
+
+# ─── Profile ───
+
+
+def slow(x: int) -> int:
+    return x * 2
+
+
+def test_board_serves_the_profile_by_plan_key(
+    board: tuple[BoardRuns, LiveBoard],
+) -> None:
+    runs, live = board
+    tool = LiveBoardTool(runs, profile=True)
+    assert tool.profiler is not None
+    flow = instrument(
+        IcoSource(numbers) | IcoOperator(slow).stream() | IcoSink(ignore), tool.profiler
+    )
+    IcoRuntime(flow, tools=[tool]).activate().run().deactivate()
+
+    [view] = runs.runs()
+    assert view["has_profile"]
+    plan = get(live, f"/api/plan?run={view['id']}")
+    profile = get(live, f"/api/profile?run={view['id']}")
+    keys = [k for k in plan["keys"] if k is not None]
+    assert set(keys) <= set(profile)
+    [slow_key] = [
+        k
+        for k, row in zip(plan["keys"], plan["rows"], strict=False)
+        if "slow" in str(row)
+    ]
+    assert profile[slow_key]["count"] == "4"
+    assert "Share of work" in get(live, "/")
+
+
+def test_a_run_without_profile() -> None:
+    runs = BoardRuns()
+    run = runs.start("plain")
+    assert not run.view()["has_profile"]
+    assert runs.profile(run.id) is None
+    assert runs.profile("missing") is None
+    assert LiveBoardTool(runs).profiler is None

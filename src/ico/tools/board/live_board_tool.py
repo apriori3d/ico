@@ -14,6 +14,7 @@ from ico.core.tree_utils import TreePathIndex
 from ico.describe.plan.json_renderer import plan_view
 from ico.tools.board.runs import BoardRun, BoardRuns
 from ico.tools.board.server import LiveBoard
+from ico.tools.profiler.tool import ProfilerTool, ProfileSnapshot
 from ico.tools.progress.json_progress_tool import JsonProgressTool, ProgressSnapshot
 
 _default: tuple[BoardRuns, LiveBoard] | None = None
@@ -53,9 +54,15 @@ class LiveBoardTool(IcoRuntimeTool):
             (:func:`default_board`). Pass your own to host the board yourself.
         title: Run title; by default the flow name.
         max_rate: Progress snapshots per second per node.
+        profile: Also show a profile in the plan: instrument the flow with
+            :attr:`profiler` before creating the runtime::
+
+                board = LiveBoardTool(profile=True)
+                flow = instrument(flow, board.profiler)
+                IcoRuntime(flow, tools=[board]).activate().run().deactivate()
     """
 
-    __slots__ = ("runs", "title", "_progress", "_runtime", "_run")
+    __slots__ = ("runs", "title", "profiler", "_progress", "_runtime", "_run")
 
     def __init__(
         self,
@@ -63,10 +70,13 @@ class LiveBoardTool(IcoRuntimeTool):
         *,
         title: str | None = None,
         max_rate: float = 2.0,
+        profile: bool = False,
     ) -> None:
         super().__init__()
         self.runs = runs
         self.title = title
+        self.profiler = ProfilerTool(self._on_profile) if profile else None
+        """The profiler to instrument the flow with (``profile=True``)."""
         self._progress = JsonProgressTool(self._on_progress, max_rate=max_rate)
         self._runtime: IcoRuntime | None = None
         self._run: BoardRun | None = None
@@ -87,10 +97,14 @@ class LiveBoardTool(IcoRuntimeTool):
         title = self.title or (flow.name if flow is not None else None) or "run"
         self._run = runs.start(title, plan_view(flow) if flow is not None else None)
         self._progress.on_activate()
+        if self.profiler is not None:
+            self.profiler.on_activate()
 
     def on_deactivate(self) -> None:
         super().on_deactivate()
         self._progress.on_deactivate()
+        if self.profiler is not None:
+            self.profiler.on_deactivate()  # the final profile
         if self._run is not None:
             fault = self._runtime is not None and self._runtime.state.is_fault
             self._run.finish("the runtime is in the fault state" if fault else None)
@@ -101,7 +115,13 @@ class LiveBoardTool(IcoRuntimeTool):
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         super().on_forward_event(event)
         self._progress.on_forward_event(event)
+        if self.profiler is not None:
+            self.profiler.on_forward_event(event)
 
     def _on_progress(self, snapshot: ProgressSnapshot) -> None:
         if self._run is not None:
             self._run.progress(snapshot)
+
+    def _on_profile(self, snapshot: ProfileSnapshot) -> None:
+        if self._run is not None:
+            self._run.profile(snapshot)

@@ -52,8 +52,9 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
     """
 
     fn: Callable[[I], Awaitable[O]]
-    _probe: IcoProbe | None = None
-    """Called instead of ``fn`` when set (see :mod:`ico.core.probe`)."""
+    probe: IcoProbe | None = None
+    """Hook for tools (profilers): when set, called instead of ``fn``;
+    ``None`` normally (see :mod:`ico.core.probe`)."""
 
     def __init__(
         self,
@@ -94,7 +95,7 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
             This method must be awaited since it delegates to the async function.
             Used to make the operator callable: await operator(item).
         """
-        probe = self._probe
+        probe = self.probe
         if probe is None:
             return await self.fn(item)
         return cast(O, await probe.call_async(self.fn, item))

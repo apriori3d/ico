@@ -6,6 +6,7 @@ See ``docs/design/profiler.md``.
 from ico.tools.profiler.instrument import instrument
 from ico.tools.profiler.metrics import CpuTime, IcoMetric, WallTime
 from ico.tools.profiler.remote import IcoProfileEvent
+from ico.tools.profiler.report import ProfileCells, print_profile, profile_cells
 from ico.tools.profiler.stats import StatsView
 from ico.tools.profiler.table import MetricView, NodeProfile
 from ico.tools.profiler.tool import (
@@ -23,9 +24,12 @@ __all__ = [
     "MetricView",
     "NodeProfile",
     "ProcessInfo",
+    "ProfileCells",
     "ProfileSnapshot",
     "ProfilerTool",
     "StatsView",
     "WallTime",
     "instrument",
+    "print_profile",
+    "profile_cells",
 ]

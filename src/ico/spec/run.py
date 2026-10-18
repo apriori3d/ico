@@ -133,7 +133,8 @@ def run(
 
     spec = bind(spec, params)
     root = spec.root if isinstance(spec, PipelineSpec) else spec
-    context = registry_context(registry)
+    # A profiled flow is instrumented: it must not share registered nodes.
+    context = registry_context(registry, fresh=profiler is not None)
     flow = cast(IcoOperatorProtocol[Any, Any], context.build(root))
     if profiler is not None:
         from ico.tools.profiler import instrument

@@ -1,7 +1,7 @@
 # Profiler: design
 
-Status: items 1 and 2 of section 10 implemented (2026-10-18); items 3–4
-are proposals. Ports the idea of apriori3d/ico#17 (branch
+Status: items 1–3 of section 10 implemented (2026-10-18); item 4
+(ico-mcp) is a proposal. Ports the idea of apriori3d/ico#17 (branch
 `feature/profiler` and its stash) onto current `main`.
 
 ## 1. Goal
@@ -100,6 +100,10 @@ What counts as one event of a node:
     separately: setup (opening a file, loading a model) would otherwise
     distort the max and p99 of the items. A provider that returns a list
     (`yield from load_all()`) shows nearly all its time as `startup`.
+  - The first call of each instance of a node returning values is
+    `startup` too: lazy initialization (opening a dataset in every worker
+    process) stays out of the distribution, so p95 describes the steady
+    state.
   - **`end`** is the time of the final `next()`.
   - An iterator that is not consumed to the end is closed by the garbage
     collector, and that time is not counted.
@@ -136,7 +140,10 @@ chain, not its child.
   the workers are.
 - **`IcoWorker` portal:** the portal's call time minus the runner's root
   time for the same calls is the transfer overhead (pickling, queues),
-  reported per worker key.
+  reported per worker key. The portal waits while its runner works in
+  another process, where frames cannot nest in the portal's, so the
+  portal's self excludes the runner's flow (wall-like metrics): its self is
+  the transfer, not the runner's work counted twice.
 - **Async operators** (`IcoAsyncOperator`): wall time only, without self
   time or CPU time, because a coroutine suspends across `await`.
 
@@ -145,8 +152,8 @@ chain, not its child.
 `instrument(flow, profiler)` walks the flow and, for each node:
 
 - `IcoOperator` and subclasses (chain, stream, source, sink, filter,
-  pipeline, worker portal, …): sets the probe hook of the instance
-  (`ico.core.probe.set_probe`). `IcoOperator.__call__` calls
+  pipeline, worker portal, …): sets the public hook `operator.probe`
+  (`ico.core.probe.IcoProbe`). `IcoOperator.__call__` calls
   `probe.call(self._fn, item)` when a probe is set, else `self._fn(item)`.
   Every node calls its children through `child(item)`, so composites are
   measured without special cases.
@@ -157,18 +164,27 @@ The hook is used instead of replacing `_fn`, because `describe`, the plan
 renderers and signature checks inspect `_fn` (its `__self__`, whether it
 is a bound method). With the hook, `_fn` stays the original. Without a
 probe, the cost is one attribute check per call.
-- `IcoWorker` (and nested workers): its `runner_flow_factory` is set to a
-  pickleable `ProfiledFlowFactory(inner, root_key, metrics, interval)`
-  (section 4). `runner_flow_factory` is the factory the runner builds its
-  flow with (`flow_factory` when unset). `flow_factory` itself stays, so
-  the worker's signature and the plan with remote flows do not change.
+- `IcoWorker` (and nested workers): sets the public hook
+  `worker.runner_probe` (`ico.core.probe.IcoRunnerProbe`) to a pickleable
+  `RunnerProfiler(root_key, metrics, interval)` (section 4). The runner
+  builds its flow from `flow_factory` and runs `runner_probe.wrap(flow)`.
+  `flow_factory` stays, so the worker's signature and the plan with remote
+  flows do not change.
+
+Both hooks are public attributes, documented as hooks for tools and `None`
+normally: tools set them from other modules, which a private attribute
+would not allow by convention.
 
 Properties:
 
-- Instrumentation is idempotent: a probed node is skipped.
-- It mutates the given flow. A flow built only for one run (as in
-  `ico.spec.run` and ico-mcp) is the intended use, so no `uninstrument`
-  (YAGNI).
+- Instrumenting twice into one profiler changes nothing; another profiler
+  takes the nodes over (its probes replace the earlier profiler's); probes
+  of other tools are kept.
+- It mutates the given flow, so a profiled run needs a flow of its own,
+  without nodes shared with other flows. Registered functions are shared
+  nodes of the registry: `ico.spec.run(..., profiler=...)` builds the flow
+  fresh (`registry_context(fresh=True)`), so the registry stays
+  uninstrumented. No `uninstrument` (YAGNI).
 - Tests check that `signature`, `describe` and `plan_view` of an
   instrumented flow equal those of the original.
 
@@ -176,26 +192,38 @@ Properties:
 
 ### 4.1 Node keys
 
-A metric key is the path of the node in the **plan walker's** tree
-(`create_plan_walker(expand_remote_flows=True)`), as dotted child
-indices:
+A metric key is the **plan key** of the node, defined once in
+`ico.describe.plan.keys` and shared by the plan renderers and the
+profiler. Keys are dotted child indices in the plan's tree (`plan_children`):
 
 - A pool built from a factory is flattened to its first member, as the
   plan does. All members of a factory pool therefore have one key, and
   their aggregates merge into one row of the plan.
-- The remote flow of a worker is the worker's last child, as in the plan
-  walker.
+- The remote flow of a worker is the worker's last child
+  (`remote_flow_key`).
 
-`plan_view` gets a parallel list `keys: list[str | None]`, one per row
-(`None` for footer rows such as `yield`). A consumer then joins profile
-rows to plan rows without knowing node kinds. Progress keys stay runtime
-paths; they are unrelated.
+`plan_nodes(flow)` yields every node with its key, including all members
+of a factory pool; `instrument` walks it.
+
+`plan_view` has a parallel list `keys: list[str | None]`, one per row.
+- `None` marks closing rows (`yield`, `collect`, `emit`, …) and rows of
+  nodes already keyed by another row.
+- A branch label (`├─▸ case 'b'`) or an epoch part header has the key of
+  its subtree only when the subtree has no row of its own (a chain).
+
+A consumer joins profile rows to plan rows without knowing node kinds.
+
+The plan engine assigns keys during its single walk. Custom renderers
+(fork, route, epoch) call `plan.render_subtree(child)` instead of walking
+their parts with walkers of their own, so keys stay exact inside them.
+
+Progress keys stay runtime paths; they are unrelated.
 
 ### 4.2 Runner processes
 
-`ProfiledFlowFactory.__call__` runs in the runner process:
+`RunnerProfiler.wrap(flow)` runs in the runner process:
 
-1. It builds the inner flow and instruments it with a table of this
+1. It instruments the flow the runner built with a table of this
    process. Keys are prefixed with the worker's key, so they match the main
    process's plan. Nested workers are instrumented the same way.
 2. It returns the flow under `ProfileHost`: an `IcoOperator` (it passes
@@ -299,12 +327,33 @@ profiler.snapshot()                          # the final ProfileSnapshot
 
 ## 7. Presentation
 
-- **Rich:** a `profile` column set for the plan renderer, which prints a
-  self / total / p95 / share column next to each plan row. Profiling then
-  looks like the familiar plan. The hottest node by self time is
-  highlighted.
-- **Live Board:** `BoardRun.profile(snapshot)`, and the plan table shows
-  the same columns, joined by `keys` (section 4.1).
+- **Cells:** `profile_cells(snapshot)` formats every node once, by plan key.
+  Both the Rich report and the Live Board use these cells and join them to
+  plan rows by `keys` (section 4.1).
+- **Columns:** they follow the flow column: Flow, then Self, Total, Share
+  of work, CPU, Count, p95, Info, then Signature and Name.
+  - Self: wall time of the node itself.
+  - Total: self of the node and of the nodes below it in the plan. With
+    parallel pools, it is work summed over threads, so it can exceed the
+    run's wall time.
+  - Share of work: self over the sum of all self times, in all threads and
+    processes.
+  - Count: items for iterator nodes, calls otherwise.
+  - p95: only for nodes with two or more events (no p95 for a sink called
+    once).
+  - Info: `util` (pools), `transfer` (workers), `startup` (the node's own
+    setup: first call or first item, at least 1 ms; it excludes the
+    upstream's startup it pulled), `max` when at least 1 ms and 10 × p95
+    (a rare slow call), errors.
+  - The hottest node by self time is highlighted.
+- **Rich:** `print_profile(flow, snapshot)`.
+- **Live Board:**
+  - `LiveBoardTool(profile=True)` owns a `ProfilerTool` (`tool.profiler`,
+    to instrument the flow with);
+  - `BoardRun.profile(snapshot)` keeps the latest profile and
+    `api/profile?run=` serves the cells;
+  - the page refetches the profile while the run is running and once
+    after it ends.
 - **ico-mcp** (a separate change there):
   - `run(profile=true)`;
   - the kernel attaches the tool and streams `profile` notifications to
@@ -349,7 +398,7 @@ The metric protocol and the snapshot leave room for each of these.
      length hints kept, merging of shards, thread pools, unchanged
      describe / signature.
 2. **Remote flows.**
-   - What: `ProfiledFlowFactory`, `ProfileHost`, `IcoProfileEvent`,
+   - What: `RunnerProfiler`, `ProfileHost`, `IcoProfileEvent`,
      merging by source, peak RSS, worker transfer overhead, pool
      utilization.
    - Tests: `MPWorker`, factory pools, a nested worker, the final snapshot

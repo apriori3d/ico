@@ -7,6 +7,7 @@ from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Any, Generic, final
 
 from ico.core.operator import I, IcoOperatorProtocol, O
+from ico.core.probe import IcoRunnerProbe
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.event import (
     IcoFaultEvent,
@@ -280,9 +281,7 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
         assert self.channel is not None
 
         runner_channel = self.channel.invert()  # Invert channel for runner
-        flow_factory = self.runner_flow_factory
-        if flow_factory is None:
-            flow_factory = self.flow_factory
+        flow_factory = self.flow_factory
         name = self.name
 
         # Return a pickleable factory that preserves generic typing
@@ -290,6 +289,7 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
             runner_channel=runner_channel,
             flow_factory=flow_factory,
             name=name,
+            probe=self.runner_probe,
         )
 
     def _create_channel(self) -> MPChannel[I, O]:
@@ -567,6 +567,7 @@ class _WorkerFactory(Generic[I, O]):
         runner_channel: IcoChannel[O, I],
         flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         name: str | None,
+        probe: IcoRunnerProbe | None = None,
     ) -> None:
         """Initialize runner factory with runner configuration.
 
@@ -574,6 +575,7 @@ class _WorkerFactory(Generic[I, O]):
             runner_channel: Pre-configured inverted channel for runner communication.
             flow_factory: Factory function for creating computation flow in runner.
             name: Optional runner name for debugging and identification.
+            probe: The worker's ``runner_probe``, passed to the runner.
 
         Factory State:
             All arguments stored as instance attributes for pickling:
@@ -590,6 +592,7 @@ class _WorkerFactory(Generic[I, O]):
         self.runner_channel = runner_channel
         self.flow_factory = flow_factory
         self.name = name
+        self.probe = probe
 
     def __call__(self) -> IcoRunner[I, O]:
         """Create and return configured IcoRunner instance.
@@ -620,4 +623,5 @@ class _WorkerFactory(Generic[I, O]):
             channel=self.runner_channel,
             flow_factory=self.flow_factory,
             name=self.name,
+            probe=self.probe,
         )

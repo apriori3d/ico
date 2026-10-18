@@ -24,6 +24,7 @@ from typing import Any, cast, final
 from ico.tools.profiler.table import (
     CALL_ERROR,
     END,
+    FIRST,
     ITEM,
     NEXT_ERROR,
     OPEN,
@@ -61,13 +62,21 @@ class NodeProbe:
     ``perf_counter_ns``, for the utilization of pools.
     """
 
-    __slots__ = ("key", "table", "timed", "_metrics")
+    __slots__ = ("key", "table", "timed", "_metrics", "_called")
 
     def __init__(self, key: str, table: ProfileTable, *, timed: bool = False) -> None:
         self.key = key
         self.table = table
         self.timed = timed
         self._metrics = table.metrics
+        self._called = False
+        """Whether the node was called: its first call is its startup.
+        Racy across threads at worst counts two first calls."""
+
+    def _value_kind(self) -> int:
+        kind = VALUE if self._called else FIRST
+        self._called = True
+        return kind
 
     # ─── IcoProbe ───
 
@@ -76,12 +85,13 @@ class NodeProbe:
         try:
             out = fn(item)
         except BaseException:
+            self._called = True
             self.exit(frame, CALL_ERROR)
             raise
         if isinstance(out, Iterator):
             self.exit(frame, OPEN)
             return _TimedIterator(cast(Iterator[Any], out), self)
-        self.exit(frame, VALUE)
+        self.exit(frame, self._value_kind())
         return out
 
     def call_with_context(
@@ -91,9 +101,10 @@ class NodeProbe:
         try:
             out = fn(item, context)
         except BaseException:
+            self._called = True
             self.exit(frame, CALL_ERROR)
             raise
-        self.exit(frame, VALUE)
+        self.exit(frame, self._value_kind())
         return out
 
     async def call_async(self, fn: Callable[[Any], Awaitable[Any]], item: Any) -> Any:
@@ -103,7 +114,9 @@ class NodeProbe:
             (i, m, m.start()) for i, m in enumerate(self._metrics) if not m.thread_bound
         ]
         began = time.perf_counter_ns() if self.timed else 0
-        kind = VALUE
+        first = not self._called
+        self._called = True
+        kind = FIRST if first else VALUE
         try:
             return await fn(item)
         except BaseException:

@@ -92,8 +92,9 @@ class IcoOperator(Generic[I, O], IcoNode):
     # Note:  __slots__ is not used here to allow dynamic inference of ICO-signature attributes
 
     _fn: Callable[[I], O]
-    _probe: IcoProbe | None = None
-    """Called instead of ``_fn`` when set (see :mod:`ico.core.probe`)."""
+    probe: IcoProbe | None = None
+    """Hook for tools (profilers): when set, called instead of ``_fn``;
+    ``None`` normally (see :mod:`ico.core.probe`)."""
 
     def __init__(
         self,
@@ -131,7 +132,7 @@ class IcoOperator(Generic[I, O], IcoNode):
         Returns:
             The output value of type O after applying the wrapped function.
         """
-        probe = self._probe
+        probe = self.probe
         if probe is None:
             return self._fn(item)
         return cast(O, probe.call(self._fn, item))

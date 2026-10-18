@@ -1,25 +1,30 @@
-"""Probe hook of operator calls, for profilers.
+"""Probe hooks, for tools such as profilers.
 
-An operator calls its callable directly unless a probe is set on the
-instance (``node._probe``); then it calls the probe with its callable and
-its arguments. Nothing else changes: ``fn``, the signature, ``describe`` and
-the plan of an operator with a probe are the same. With no probe, the cost
-is one attribute check per call.
+Two hooks, both ``None`` normally:
+
+- ``probe`` of an operator (``IcoOperator``, ``IcoContextOperator``,
+  ``IcoAsyncOperator``): when set, the operator calls the probe with its
+  callable and its arguments instead of calling the callable.
+- ``runner_probe`` of a worker (``IcoWorker``): when set, the worker's
+  runner calls ``runner_probe.wrap(flow)`` on the flow it built from
+  ``flow_factory`` and runs the flow that ``wrap`` returns.
+
+Nothing else changes: ``fn``, ``flow_factory``, signatures, ``describe`` and
+plans are the same with and without probes. Without a probe, the cost is
+one attribute check per call.
 """
 
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, Protocol, Union, cast
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from ico.core.async_operator import IcoAsyncOperator
-    from ico.core.context_operator import IcoContextOperator
-    from ico.core.operator import IcoOperator
+    from ico.core.operator import IcoOperatorProtocol
 
 
 class IcoProbe(Protocol):
-    """Called instead of an operator's callable when set on the operator."""
+    """Called instead of an operator's callable when set as its ``probe``."""
 
     def call(self, fn: Callable[[Any], Any], item: Any) -> Any:
         """Call ``fn(item)`` of an ``IcoOperator`` and return its result."""
@@ -36,19 +41,13 @@ class IcoProbe(Protocol):
         ...
 
 
-ProbedOperator = Union[
-    "IcoOperator[Any, Any]",
-    "IcoContextOperator[Any, Any, Any]",
-    "IcoAsyncOperator[Any, Any]",
-]
-"""The operators that call a probe."""
+class IcoRunnerProbe(Protocol):
+    """Wraps the flow a worker's runner built, when set as the worker's
+    ``runner_probe``. It travels to the runner process, so it must be
+    pickleable."""
 
-
-def get_probe(node: object) -> IcoProbe | None:
-    """The probe set on a node, if any."""
-    return cast(IcoProbe | None, getattr(node, "_probe", None))
-
-
-def set_probe(node: ProbedOperator, probe: IcoProbe | None) -> None:
-    """Set (or with ``None`` remove) the probe of an operator."""
-    node._probe = probe  # pyright: ignore[reportPrivateUsage]
+    def wrap(
+        self, flow: IcoOperatorProtocol[Any, Any]
+    ) -> IcoOperatorProtocol[Any, Any]:
+        """The flow the runner runs instead of ``flow``."""
+        ...
