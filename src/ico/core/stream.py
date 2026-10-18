@@ -114,10 +114,18 @@ class IcoStream(
                     counter.start(length)
         for item in items:
             yield self.body(item)
+        # The iteration is over: its progress is reported before the next.
+        for progress in self._progress_steps():
+            progress.flush()
 
     def _counters(self) -> list[IcoProgress[Any]]:
         """Progress nodes without a total among the body's own steps (not
         inside nested streams or forks): they count this stream's items."""
+        return [p for p in self._progress_steps() if p.total is None]
+
+    def _progress_steps(self) -> list[IcoProgress[Any]]:
+        """Progress nodes among the body's own steps (not inside nested
+        streams or forks)."""
         from ico.core.chain import IcoChain
         from ico.core.runtime.progress import IcoProgress
         from ico.registry.registry import get_meta
@@ -129,9 +137,7 @@ class IcoStream(
                 for child in cast(IcoChain[Any, Any, Any], node).children:
                     visit(child)
             elif isinstance(node, IcoProgress):
-                progress = cast(IcoProgress[Any], node)
-                if progress.total is None:
-                    found.append(progress)
+                found.append(cast(IcoProgress[Any], node))
 
         visit(self.body)
         return found

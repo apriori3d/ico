@@ -343,14 +343,20 @@ class IcoChannel(Generic[I, O], ABC):
             Enables distributed event bubbling by forwarding runtime events
             (state changes, errors, heartbeats) to remote processes.
         """
-        message = EventMessage(self._message_id, payload)
+        message = EventMessage(self._message_id, payload, ack=wait_for_ack)
         self._send(message)
 
         if wait_for_ack:
             self._wait_for_ack(message.id)
 
     def _send(self, message: DataMessage[I] | RuntimeMessage) -> None:
-        """Internal method to send message with ID increment."""
+        """Internal method to send message with ID increment.
+
+        Events without acknowledgment may be sent from another thread (a
+        progress flush) while this one sends data: the queue is thread-safe,
+        and IDs only need to be unique among acknowledged messages, which
+        one thread sends.
+        """
         self._message_id += 1
         self.sender.send(message)
 
@@ -532,7 +538,8 @@ class IcoChannel(Generic[I, O], ABC):
             after sending ACK, enabling distributed error propagation.
         """
         if isinstance(message.event, IcoFaultEvent):
-            self._send(AcknowledgeMessage(self._message_id, message.id))
+            if message.ack:
+                self._send(AcknowledgeMessage(self._message_id, message.id))
             raise IcoRuntimeError(
                 f"Remote worker raise an exception: {message.event.info}"
             )
@@ -546,7 +553,8 @@ class IcoChannel(Generic[I, O], ABC):
             return
 
         self.runtime_port.on_channel_event(message.event)
-        self._send(AcknowledgeMessage(self._message_id, message.id))
+        if message.ack:
+            self._send(AcknowledgeMessage(self._message_id, message.id))
 
     def close(self) -> None:
         """Close channel endpoints and release communication resources.
