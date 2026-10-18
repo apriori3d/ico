@@ -25,6 +25,15 @@ def test_replace_typevar() -> None:
     assert replace_typevar(list[list[I]], I, int) == list[list[int]]
 
 
+def test_replace_typevar_in_pep604_unions() -> None:
+    # ``X | Y`` is a types.UnionType, which cannot be subscripted.
+    assert (
+        replace_typevar(dict[str, int | list[I]], I, str) == dict[str, int | list[str]]
+    )
+    assert replace_typevar(I | None, I, int) == int | None  # pyright: ignore[reportArgumentType]
+    assert replace_typevar(str | int, I, float) == str | int  # pyright: ignore[reportArgumentType]
+
+
 def test_args_contain_typevars() -> None:
     # Simple typevars
     assert type_contain_any_typevar(I, I) is True
