@@ -418,10 +418,20 @@ def serialize_worker(node: IcoWorker[object, object], ctx: SpecContext) -> NodeS
     # The worker subtree fully describes the factory: build() recreates it
     # with a SpecFactory, so the original factory reference is not exported.
     factory = cast(Callable[[], IcoNodeProtocol], node.get_remote_flow_factory())
+    params: dict[str, JsonValue] = {"type": _type_ref(node)}
+    # Only a non-default start_timeout: existing specs stay as they are.
+    if node.start_timeout != _default_start_timeout():
+        params["start_timeout"] = node.start_timeout
     return NodeSpec(
         kind="worker",
         name=node.name,
         sig=node_signature(node),
-        params={"type": _type_ref(node)},
+        params=params,
         children=(ctx.walk(factory()),),
     )
+
+
+def _default_start_timeout() -> float | None:
+    from ico.runtime.worker.mp.mp_worker import DEFAULT_START_TIMEOUT
+
+    return DEFAULT_START_TIMEOUT

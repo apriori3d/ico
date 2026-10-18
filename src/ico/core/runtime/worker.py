@@ -169,6 +169,21 @@ class IcoWorkerDied(RuntimeError):
         return _signal_name(-self.exitcode)
 
 
+class IcoWorkerStartTimeout(IcoWorkerDied):
+    """A worker's runner did not start within the worker's ``start_timeout``
+    (a hang while it imports modules or builds its flow); the runner was
+    stopped."""
+
+    def __init__(self, timeout: float, name: str | None = None) -> None:
+        self.exitcode = None
+        self.timeout = timeout
+        where = f"worker '{name}'" if name else "worker"
+        RuntimeError.__init__(
+            self,
+            f"{where} process did not start within {timeout:g} s and was stopped",
+        )
+
+
 def _signal_name(number: int) -> str:
     import signal
 
@@ -259,6 +274,11 @@ class IcoWorker(
     ``runner_probe.wrap(flow)`` instead of the flow it built from
     ``flow_factory``; ``None`` normally (see :mod:`ico.core.probe`)."""
     subtree_factory: Callable[[], IcoRuntimeNode]
+    start_timeout: float | None = None
+    """Seconds the runner has to start (import, build its flow and
+    acknowledge activation); ``None`` for no limit. A runner that does not
+    start in time is stopped and activation raises
+    ``IcoWorkerStartTimeout``."""
 
     # Placeholder for runner in runtime tree (actual runner exists in separate process).
     _runner_placeholder: IcoRuntimeNode
@@ -355,6 +375,10 @@ class IcoWorker(
             • Release any allocated system resources
         """
         pass
+
+    def _abort_runner(self) -> None:  # noqa: B027
+        """Stop a runner that did not start in time; subclasses with runner
+        processes kill them."""
 
     def runner_alive(self) -> bool:
         """Whether the remote runner can still receive commands; subclasses
@@ -481,7 +505,14 @@ class IcoWorker(
                     self._activate_runner()
 
                 assert self.channel is not None
-                self.channel.send_command(command)
+                try:
+                    self.channel.send_command(command, timeout=self.start_timeout)
+                except TimeoutError:
+                    assert self.start_timeout is not None
+                    self._abort_runner()
+                    assert isinstance(self.state_model, WorkerStateModel)
+                    self.state_model.fault()
+                    raise IcoWorkerStartTimeout(self.start_timeout, self.name) from None
 
             case IcoDeactivateCommand():
                 if self.state.is_ready or self.state.is_fault:
