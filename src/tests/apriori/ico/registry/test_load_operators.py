@@ -280,3 +280,54 @@ def test_loaded_operator_runs_in_spawned_worker(package: Package) -> None:
         assert worker(21) == 42
     finally:
         worker.deactivate()
+
+
+# ─── Selected modules ───
+
+USES_DOUBLE = """
+from ico.registry import register
+
+from .double import double
+
+
+@register("{pkg}.quadruple", 1)
+def quadruple(x: int) -> int:
+    \"\"\"Double twice.\"\"\"
+    return double(double(x))
+"""
+
+
+def test_modules_selects_what_is_imported(package: Package) -> None:
+    package.write("double", DOUBLE)
+    package.write("scale", SCALE, status="draft", factor=3)
+    package.write("quad", USES_DOUBLE)
+
+    report = load_operators(package.dir, status="draft", modules=["quad"])
+
+    # quad imports double relatively, so both register; scale is not imported.
+    assert report.loaded == (f"{package.name}.double@1", f"{package.name}.quadruple@1")
+    assert f"{package.name}.scale" not in sys.modules
+    assert default_registry.get(f"{package.name}.double@1").meta.status == "draft"
+    assert report.errors == ()
+
+
+def test_unknown_selected_module_is_reported(package: Package) -> None:
+    package.write("double", DOUBLE)
+
+    report = load_operators(package.dir, modules=["double", "missing"])
+
+    assert report.loaded == (f"{package.name}.double@1",)
+    [(file, error)] = report.errors
+    assert file.endswith("missing.py")
+    assert (
+        error == f"ModuleNotFoundError: no module 'missing' in package '{package.name}'"
+    )
+
+
+def test_no_selected_modules_imports_nothing(package: Package) -> None:
+    package.write("double", DOUBLE)
+
+    report = load_operators(package.dir, modules=[])
+
+    assert report.loaded == () and report.errors == ()
+    assert f"{package.name}.double" not in sys.modules

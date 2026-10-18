@@ -18,6 +18,7 @@ import dataclasses
 import importlib
 import importlib.util
 import sys
+from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -58,6 +59,7 @@ def load_operators(
     strict: bool = False,
     replace: bool = False,
     status: Status | None = None,
+    modules: Collection[str] | None = None,
 ) -> LoadReport:
     """Import every operator module of a package directory.
 
@@ -79,6 +81,11 @@ def load_operators(
             package location (e.g. ``draft`` for a drafts package, ``stable``
             for the reviewed one). ``None`` keeps the modules' own status.
             ``replace`` checks the overridden status.
+        modules: Names of the package's modules to import (``"frames"`` for
+            ``<package>/frames.py``); ``None`` imports them all. Modules a
+            selected one imports (e.g. relatively) are imported by Python as
+            usual, so a process can load only the operators it needs. An
+            unknown name is reported in ``errors``.
 
     Returns:
         A :class:`LoadReport`. One broken file does not prevent the others
@@ -116,9 +123,19 @@ def load_operators(
     skipped: list[str] = []
     errors: list[tuple[str, str]] = []
 
-    for file in sorted(directory.glob("*.py")):
-        if file.name == "__init__.py":
-            continue
+    files = sorted(f for f in directory.glob("*.py") if f.name != "__init__.py")
+    if modules is not None:
+        present = {f.stem for f in files}
+        errors.extend(
+            (
+                str(directory / f"{name}.py"),
+                f"ModuleNotFoundError: no module {name!r} in package {package!r}",
+            )
+            for name in sorted(set(modules) - present)
+        )
+        files = [f for f in files if f.stem in modules]
+
+    for file in files:
         module_name = f"{package}.{file.stem}"
         existing = sys.modules.get(module_name)
         if existing is not None and not replace:
