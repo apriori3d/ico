@@ -14,20 +14,10 @@ from ico.core.tree_utils import TreePathIndex
 
 @dataclass(slots=True, frozen=True)
 class IcoRuntimeState:
-    """Base class for runtime execution lifecycle states.
-
-    Runtime State Architecture:
-        • States manage execution lifecycle: resource allocation → execution → cleanup
-        • State transitions triggered by runtime commands (activate, run, deactivate)
-        • State changes bubble up as events for monitoring and coordination
-
-    Core State Lifecycle:
-        1. Idle: No resources allocated, node inactive
-        2. Ready: Resources allocated, prepared for execution
-        3. Running: Active execution in progress
-        4. Fault: Error occurred, requires intervention
-
-    """
+    """A lifecycle state of a runtime node: Idle (inactive), Ready (active),
+    Running (a runtime's flow runs) or Fault. States are read, not sent: a
+    node answers ``IcoStateRequestCommand`` with its state (see
+    ``IcoRuntime.query``)."""
 
     name: ClassVar[str] = "base_state"
 
@@ -112,34 +102,15 @@ Used by BaseStateModel and subclasses to define lifecycle transitions.
 
 
 class BaseStateModel:
-    """State management model for runtime node execution lifecycle.
+    """The lifecycle state of a runtime node.
 
-    BaseStateModel orchestrates state transitions in response to runtime commands,
-    providing lifecycle management for execution infrastructure.
+    Commands set it: Activate → Ready, Deactivate → Idle. ``IcoRuntime.run``
+    sets Running while its flow runs, then Ready, or Fault when the flow
+    raises. Workers and their runners add Pending, Waiting and Sending
+    (see ``ico.core.runtime.worker``). Other nodes stay Ready while active:
+    items do not change states.
 
-    State Transition Architecture:
-        • Command-driven transitions: Commands trigger automatic state changes
-        • Lifecycle enforcement: Validates legal state transitions (ready → running)
-        • Error handling: Transitions to fault state on runtime errors
-        • Event generation: State changes bubble as events for monitoring
-
-    Default State Transitions:
-        • IcoActivateCommand → ReadyState (allocate resources)
-        • IcoDeactivateCommand → IdleState (release resources)
-        • Manual transitions: ready() → ReadyState, running() → RunningState
-        • Error transitions: fault() → FaultState (on any error)
-
-    Lifecycle Flow:
-        1. Creation: Node starts in IdleState
-        2. Activation: activate() command → ReadyState (resources allocated)
-        3. Execution: run() command → RunningState (execution begins)
-        4. Completion: Node remains in RunningState until deactivation
-        5. Deactivation: deactivate() command → IdleState (resources released)
-        6. Error Recovery: fault() → FaultState (requires intervention)
-
-    Subclass Customization:
-        Subclasses can override transitions dict to customize state behavior
-        for specialized runtime nodes (workers, tools, specific operators).
+    Subclasses extend ``transitions`` for their own commands.
     """
 
     transitions: ClassVar[StateTransitionMap] = {

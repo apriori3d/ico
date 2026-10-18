@@ -28,7 +28,6 @@ class IcoRuntimeCommand:
 
     Core Commands:
         • activate: Allocate resources and prepare for execution
-        • run: Begin execution phase across runtime tree
         • deactivate: Release resources and cleanup
 
     Broadcast Order:
@@ -71,32 +70,6 @@ class IcoActivateCommand(IcoRuntimeCommand):
             Command instance for resource allocation phase.
         """
         return IcoActivateCommand()
-
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoRunCommand(IcoRuntimeCommand):
-    """Command to begin execution across runtime nodes.
-
-    IcoRunCommand broadcasts through the runtime tree to initiate
-    execution phase. Triggers state transitions from Ready → Running
-    and begins actual computation execution.
-
-    Execution Phase:
-        • Computation start: Begin data processing, model inference
-        • State transition: Ready → Running for all nodes
-        • Execution coordination: Synchronize distributed execution
-        • Progress tracking: Enable monitoring and progress reporting
-    """
-
-    @staticmethod
-    def create() -> IcoRunCommand:
-        """Create new run command for broadcasting.
-
-        Returns:
-            Command instance for execution initiation.
-        """
-        return IcoRunCommand()
 
 
 @final

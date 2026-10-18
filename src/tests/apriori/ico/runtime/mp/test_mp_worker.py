@@ -11,10 +11,8 @@ from ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
 )
-from ico.core.runtime.event import (
-    IcoHeartbeatEvent,
-)
 from ico.core.runtime.exceptions import IcoRuntimeError
+from ico.core.runtime.printer import IcoPrintEvent
 from ico.core.runtime.runtime import IcoRuntime
 from ico.runtime.worker.mp.mp_worker import (
     MPWorker,
@@ -145,9 +143,9 @@ def test_worker_event_propagation() -> None:
     # flow = host.channel.send | host.channel.receive
 
     # Worker echoes heartbeat event manually
-    mp_process.bubble_event(IcoHeartbeatEvent.create())
+    mp_process.bubble_event(IcoPrintEvent.create(message="ping"))
 
-    assert main_runtime.recorded_events == [IcoHeartbeatEvent]
+    assert main_runtime.recorded_events == [IcoPrintEvent]
 
     main_runtime.deactivate()
 

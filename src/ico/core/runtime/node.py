@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 from ico.core.runtime.command import (
     IcoActivateCommand,
     IcoDeactivateCommand,
-    IcoRunCommand,
     IcoRuntimeCommand,
 )
 from ico.core.runtime.event import IcoRuntimeEvent
@@ -194,17 +193,11 @@ class IcoRuntimeNode(ABC):
 
         elif isinstance(command, IcoActivateCommand):
             self.on_activate()
-        elif isinstance(command, IcoRunCommand):
-            self.on_run()
         elif isinstance(command, IcoDeactivateCommand):
             self.on_deactivate()
 
     def on_activate(self) -> None:  # noqa: B027
         """Handle activation command to prepare for execution."""
-        pass
-
-    def on_run(self) -> None:  # noqa: B027
-        """Handle run command to begin execution."""
         pass
 
     def on_deactivate(self) -> None:  # noqa: B027
@@ -245,7 +238,7 @@ class IcoRuntimeNode(ABC):
         """Process runtime event and determine propagation behavior.
 
         Args:
-            event: Runtime event to handle (state changes, errors, heartbeats).
+            event: Runtime event to handle (progress, prints, faults).
 
         Returns:
             Event to continue bubbling up the tree, or None to stop propagation.
@@ -359,19 +352,6 @@ class IcoRuntimeNode(ABC):
             Self for method chaining.
         """
         self.broadcast_command(IcoActivateCommand.create())
-        return self
-
-    def run(self) -> Self:
-        """Broadcast run command through the runtime subtree.
-
-        Initiates execution phase across all runtime nodes in the subtree.
-        Nodes transition from ready state to running state and begin
-        their execution logic.
-
-        Returns:
-            Self for method chaining.
-        """
-        self.broadcast_command(IcoRunCommand.create())
         return self
 
     def deactivate(self) -> Self:
