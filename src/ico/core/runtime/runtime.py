@@ -5,7 +5,9 @@ import threading
 from collections.abc import Sequence
 from dataclasses import replace
 
+from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperatorProtocol
+from ico.core.plan_keys import assign_plan_keys
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
@@ -137,6 +139,7 @@ class IcoRuntime(IcoRuntimeNode):
         None, None
     ]  # Complete computation flow (Source → Sink)
     toolbox: IcoRuntimeToolBox  # Tool container for runtime monitoring
+    plan_root: IcoNodeProtocol  # The flow whose plan keys events carry
 
     def __init__(
         self,
@@ -147,6 +150,7 @@ class IcoRuntime(IcoRuntimeNode):
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
         tools: Sequence[IcoRuntimeTool] | None = None,
+        plan_root: IcoNodeProtocol | None = None,
     ) -> None:
         """Initialize runtime coordinator with computation flow and tool integration.
 
@@ -157,6 +161,9 @@ class IcoRuntime(IcoRuntimeNode):
             runtime_children: Optional additional runtime children beyond automatic toolbox.
             state_model: Optional custom state model (default: BaseStateModel).
             tools: Optional sequence of runtime tools for monitoring and management.
+            plan_root: The flow whose plan keys the runtime nodes and their
+                events get (``node``), when ``closure`` wraps it (as
+                ``ico.spec.run`` does); ``closure`` by default.
 
         Initialization Process:
             1. **ToolBox Creation**: Create tool container with provided tools
@@ -191,6 +198,9 @@ class IcoRuntime(IcoRuntimeNode):
         # so we need to discover and connect runtime nodes before creating the toolbox and adding tools to it.
 
         discover_and_connect_runtime_nodes(self, closure)
+        # Plan keys before the tools register the nodes.
+        self.plan_root = plan_root if plan_root is not None else closure
+        assign_plan_keys(self.plan_root)
 
         self.toolbox = IcoRuntimeToolBox(runtime=self, tools=tools)
         self.add_runtime_children(self.toolbox)

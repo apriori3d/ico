@@ -30,6 +30,8 @@ ProgressSnapshot = Mapping[str, str | float | None]
 class NodeProgress(TypedDict):
     key: str
     label: str
+    node: str | None
+    """Plan key of the progress node (see ``plan["keys"]``), if known."""
     done: float
     total: float | None
     rate: float | None
@@ -178,6 +180,7 @@ def _node(snapshot: ProgressSnapshot) -> NodeProgress:
     return {
         "key": str(snapshot.get("key")),
         "label": str(snapshot.get("label")),
+        "node": node if isinstance(node := snapshot.get("node"), str) else None,
         "done": number("done") or 0.0,
         "total": number("total"),
         "rate": number("rate"),

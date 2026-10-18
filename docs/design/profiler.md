@@ -193,7 +193,7 @@ Properties:
 ### 4.1 Node keys
 
 A metric key is the **plan key** of the node, defined once in
-`ico.describe.plan.keys` and shared by the plan renderers and the
+`ico.core.plan_keys` and shared by the plan renderers and the
 profiler. Keys are dotted child indices in the plan's tree (`plan_children`):
 
 - A pool built from a factory is flattened to its first member, as the

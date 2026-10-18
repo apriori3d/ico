@@ -57,7 +57,7 @@ def test_snapshot_format_and_final_state() -> None:
     run(numbers(4) | progress.stream(), tool)
 
     initial, first, last = snapshots[0], snapshots[1], snapshots[-1]
-    assert set(first) == {"key", "label", "done", "total", "rate", "eta"}
+    assert set(first) == {"key", "label", "node", "done", "total", "rate", "eta"}
     assert (initial["done"], initial["rate"], initial["eta"]) == (0.0, None, None)
     assert (first["label"], first["done"], first["total"]) == ("items", 1.0, 4)
     assert first["rate"] is None and first["eta"] is None  # nothing measured yet

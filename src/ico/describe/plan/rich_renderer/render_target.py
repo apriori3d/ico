@@ -7,8 +7,8 @@ from typing import Protocol, TypeAlias
 from rich.text import Text
 
 from ico.core.node import IcoNodeProtocol
+from ico.core.plan_keys import plan_children
 from ico.core.tree_utils import TraversalInfo, TreeWalker
-from ico.describe.plan.keys import plan_children
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 

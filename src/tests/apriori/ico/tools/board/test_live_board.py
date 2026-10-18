@@ -198,3 +198,20 @@ def test_a_run_without_profile() -> None:
     assert runs.profile(run.id) is None
     assert runs.profile("missing") is None
     assert LiveBoardTool(runs).profiler is None
+
+
+def test_board_progress_has_the_plan_keys_of_its_rows() -> None:
+    runs = BoardRuns()
+    progress: IcoProgress[int] = IcoProgress(total=4, name="items")
+    flow = IcoSource(numbers) | progress.stream()
+    runtime = IcoRuntime(
+        flow | IcoSink(ignore), tools=[LiveBoardTool(runs)], plan_root=flow
+    )
+    runtime.activate().run().deactivate()
+
+    [view] = runs.runs()
+    plan = runs.plan(view["id"])
+    assert plan is not None
+    [node] = view["progress"]
+    assert node["node"] == progress.plan_key
+    assert node["node"] in plan["keys"]
