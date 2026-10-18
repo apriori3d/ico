@@ -325,7 +325,7 @@ class IcoChannel(Generic[I, O], ABC):
             Enables distributed runtime tree coordination by forwarding
             lifecycle commands (activate, run, deactivate) to remote processes.
         """
-        message = CommandMessage(self._message_id, payload)
+        message = CommandMessage(self._message_id, payload, ack=wait_for_ack)
         self._send(message)
 
         # Runtime command may be updated by peer runtime
@@ -519,7 +519,8 @@ class IcoChannel(Generic[I, O], ABC):
         if self.runtime_port is not None:
             self.runtime_port.on_channel_command(message.command)
 
-        self._send(AcknowledgeMessage(self._message_id, message_id=message.id))
+        if message.ack:
+            self._send(AcknowledgeMessage(self._message_id, message_id=message.id))
 
     def _handle_input_event(self, message: EventMessage) -> None:
         """Handle runtime event received from remote process.

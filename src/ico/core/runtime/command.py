@@ -38,6 +38,10 @@ class IcoRuntimeCommand:
     """
 
     broadcast_order: ClassVar[CommandBroadcastOrder] = "pre"
+    acknowledged: ClassVar[bool] = True
+    """Whether a worker waits for its runner to acknowledge the command. A
+    command that may come while a run uses the worker's channel (from
+    another thread) is not acknowledged: the runner takes it between items."""
     request: int | None = field(default=None, kw_only=True)
     """Set by ``IcoRuntime.query``: the nodes answer with events whose
     ``reply_to`` is this number."""

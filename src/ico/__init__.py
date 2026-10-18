@@ -60,6 +60,7 @@ from ico.tools.board import LiveBoardTool
 from ico.tools.printer.rich_printer_tool import RichPrinterTool
 from ico.tools.progress.json_progress_tool import JsonProgressTool
 from ico.tools.progress.rich_progress_tool import RichProgressTool, WorkerFlow
+from ico.tools.sample import JsonSampleTool
 
 __all__ = [
     # core
@@ -121,6 +122,7 @@ __all__ = [
     # tools
     "RichPrinterTool",
     "JsonProgressTool",
+    "JsonSampleTool",
     "LiveBoardTool",
     "RichProgressTool",
     "WorkerFlow",
