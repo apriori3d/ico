@@ -8,6 +8,7 @@ from ico.core.operator import (
     IcoOperatorProtocol,
     wrap_operator,
 )
+from ico.core.runtime.cancel import check_cancelled
 from ico.core.signature import IcoSignature
 
 C = TypeVar("C")  # noqa: E741
@@ -191,12 +192,14 @@ class IcoProcess(
         until = self.until
         if until is None:
             for _ in range(self.max_iterations):
+                check_cancelled()
                 context = self.body(context)
             return context
 
         for _ in range(self.max_iterations):
             if until(context):
                 return context
+            check_cancelled()
             context = self.body(context)
 
         if until(context) or self.on_limit == "return":

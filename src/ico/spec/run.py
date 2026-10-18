@@ -19,6 +19,7 @@ from ico.core.tree_utils import TreePathIndex
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError, is_json_value
 
 if TYPE_CHECKING:
+    from ico.core.runtime.cancel import IcoCancelToken
     from ico.core.runtime.tool import IcoRuntimeTool
     from ico.registry.registry import IcoRegistry
     from ico.tools.profiler import ProfilerTool
@@ -65,24 +66,31 @@ class RunResult:
         total: Number of output items (1 for a non-iterator output).
         truncated: Whether ``outputs`` holds fewer items than ``total``.
         errors: Per-item errors collected by ``on_error="collect"`` streams.
+        cancelled: The reason when the run was cancelled, else ``None``.
     """
 
     outputs: tuple[JsonValue, ...]
     total: int
     truncated: bool
     errors: tuple[RunError, ...] = ()
+    cancelled: str | None = None
+    """The reason when the run was cancelled: ``outputs`` and ``total``
+    then hold what was produced before it stopped."""
 
     def to_dict(self) -> dict[str, JsonValue]:
         outputs: list[JsonValue] = []
         outputs.extend(self.outputs)
         errors: list[JsonValue] = []
         errors.extend(error.to_dict() for error in self.errors)
-        return {
+        result: dict[str, JsonValue] = {
             "outputs": outputs,
             "total": self.total,
             "truncated": self.truncated,
             "errors": errors,
         }
+        if self.cancelled is not None:
+            result["cancelled"] = self.cancelled
+        return result
 
 
 def run(
@@ -94,6 +102,7 @@ def run(
     tools: Sequence[IcoRuntimeTool] = (),
     params: Mapping[str, JsonValue] | None = None,
     profiler: ProfilerTool | None = None,
+    cancel: IcoCancelToken | None = None,
 ) -> RunResult:
     """Build a spec and run it once.
 
@@ -113,6 +122,9 @@ def run(
         profiler: Profiles the run: the built flow is instrumented (keys
             are paths in the plan of the spec's flow) and the tool is
             attached; read the profile with ``profiler.snapshot()``.
+        cancel: A token that stops the run between items when cancelled
+            (from any thread): the result holds what was produced so far,
+            with ``cancelled`` set to the reason.
 
     Returns:
         A :class:`RunResult`.
@@ -128,6 +140,7 @@ def run(
         >>> result.to_dict()
     """
     from ico.core.async_stream import IcoStreamErrors
+    from ico.core.runtime.cancel import IcoCancelled
     from ico.core.runtime.runtime import IcoRuntime
     from ico.spec.builders import registry_context
     from ico.spec.params import bind
@@ -165,7 +178,8 @@ def run(
     closure: IcoOperatorProtocol[None, None] = (
         IcoOperator(provide) | flow | IcoOperator(collect)
     )
-    runtime = IcoRuntime(closure, tools=tools, plan_root=flow)
+    runtime = IcoRuntime(closure, tools=tools, plan_root=flow, cancel=cancel)
+    cancelled: str | None = None
     errors: list[RunError] = []
     try:
         runtime.activate()
@@ -177,6 +191,8 @@ def run(
         raise
     try:
         runtime.run()
+    except IcoCancelled as e:
+        cancelled = e.reason
     except IcoStreamErrors as e:
         path = context.paths.get(id(e.stream)) if e.stream is not None else None
         errors = [
@@ -197,6 +213,7 @@ def run(
         total=total,
         truncated=total > len(outputs),
         errors=tuple(errors),
+        cancelled=cancelled,
     )
 
 

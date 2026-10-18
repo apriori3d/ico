@@ -6,6 +6,7 @@ from ico.core.context_operator import (
     wrap_context_operator,
 )
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, wrap_operator
+from ico.core.runtime.cancel import check_cancelled
 from ico.core.signature import IcoSignature
 
 C = TypeVar("C")  # noqa: E741
@@ -166,6 +167,7 @@ class IcoEpoch(
             sequentially to build up the final context state.
         """
         for item in self.source(None):
+            check_cancelled()
             context = self.context_operator(item, context)
         return context
 

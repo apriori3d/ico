@@ -11,6 +11,7 @@ from ico.core.operator import (
     O,
     wrap_operator,
 )
+from ico.core.runtime.cancel import check_cancelled
 from ico.core.signature import IcoSignature
 
 if TYPE_CHECKING:
@@ -113,6 +114,7 @@ class IcoStream(
                 for counter in counters:
                     counter.start(length)
         for item in items:
+            check_cancelled()
             yield self.body(item)
         # The iteration is over: its progress is reported before the next.
         for progress in self._progress_steps():

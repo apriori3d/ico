@@ -5,6 +5,7 @@ from ico.core.operator import (
     I,
     IcoOperator,
 )
+from ico.core.runtime.cancel import check_cancelled
 from ico.core.signature import IcoSignature
 
 
@@ -76,6 +77,7 @@ class IcoSink(
             items and applies the consumer function to each one.
         """
         for item in items:
+            check_cancelled()
             self.consumer(item)
 
     @property

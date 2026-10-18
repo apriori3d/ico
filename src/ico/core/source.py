@@ -5,6 +5,7 @@ from ico.core.operator import (
     IcoOperator,
     O,
 )
+from ico.core.runtime.cancel import check_cancelled
 from ico.core.signature import IcoSignature
 
 
@@ -86,7 +87,9 @@ class IcoSource(
             This is the function used by __call__. It calls the provider
             and yields each item, converting any Iterable to an Iterator.
         """
-        yield from self.provider()
+        for item in self.provider():
+            check_cancelled()
+            yield item
 
     @property
     def signature(self) -> IcoSignature:
