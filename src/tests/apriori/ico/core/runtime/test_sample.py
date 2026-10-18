@@ -18,6 +18,7 @@ from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
 from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.tools.profiler import ProfilerTool, instrument
+from ico.tools.profiler.instrument import label
 from ico.tools.profiler.probe import NodeProbe
 from ico.tools.sample import JsonSampleTool, SampleSnapshot
 
@@ -181,3 +182,48 @@ def test_previews_are_short() -> None:
             raise RuntimeError
 
     assert preview(Broken()).startswith("<Broken instance")
+
+
+# A long item in a worker: a video whose frames stream inside the worker.
+
+
+def videos() -> Iterator[int]:
+    yield from range(3)
+
+
+def frames(video: int) -> Iterator[int]:
+    return iter(range(video * 100, video * 100 + 40))
+
+
+def slow_frame(frame: int) -> int:
+    time.sleep(0.05)  # 2 s per video
+    return frame
+
+
+def total(values: Iterator[int]) -> int:
+    return sum(values)
+
+
+def video_flow() -> IcoOperatorProtocol[int, int]:
+    return IcoOperator(frames) | IcoStream(IcoOperator(slow_frame)) | IcoOperator(total)
+
+
+def test_samples_reach_a_worker_during_a_long_item() -> None:
+    worker = MPWorker(video_flow)
+    flow = IcoSource(videos) | IcoStream(worker) | IcoSink(ignore)
+    samples = Samples()
+    runtime = IcoRuntime(flow, tools=[samples.tool]).activate()
+    [key] = [
+        p.key
+        for p in plan_nodes(flow, expand_remote_flows=True)
+        if label(p.node) == "slow_frame"
+    ]
+    try:
+        threading.Timer(0.5, runtime.sample, args=(key, 2)).start()
+        runtime.run()
+    finally:
+        runtime.deactivate()
+
+    frames_seen = [int(s["preview"]) for s in samples.items]
+    assert len(frames_seen) == 2
+    assert all(f < 100 for f in frames_seen)  # from the first video, mid-item

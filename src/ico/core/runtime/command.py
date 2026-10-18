@@ -40,7 +40,8 @@ class IcoRuntimeCommand:
     acknowledged: ClassVar[bool] = True
     """Whether a worker waits for its runner to acknowledge the command. A
     command that may come while a run uses the worker's channel (from
-    another thread) is not acknowledged: the runner takes it between items."""
+    another thread) is not acknowledged: it goes through the control lane,
+    which the runner reads at once, also while it runs an item."""
     request: int | None = field(default=None, kw_only=True)
     """Set by ``IcoRuntime.query``: the nodes answer with events whose
     ``reply_to`` is this number."""

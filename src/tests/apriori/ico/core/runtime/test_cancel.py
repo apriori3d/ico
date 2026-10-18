@@ -195,3 +195,38 @@ def test_progress_after_cancel_is_flushed() -> None:
         runtime.run()
     runtime.deactivate()  # the progress counted so far is reported
     assert snapshots[-1]["done"] in (len(out), len(out) + 1)
+
+
+# A long item in a worker stops too: its inner stream checks the runner's token.
+
+
+def frames(video: int) -> Iterator[int]:
+    return iter(range(video * 1000, video * 1000 + 100))
+
+
+def total(values: Iterator[int]) -> int:
+    return sum(values)
+
+
+def video_flow() -> IcoOperatorProtocol[int, int]:
+    return IcoOperator(frames) | IcoStream(IcoOperator(slow)) | IcoOperator(total)
+
+
+def make_video_worker() -> MPWorker[int, int]:
+    return MPWorker(video_flow)
+
+
+def test_a_long_item_in_a_worker_stops() -> None:
+    # 100 frames of 30 ms: 3 s per video without cancellation.
+    worker = MPWorker(video_flow)
+    out, elapsed = run_and_cancel(IcoSource(numbers) | IcoStream(worker), 0.5)
+    assert out == []  # the first video was cut short
+    assert elapsed < 1.5
+    assert not worker.is_alive
+
+
+def test_a_pool_of_long_items_stops_whatever_on_error() -> None:
+    pool = IcoAsyncStream(make_video_worker, pool_size=2, on_error="collect")
+    out, elapsed = run_and_cancel(IcoSource(numbers) | pool, 0.5)
+    assert out == []
+    assert elapsed < 1.5  # IcoCancelled, not IcoStreamErrors at the end

@@ -4,7 +4,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from queue import Empty
-from typing import Generic, Protocol
+from typing import Any, Generic, Protocol
 
 from ico.core.operator import I, O
 from ico.core.runtime.channel.messages import (
@@ -204,6 +204,8 @@ class IcoChannel(Generic[I, O], ABC):
         "strict_accept",
         "check_peer",
         "poll_interval",
+        "control_sender",
+        "control_receiver",
         "_message_id",
     )
 
@@ -234,6 +236,8 @@ class IcoChannel(Generic[I, O], ABC):
         strict_accept: bool = False,
         check_peer: Callable[[], None] | None = None,
         poll_interval: float = 0.5,
+        control_sender: IcoSendEndpoint[Any] | None = None,
+        control_receiver: IcoReceiveEndpoint[Any] | None = None,
     ) -> None:
         """Initialize bidirectional channel with endpoints and configuration.
 
@@ -267,6 +271,10 @@ class IcoChannel(Generic[I, O], ABC):
         self.strict_accept = strict_accept
         self.check_peer = check_peer
         self.poll_interval = poll_interval
+        self.control_sender = control_sender
+        """The control lane, worker → runner: commands that must not wait
+        for the runner to finish its item (see :meth:`send_control`)."""
+        self.control_receiver = control_receiver
         self._message_id = 0
 
     @abstractmethod
@@ -331,6 +339,30 @@ class IcoChannel(Generic[I, O], ABC):
         # Runtime command may be updated by peer runtime
         if wait_for_ack:
             self._wait_for_ack(message.id, timeout)
+
+    def send_control(self, command: IcoRuntimeCommand) -> None:
+        """Send a command without an acknowledgment, from any thread.
+
+        Through the control lane, if the channel has one: the peer reads it
+        on a thread of its own (:meth:`receive_control`), also while it runs
+        an item. Otherwise through the data lane, where the peer takes it
+        between items.
+        """
+        if self.control_sender is None:
+            self.send_command(command, wait_for_ack=False)
+        else:
+            self.control_sender.send(CommandMessage(0, command, ack=False))
+
+    def receive_control(self) -> IcoRuntimeCommand | None:
+        """Wait for the next command of the control lane; ``None`` when the
+        channel has none or it was closed."""
+        if self.control_receiver is None:
+            return None
+        try:
+            message = self.control_receiver.receive()
+        except (EOFError, OSError, ValueError):
+            return None
+        return message.command if isinstance(message, CommandMessage) else None
 
     def send_event(self, payload: IcoRuntimeEvent, wait_for_ack: bool = True) -> None:
         """Send runtime event with optional acknowledgment.
@@ -566,3 +598,5 @@ class IcoChannel(Generic[I, O], ABC):
         """
         self.receiver.close()
         self.sender.close()
+        if self.control_sender is not None:
+            self.control_sender.close()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -8,6 +9,13 @@ from typing import Any, ClassVar, Generic
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O
 from ico.core.plan_keys import assign_plan_keys
 from ico.core.probe import IcoRunnerProbe
+from ico.core.runtime.cancel import (
+    IcoCancelCommand,
+    IcoCancelled,
+    IcoCancelToken,
+    cancellable,
+    cancelled_reason,
+)
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.command import (
     IcoActivateCommand,
@@ -436,7 +444,12 @@ class IcoWorker(
             assert output is not None
             return output
 
-        except Exception:
+        except Exception as e:
+            reason = cancelled_reason()
+            if reason is not None:
+                # The run was cancelled: the runner stopped its item.
+                self.state_model.ready()
+                raise IcoCancelled(reason) from e
             self.state_model.fault()
             raise
 
@@ -534,9 +547,12 @@ class IcoWorker(
             case _:
                 if is_ready:
                     assert self.channel is not None
-                    self.channel.send_command(
-                        command, wait_for_ack=command.acknowledged
-                    )
+                    if command.acknowledged:
+                        self.channel.send_command(command)
+                    else:
+                        # From any thread, while the portal may wait for a
+                        # result: the runner reads its control lane at once.
+                        self.channel.send_control(command)
 
         if command.broadcast_order == "post":
             super().on_command(command)
@@ -663,6 +679,9 @@ class IcoRunner(
         self.channel = channel
         self._plan_flow = flow  # as built, for samples (a probe may wrap it)
         self._flow_key = flow_key
+        self._cancel = IcoCancelToken()
+        """Cancelled by ``IcoCancelCommand``: the item in progress stops
+        between its inner items."""
 
         # Connect to runtime port to enable command and event handling for remote runtime
         channel.runtime_port = self
@@ -713,6 +732,10 @@ class IcoRunner(
 
         # Worker is now pending activation
         self.state_model.pending()
+        if self.channel.control_receiver is not None:
+            threading.Thread(
+                target=self._read_control, name="ico-runner-control", daemon=True
+            ).start()
 
         while True:
             try:
@@ -725,7 +748,8 @@ class IcoRunner(
 
                 # Process input item through flow
                 self.state_model.running()
-                output = self.flow(input_item)
+                with cancellable(self._cancel):
+                    output = self.flow(input_item)
 
                 # Send output item upstream
                 self.state_model.sending()
@@ -758,9 +782,17 @@ class IcoRunner(
         """
         self.broadcast_command(command)
 
+    def _read_control(self) -> None:
+        """Handle the commands of the control lane as they come, also while
+        an item runs (samples, cancellation)."""
+        while (command := self.channel.receive_control()) is not None:
+            self.on_channel_command(command)
+
     def on_command(self, command: IcoRuntimeCommand) -> None:
         if isinstance(command, IcoSampleCommand) and self._flow_key is not None:
             start_sampling(self._plan_flow, self._flow_key, command, self.bubble_event)
+        elif isinstance(command, IcoCancelCommand):
+            self._cancel.cancel(command.reason)
         super().on_command(command)
 
     def on_channel_event(self, event: IcoRuntimeEvent) -> None:
