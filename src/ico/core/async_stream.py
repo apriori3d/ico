@@ -13,6 +13,7 @@ from typing import Any, Generic, Literal, TypeAlias, TypeVar, final, overload
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.operator import I, IcoOperator, O
+from ico.core.runtime.worker import IcoWorkerDied
 from ico.core.signature import IcoSignature
 
 T = TypeVar("T")
@@ -371,8 +372,11 @@ class IcoAsyncStream(
         ordering_buffer_ready = asyncio.Event()
         ordering_buffer_ready.set()
 
+        live = _Live(len(self.pool))
         executors = [
-            asyncio.create_task(self._execute_operator(op, input_queue, results_queue))
+            asyncio.create_task(
+                self._execute_operator(op, input_queue, results_queue, live)
+            )
             for op in self.pool
         ]
         scheduler = asyncio.create_task(
@@ -490,21 +494,40 @@ class IcoAsyncStream(
         operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
         in_queue: asyncio.Queue[tuple[int, I] | None],
         out_queue: asyncio.Queue[_Message[O]],
+        live: _Live,
     ) -> None:
         """Worker coroutine: process items until the termination signal.
 
         Every item produces exactly one outcome (after retries), and
         ``task_done()`` is called once per ``get()``, including the
         termination signal.
+
+        A worker whose process died (``IcoWorkerDied``) stops taking items,
+        so the others process the rest. If it was the last live worker, it
+        keeps taking items and fails each one with the same error, so the
+        stream ends instead of waiting for workers that are gone.
         """
+        dead: IcoWorkerDied | None = None
         while True:
             task = await in_queue.get()
             try:
                 if task is None:
                     return
                 index, item = task
-                outcome = await self._call_with_retry(operator, item)
+                if dead is not None:
+                    outcome: O | _Failed = _Failed(dead, item, 0)
+                else:
+                    outcome = await self._call_with_retry(operator, item)
                 await out_queue.put((index, outcome))
+                if (
+                    dead is None
+                    and isinstance(outcome, _Failed)
+                    and isinstance(outcome.error, IcoWorkerDied)
+                ):
+                    dead = outcome.error
+                    live.count -= 1
+                    if live.count > 0:
+                        return  # leave the remaining items to live workers
             finally:
                 in_queue.task_done()
 
@@ -553,6 +576,13 @@ class _Failed:
     error: Exception
     item: Any
     attempts: int
+
+
+@dataclass(slots=True)
+class _Live:
+    """Number of workers of a run whose process is not known to be dead."""
+
+    count: int
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from queue import Empty
 from typing import Generic, Protocol
 
@@ -83,8 +84,12 @@ class IcoReceiveEndpoint(Generic[O], ABC):
     """
 
     @abstractmethod
-    def receive(self) -> DataMessage[O] | RuntimeMessage:
+    def receive(self, timeout: float | None = None) -> DataMessage[O] | RuntimeMessage:
         """Receive message from communication endpoint.
+
+        Args:
+            timeout: Seconds to wait for a message; ``None`` blocks until one
+                arrives.
 
         Returns:
             Data or runtime message received from remote endpoint.
@@ -196,6 +201,8 @@ class IcoChannel(Generic[I, O], ABC):
         "accept_commands",
         "accept_events",
         "strict_accept",
+        "check_peer",
+        "poll_interval",
         "_message_id",
     )
 
@@ -207,6 +214,10 @@ class IcoChannel(Generic[I, O], ABC):
     accept_commands: bool
     accept_events: bool
     strict_accept: bool
+    check_peer: Callable[[], None] | None
+    """Raises when the remote process is gone; called while waiting."""
+    poll_interval: float
+    """Seconds between ``check_peer`` calls while no message arrives."""
     _message_id: int
 
     def __init__(
@@ -220,6 +231,8 @@ class IcoChannel(Generic[I, O], ABC):
         accept_commands: bool = True,
         accept_events: bool = True,
         strict_accept: bool = False,
+        check_peer: Callable[[], None] | None = None,
+        poll_interval: float = 0.5,
     ) -> None:
         """Initialize bidirectional channel with endpoints and configuration.
 
@@ -232,6 +245,10 @@ class IcoChannel(Generic[I, O], ABC):
             accept_commands: Process runtime commands from remote endpoint.
             accept_events: Process runtime events from remote endpoint.
             strict_accept: Raise errors vs ignore unexpected message types.
+            check_peer: Called every ``poll_interval`` seconds while waiting
+                for a message; raises when the remote process is gone, so a
+                crashed peer ends the wait instead of blocking forever.
+            poll_interval: Seconds between ``check_peer`` calls.
 
         Channel Configuration:
             • Runtime integration: Optional port for runtime tree coordination
@@ -247,6 +264,8 @@ class IcoChannel(Generic[I, O], ABC):
         self.accept_commands = accept_commands
         self.accept_events = accept_events
         self.strict_accept = strict_accept
+        self.check_peer = check_peer
+        self.poll_interval = poll_interval
         self._message_id = 0
 
     @abstractmethod
@@ -397,10 +416,16 @@ class IcoChannel(Generic[I, O], ABC):
             • Timeout behavior controlled by ignore_receive_timeouts flag
         """
         while True:
+            check_peer = self.check_peer
             try:
-                input_message = self.receiver.receive()
+                input_message = self.receiver.receive(
+                    timeout=self.poll_interval if check_peer is not None else None
+                )
 
             except (TimeoutError, Empty):
+                if check_peer is not None:
+                    check_peer()  # raises when the peer is gone
+                    continue
                 if self.ignore_receive_timeouts:
                     continue
                 else:

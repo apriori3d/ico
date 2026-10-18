@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import multiprocessing
 from collections.abc import Callable
 from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
@@ -10,7 +11,7 @@ from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.event import (
     IcoFaultEvent,
 )
-from ico.core.runtime.worker import IcoRunner, IcoWorker
+from ico.core.runtime.worker import IcoRunner, IcoWorker, IcoWorkerDied
 from ico.core.signature import IcoSignature
 from ico.core.signature_utils import infer_from_flow_factory
 from ico.runtime.worker.mp.mp_channel import (
@@ -340,8 +341,19 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
         # Recreate channel for worker process to ensure closed channels are not reused
         self.channel = self._create_channel()
         self._runner_process = self.spawn_runner()
+        # A crashed runner ends every wait for it with IcoWorkerDied.
+        self.channel.check_peer = self._check_runner
 
         super()._activate_runner()
+
+    def _check_runner(self) -> None:
+        """Raise ``IcoWorkerDied`` if the runner process has exited."""
+        process = self._runner_process
+        if process is not None and not process.is_alive():
+            raise IcoWorkerDied(process.exitcode, self.name)
+
+    def runner_alive(self) -> bool:
+        return self.is_alive
 
     def _deactivate_runner(self) -> None:
         """Gracefully shutdown runner process and cleanup resources.
@@ -448,6 +460,9 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
             • **Bidirectional**: Full bidirectional communication capability
         """
         runner = worker_factory()
+        # An orphaned runner (its worker's process was killed) exits instead
+        # of waiting forever for the next item.
+        runner.channel.check_peer = _exit_if_parent_gone
         # Run worker to start receiving and processing commands and items
         runner.run_loop()
 
@@ -501,6 +516,13 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
 # ────────────────────────────────────────────────────────────────────────────
 # Pickleable runner factory for cross-process initialization
 # ────────────────────────────────────────────────────────────────────────────
+
+
+def _exit_if_parent_gone() -> None:
+    """In a runner process: exit when the parent process is gone."""
+    parent = multiprocessing.parent_process()
+    if parent is not None and not parent.is_alive():
+        raise SystemExit(0)  # not an Exception: the runner loop does not catch it
 
 
 @final

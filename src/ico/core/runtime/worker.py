@@ -142,6 +142,49 @@ class RunnerStateModel(WorkerStateModel):
 # ────────────────────────────────────────────────
 
 
+class IcoWorkerDied(RuntimeError):
+    """The process of a worker's runner is gone (a crash, a kill, an exit).
+
+    Raised by every call of the worker once its runner is dead, so that a
+    crashed process ends the wait for its result instead of blocking it
+    forever. ``IcoAsyncStream`` treats it as an item error (``on_error``)
+    and stops giving items to that worker.
+
+    Attributes:
+        exitcode: Exit code of the process; negative for a signal (as in
+            ``multiprocessing``), ``None`` when unknown.
+    """
+
+    def __init__(self, exitcode: int | None, name: str | None = None) -> None:
+        self.exitcode = exitcode
+        where = f"worker '{name}'" if name else "worker"
+        super().__init__(f"{where} process {_exit_reason(exitcode)}")
+
+    @property
+    def signal(self) -> str | None:
+        """Name of the signal that killed the process (e.g. ``SIGSEGV``)."""
+        if self.exitcode is None or self.exitcode >= 0:
+            return None
+        return _signal_name(-self.exitcode)
+
+
+def _signal_name(number: int) -> str:
+    import signal
+
+    try:
+        return signal.Signals(number).name
+    except ValueError:
+        return f"signal {number}"
+
+
+def _exit_reason(exitcode: int | None) -> str:
+    if exitcode is None:
+        return "is gone"
+    if exitcode < 0:
+        return f"died: {_signal_name(-exitcode)} (exit code {exitcode})"
+    return f"exited with code {exitcode}"
+
+
 class IcoWorker(
     Generic[I, O],
     IcoOperator[I, O],
@@ -308,6 +351,11 @@ class IcoWorker(
         """
         pass
 
+    def runner_alive(self) -> bool:
+        """Whether the remote runner can still receive commands; subclasses
+        with a runner process report its state."""
+        return True
+
     # ──────── Data flow function ────────
 
     def _portal_fn(self, input: I) -> O:
@@ -435,7 +483,8 @@ class IcoWorker(
                     assert command.broadcast_order == "post"
                     assert self.channel is not None
 
-                    self.channel.send_command(command)
+                    if self.runner_alive():  # a dead runner cannot acknowledge
+                        self.channel.send_command(command)
 
                     # Deactivate runner in post-order, to ensure proper shutdown
                     self._deactivate_runner()
