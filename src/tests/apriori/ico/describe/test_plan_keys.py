@@ -9,13 +9,13 @@ from ico.core.context_operator import IcoContextOperator
 from ico.core.context_pipeline import IcoContextPipeline
 from ico.core.epoch import IcoEpoch
 from ico.core.operator import IcoOperatorProtocol
+from ico.core.plan_keys import plan_nodes, remote_flow_key
 from ico.core.route import route
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
 from ico.describe.plan.json_renderer import PlanCell, PlanView
-from ico.describe.plan.keys import plan_nodes, remote_flow_key
 from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
 from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.tools.profiler import ProfilerTool, instrument

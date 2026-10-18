@@ -1,6 +1,7 @@
 """Keys of plan nodes: one definition of the plan's tree, shared by the
-plan renderers (``plan_view(...)["keys"]``) and by tools that report per
-node, such as the profiler.
+plan renderers (``plan_view(...)["keys"]``), the runtime (``plan_key`` of
+runtime nodes, ``node`` of their events) and tools that report per node,
+such as the profiler.
 
 The plan's tree is the flow's tree with two changes:
 
@@ -18,7 +19,6 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
 
-from ico.core.async_stream import IcoAsyncStream
 from ico.core.node import HasRemoteFlow, IcoNodeProtocol
 from ico.core.tree_utils import TreePathIndex
 
@@ -35,6 +35,9 @@ def path_key(key: str, path: TreePathIndex) -> str:
 
 
 def is_factory_pool(node: IcoNodeProtocol) -> bool:
+    # Imported here: async_stream imports the runtime, which uses this module.
+    from ico.core.async_stream import IcoAsyncStream
+
     return (
         isinstance(node, IcoAsyncStream)
         and cast(IcoAsyncStream[Any, Any], node).pool_from_factory
@@ -98,3 +101,20 @@ def plan_nodes(
             yield from walk(child, child_key(key, i), here)
 
     yield from walk(flow, root_key, None)
+
+
+def assign_plan_keys(flow: IcoNodeProtocol, root_key: str = ROOT_KEY) -> None:
+    """Set ``plan_key`` on the runtime nodes of ``flow`` (progress nodes,
+    printers, workers, ...), so that their events carry it as ``node``.
+
+    A node used at several places gets its first key; keys from an earlier
+    flow the node was part of are replaced.
+    """
+    from ico.core.runtime.node import IcoRuntimeNode
+
+    seen: set[int] = set()
+    for planned in plan_nodes(flow, root_key=root_key):
+        node = planned.node
+        if isinstance(node, IcoRuntimeNode) and id(node) not in seen:
+            seen.add(id(node))
+            node.plan_key = planned.key

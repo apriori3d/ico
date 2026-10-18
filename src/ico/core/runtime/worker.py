@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Generic
 
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O
+from ico.core.plan_keys import assign_plan_keys
 from ico.core.probe import IcoRunnerProbe
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.command import (
@@ -620,6 +621,7 @@ class IcoRunner(
         state_model: BaseStateModel | None = None,
         name: str | None = None,
         probe: IcoRunnerProbe | None = None,
+        flow_key: str | None = None,
     ) -> None:
         """Initialize runner with computation flow and communication channel.
 
@@ -634,6 +636,9 @@ class IcoRunner(
             state_model: Custom state model (defaults to RunnerStateModel).
             name: Optional name for runner identification.
             probe: The worker's ``runner_probe``: wraps the built flow.
+            flow_key: Plan key of the flow in the parent's plan (the
+                worker's remote flow): the runtime nodes of the flow get
+                plan keys below it.
 
         Runner Setup:
             • Runtime tree initialization with RunnerStateModel
@@ -649,6 +654,8 @@ class IcoRunner(
             state_model=state_model or RunnerStateModel(),
         )
         flow = flow_factory()
+        if flow_key is not None:
+            assign_plan_keys(flow, flow_key)  # before a probe wraps it
         self.flow = flow if probe is None else probe.wrap(flow)
         self.channel = channel
 

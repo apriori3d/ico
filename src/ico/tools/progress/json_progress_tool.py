@@ -19,13 +19,16 @@ from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.tree_utils import TreePathIndex
 
 ProgressSnapshot = dict[str, str | float | None]
-"""``{"key", "label", "done", "total", "rate", "eta"}``; JSON-compatible."""
+"""``{"key", "label", "node", "done", "total", "rate", "eta"}``;
+JSON-compatible."""
 
 
 @dataclass(slots=True)
 class _NodeProgress:
     key: str
     label: str
+    node: str | None
+    """Plan key of the progress node (``None`` outside the plan)."""
     total: float | None
     fixed: bool = True
     """Whether ``total`` is the node's own (else it came from its stream)."""
@@ -44,7 +47,7 @@ class JsonProgressTool(IcoRuntimeTool):
     ``ico-mcp`` (which decides how to turn them into MCP progress
     notifications) or a dashboard::
 
-        {"key": "1.0.2", "label": "Train Epoch Progress",
+        {"key": "1.0.2", "label": "Train Epoch Progress", "node": "0.2",
          "done": 120, "total": 2000, "rate": 85.3, "eta": 22.1}
 
     - ``key``: path of the node in the runtime tree (``TreePathIndex``), a
@@ -52,6 +55,9 @@ class JsonProgressTool(IcoRuntimeTool):
       processes get their own keys.
     - ``label``: the node name, else ``"Progress <n>"`` by registration
       order, as in ``RichProgressTool``.
+    - ``node``: the plan key of the progress node (``plan_view(...)["keys"]``,
+      also inside ``MPWorker`` runners), to show the progress on its plan
+      row; ``None`` for a node outside the runtime's ``plan_root``.
     - ``done`` / ``total``: as in ``RichProgressTool``, a node that reached
       its total starts again from zero on the next update (next iteration).
       ``total`` is ``None`` for a node without a known count: it only
@@ -114,6 +120,7 @@ class JsonProgressTool(IcoRuntimeTool):
             self._nodes[path] = _NodeProgress(
                 key=str(path),
                 label=label,
+                node=node.plan_key,
                 total=node.total,
                 fixed=node.total is not None,
             )
@@ -200,6 +207,7 @@ def _snapshot(
     return {
         "key": state.key,
         "label": state.label,
+        "node": state.node,
         "done": state.done,
         "total": state.total,
         "rate": rate,

@@ -93,7 +93,7 @@ class LiveBoardTool(IcoRuntimeTool):
     def on_activate(self) -> None:
         super().on_activate()
         runs = self.runs if self.runs is not None else default_board()[0]
-        flow = self._runtime.closure if self._runtime is not None else None
+        flow = self._runtime.plan_root if self._runtime is not None else None
         title = self.title or (flow.name if flow is not None else None) or "run"
         self._run = runs.start(title, plan_view(flow) if flow is not None else None)
         self._progress.on_activate()

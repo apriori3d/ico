@@ -8,6 +8,7 @@ from multiprocessing.context import SpawnContext, SpawnProcess
 from typing import Any, Generic, final
 
 from ico.core.operator import I, IcoOperatorProtocol, O
+from ico.core.plan_keys import remote_flow_key
 from ico.core.probe import IcoRunnerProbe
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.event import (
@@ -304,6 +305,11 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
             flow_factory=flow_factory,
             name=name,
             probe=self.runner_probe,
+            flow_key=(
+                remote_flow_key(self.plan_key, self)
+                if self.plan_key is not None
+                else None
+            ),
         )
 
     def _create_channel(self) -> MPChannel[I, O]:
@@ -607,6 +613,7 @@ class _WorkerFactory(Generic[I, O]):
         flow_factory: Callable[[], IcoOperatorProtocol[I, O]],
         name: str | None,
         probe: IcoRunnerProbe | None = None,
+        flow_key: str | None = None,
     ) -> None:
         """Initialize runner factory with runner configuration.
 
@@ -615,6 +622,8 @@ class _WorkerFactory(Generic[I, O]):
             flow_factory: Factory function for creating computation flow in runner.
             name: Optional runner name for debugging and identification.
             probe: The worker's ``runner_probe``, passed to the runner.
+            flow_key: Plan key of the worker's remote flow, passed to the
+                runner.
 
         Factory State:
             All arguments stored as instance attributes for pickling:
@@ -632,6 +641,7 @@ class _WorkerFactory(Generic[I, O]):
         self.flow_factory = flow_factory
         self.name = name
         self.probe = probe
+        self.flow_key = flow_key
 
     def __call__(self) -> IcoRunner[I, O]:
         """Create and return configured IcoRunner instance.
@@ -663,4 +673,5 @@ class _WorkerFactory(Generic[I, O]):
             flow_factory=self.flow_factory,
             name=self.name,
             probe=self.probe,
+            flow_key=self.flow_key,
         )

@@ -35,6 +35,10 @@ class IcoRuntimeEvent:
     """
 
     trace: TreePathIndex
+    node: str | None = field(default=None, kw_only=True)
+    """Plan key of the node the event comes from (``0.1.0``, see
+    :mod:`ico.core.plan_keys`); ``None`` for nodes outside the plan (the
+    runtime, the toolbox, tools). Set by the node that bubbles it first."""
     reply_to: int | None = field(default=None, kw_only=True)
     """The ``request`` of the command this event answers (see
     ``IcoRuntime.query``); ``None`` for an event that is not an answer.

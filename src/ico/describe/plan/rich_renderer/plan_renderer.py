@@ -9,7 +9,7 @@ from rich.text import Text
 from ico.core.node import (
     IcoNodeProtocol,
 )
-from ico.describe.plan.keys import ROOT_KEY, child_key, path_key
+from ico.core.plan_keys import ROOT_KEY, child_key, path_key
 from ico.describe.plan.options import (
     PlanRendererOptions,
 )

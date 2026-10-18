@@ -10,8 +10,8 @@ from ico.core.async_stream import IcoAsyncStream
 from ico.core.context_operator import IcoContextOperator
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
+from ico.core.plan_keys import ROOT_KEY, child_key, plan_nodes, remote_flow_key
 from ico.core.runtime.worker import IcoWorker
-from ico.describe.plan.keys import ROOT_KEY, child_key, plan_nodes, remote_flow_key
 from ico.tools.profiler.probe import NodeProbe
 from ico.tools.profiler.remote import RunnerProfiler
 from ico.tools.profiler.table import ProfileTable
@@ -32,7 +32,7 @@ def instrument(flow: F, profiler: ProfilerTool) -> F:
         flow = instrument(flow, profiler)
         IcoRuntime(flow, tools=[profiler]).activate().run().deactivate()
 
-    Keys are the plan keys of the nodes (:mod:`ico.describe.plan.keys`,
+    Keys are the plan keys of the nodes (:mod:`ico.core.plan_keys`,
     the ``keys`` of :func:`~ico.plan_view`): the root is ``0`` and the
     ``i``-th child of ``k`` is ``k.i``. The members of an async stream pool
     built from a factory share the key of the first member, as the plan

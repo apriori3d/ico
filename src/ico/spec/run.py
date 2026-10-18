@@ -165,7 +165,7 @@ def run(
     closure: IcoOperatorProtocol[None, None] = (
         IcoOperator(provide) | flow | IcoOperator(collect)
     )
-    runtime = IcoRuntime(closure, tools=tools)
+    runtime = IcoRuntime(closure, tools=tools, plan_root=flow)
     errors: list[RunError] = []
     try:
         runtime.activate()

@@ -49,7 +49,7 @@ class PlanView(TypedDict):
     rows: list[list[PlanCell]]
     keys: list[str | None]
     """The plan key of the node of each row (``0.1.0``, see
-    :mod:`ico.describe.plan.keys`); ``None`` for closing rows (``yield``,
+    :mod:`ico.core.plan_keys`); ``None`` for closing rows (``yield``,
     ``collect``, ...) and rows of nodes already keyed by another row."""
 
 

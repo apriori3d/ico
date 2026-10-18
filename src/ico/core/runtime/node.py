@@ -88,6 +88,7 @@ class IcoRuntimeNode(ABC):
     __slots__ = (
         "state_model",
         "runtime_name",
+        "plan_key",
         "_runtime_children",
         "_runtime_parent",
     )
@@ -95,6 +96,7 @@ class IcoRuntimeNode(ABC):
     # Runtime tree attributes (independent of computation types)
     state_model: BaseStateModel  # Execution lifecycle state management
     runtime_name: str | None  # Human-readable identifier for debugging
+    plan_key: str | None  # Key of the node in the plan (set by the runtime)
     _runtime_children: list[IcoRuntimeNode]  # Child nodes for command broadcast
     _runtime_parent: IcoRuntimeNode | None  # Parent node for event bubbling
 
@@ -118,6 +120,7 @@ class IcoRuntimeNode(ABC):
             for proper command broadcast and event bubbling behavior.
         """
         self.runtime_name = runtime_name
+        self.plan_key = None
         self._runtime_parent = runtime_parent
         self._runtime_children = (
             list(runtime_children) if runtime_children is not None else []
@@ -276,6 +279,9 @@ class IcoRuntimeNode(ABC):
         if from_child is not None:
             child_index = self._runtime_children.index(from_child)
             event = replace(event, trace=event.trace.add_child(child_index))
+        elif event.node is None and self.plan_key is not None:
+            # The node the event comes from tells its place in the plan.
+            event = replace(event, node=self.plan_key)
 
         # If event is handled and should not propagate further, stop here
         if not self.on_event(event):
