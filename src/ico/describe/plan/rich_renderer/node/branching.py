@@ -28,7 +28,7 @@ from ico.describe.plan.options import PlanRendererOptions, SignatureFormat
 from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from ico.describe.plan.rich_renderer.render_target import (
     PlanRenderTarget,
-    create_plan_walker,
+    flattened,
 )
 from ico.describe.plan.rich_renderer.renderer_registry import register_renderer
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
@@ -75,7 +75,6 @@ class BranchingRenderer(CustomRenderer):
         plan.render_row(
             self._header, node, indent=Text("╭── ", style=DescribeStyle.group.value)
         )
-        walker = create_plan_walker(expand_remote_flows=self.options.show_remote_flows)
         for label, branch in self.branches(node):
             row = _part_row(
                 self.options,
@@ -83,11 +82,12 @@ class BranchingRenderer(CustomRenderer):
                 label,
                 "Full",
             )
-            plan.render_row(row, branch)
+            # The branch's own row has its key, unless it has no row (a chain).
+            plan.render_row(row, branch, keyed=flattened(self.options, branch))
             plan.push_group_indent(Text("│   ", style=DescribeStyle.group.value))
-            walker.walk(branch, visit_fn=plan.render_node, order="pre_post")
+            plan.render_subtree(branch)
             plan.pop_group_indent()
-        plan.render_row(self._footer, node)
+        plan.render_row(self._footer, node, keyed=False)
 
 
 @register_renderer(IcoFork)

@@ -6,12 +6,10 @@ from typing import Protocol, TypeAlias
 
 from rich.text import Text
 
-from ico.core.async_stream import IcoAsyncStream
-from ico.core.node import (
-    HasRemoteFlow,
-    IcoNodeProtocol,
-)
+from ico.core.node import IcoNodeProtocol
 from ico.core.tree_utils import TraversalInfo, TreeWalker
+from ico.describe.plan.keys import plan_children
+from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 
 
@@ -27,8 +25,21 @@ class PlanRenderTarget(Protocol):
         row_renderer: RowRenderer,
         node: IcoNodeProtocol,
         indent: Text | None = None,
+        *,
+        keyed: bool = True,
     ) -> None:
-        """Render table row with optional indentation."""
+        """Render table row with optional indentation.
+
+        The row gets the plan key of ``node`` (the node being rendered or
+        one of its children) unless ``keyed`` is false (closing rows such as
+        ``yield``) or a row already has that key.
+        """
+        ...
+
+    def render_subtree(self, child: IcoNodeProtocol) -> None:
+        """Render a child of the node being rendered (a branch, a part of an
+        epoch) with its subtree. Custom renderers use it instead of walking
+        the tree themselves, so every row keeps its plan key."""
         ...
 
     def push_group_indent(self, indent: Text) -> None:
@@ -60,17 +71,12 @@ def create_plan_walker(expand_remote_flows: bool) -> PlanTreeWalker:
     """Create tree walker for ICO plan nodes with remote flow expansion."""
 
     def _get_children(node: IcoNodeProtocol) -> Sequence[IcoNodeProtocol]:
-        # Flatten async stream pool to a single flow
-        if isinstance(node, IcoAsyncStream) and node.pool_from_factory:
-            return [node.children[0]]
-
-        children = list(node.children)
-
-        if expand_remote_flows and isinstance(node, HasRemoteFlow):
-            factory = node.get_remote_flow_factory()
-            flow = factory()
-            children.append(flow)
-
-        return children
+        return plan_children(node, expand_remote_flows=expand_remote_flows)
 
     return PlanTreeWalker(get_children_fn=_get_children)
+
+
+def flattened(options: PlanRendererOptions, node: IcoNodeProtocol) -> bool:
+    """Whether the plan shows no row for ``node`` itself (chains, pipelines),
+    only rows for its children."""
+    return type(node) in options.flatten_node_type
