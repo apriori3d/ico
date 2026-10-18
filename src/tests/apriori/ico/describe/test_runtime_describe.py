@@ -1,5 +1,5 @@
-"""Describing a runtime subscribes only to that runtime, and only while it
-collects the states of its nodes."""
+"""Queries on the runtime bus: a command with a request number, answers
+collected for the one who asked; describe of a runtime uses one."""
 
 import io
 from collections.abc import Iterator
@@ -8,14 +8,21 @@ from typing import Any
 import pytest
 from rich.console import Console
 
+from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
+from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
-from ico.core.runtime.state import IcoStateRequestCommand
+from ico.core.runtime.state import IcoStateEvent, IcoStateRequestCommand
+from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
+from ico.core.stream import IcoStream
 from ico.describe.runtime.rich_renderer.tree_renderer import RuntimeTreeRenderer
+from ico.runtime.worker.mp.mp_worker import MPWorker
+
+# Module level: spawned runner processes import this module.
 
 
 def numbers() -> Iterator[int]:
@@ -26,73 +33,103 @@ def ignore(x: Any) -> None:
     pass
 
 
-def make_runtime(name: str) -> tuple[IcoRuntime, IcoProgress[int]]:
-    progress: IcoProgress[int] = IcoProgress(total=3, name=name)
-    flow = IcoSource(numbers) | progress.stream() | IcoSink(ignore)
-    return IcoRuntime(flow), progress
+def double(x: int) -> int:
+    return x * 2
 
 
-class Counting(RuntimeTreeRenderer):
-    """Counts the events forwarded to it."""
+def worker_flow() -> IcoOperatorProtocol[int, int]:
+    return IcoProgress[int](total=1, name="inner") | IcoOperator(double)
 
-    def __init__(self, console: Console) -> None:
-        super().__init__(console=console)
-        self.events = 0
+
+class Spy(IcoRuntimeTool):
+    """Records the events forwarded to it."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.events: list[IcoRuntimeEvent] = []
 
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
-        self.events += 1
-        super().on_forward_event(event)
+        self.events.append(event)
 
 
-def render(runtime: IcoRuntime) -> tuple[RuntimeTreeRenderer, str]:
-    out = io.StringIO()
-    renderer = RuntimeTreeRenderer(console=Console(file=out, width=160))
-    renderer.render(runtime)
-    return renderer, out.getvalue()
+def make_runtime(name: str) -> tuple[IcoRuntime, IcoProgress[int], Spy]:
+    progress: IcoProgress[int] = IcoProgress(total=3, name=name)
+    spy = Spy()
+    flow = IcoSource(numbers) | progress.stream() | IcoSink(ignore)
+    return IcoRuntime(flow, tools=[spy]), progress, spy
 
 
-def test_describe_leaves_no_subscriber() -> None:
-    runtime, _ = make_runtime("first")
+def test_query_collects_the_answers_of_every_node() -> None:
+    runtime, _, spy = make_runtime("first")
     runtime.activate()
-    tools = list(runtime.toolbox.tools)
 
-    renderer, text = render(runtime)
-    render(runtime)  # twice: the renderer was unsubscribed
+    answers = runtime.query(IcoStateRequestCommand.create())
 
-    assert runtime.toolbox.tools == tools
-    assert renderer.runtime_parent is None
-    assert "Ready" in text
+    nodes = list(runtime.iterate_nodes())
+    assert len(answers) == len(nodes)
+    assert all(isinstance(a, IcoStateEvent) for a in answers)
+    assert len({a.reply_to for a in answers}) == 1
+    assert not any(isinstance(e, IcoStateEvent) for e in spy.events)  # not tools
     runtime.deactivate()
 
 
-def test_runtimes_do_not_share_subscribers() -> None:
-    first, _ = make_runtime("first")
-    second, _ = make_runtime("second")
-    renderer, _ = render(first)
+def test_query_reaches_runners_in_worker_processes() -> None:
+    worker = MPWorker(worker_flow)
+    runtime = IcoRuntime(IcoSource(numbers) | IcoStream(worker) | IcoSink(ignore))
+    runtime.activate()
+    try:
+        answers = runtime.query(IcoStateRequestCommand.create())
+    finally:
+        runtime.deactivate()
 
-    second.activate().run().deactivate()
+    local = len(list(runtime.iterate_nodes()))
+    assert len(answers) > local  # the runner and its progress node answered
+    deepest = max(answers, key=lambda a: len(a.trace.path_index))
+    assert len(deepest.trace.path_index) > 2
 
-    assert renderer not in second.toolbox.tools
-    assert not hasattr(IcoRuntime, "event_listeners")
 
-
-def test_a_failing_node_does_not_leave_the_subscriber(
+def test_a_failed_query_leaves_nothing_pending(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    runtime, progress = make_runtime("broken")
+    runtime, progress, _ = make_runtime("broken")
 
     def fail(command: IcoRuntimeCommand) -> None:
         if isinstance(command, IcoStateRequestCommand):
             raise RuntimeError("no answer")
 
     monkeypatch.setattr(progress, "on_command", fail)
-    renderer = Counting(console=Console(file=io.StringIO()))
     with pytest.raises(RuntimeError, match="no answer"):
-        renderer.render(runtime)
+        runtime.query(IcoStateRequestCommand.create())
+    monkeypatch.undo()
 
-    assert renderer not in runtime.toolbox.tools
-    assert renderer.runtime_parent is None
-    # Events of later runs do not reach it (a shared listener list did).
-    seen = renderer.events
-    make_runtime("later")[0].activate().run().deactivate()
-    assert renderer.events == seen
+    # The next query works as usual and gets every answer.
+    answers = runtime.query(IcoStateRequestCommand.create())
+    assert len(answers) == len(list(runtime.iterate_nodes()))
+
+
+def test_runtimes_do_not_share_answers_or_listeners() -> None:
+    first, _, first_spy = make_runtime("first")
+    second, _, second_spy = make_runtime("second")
+
+    first.query(IcoStateRequestCommand.create())
+    second.activate().run().deactivate()
+
+    assert not any(isinstance(e, IcoStateEvent) for e in second_spy.events)
+    assert not any(isinstance(e, IcoStateEvent) for e in first_spy.events)
+    assert not hasattr(IcoRuntime, "event_listeners")
+
+
+def test_describe_asks_for_states_and_is_not_a_tool() -> None:
+    runtime, _, _ = make_runtime("described")
+    runtime.activate()
+    tools = list(runtime.toolbox.tools)
+    out = io.StringIO()
+    renderer = RuntimeTreeRenderer(console=Console(file=out, width=160))
+
+    renderer.render(runtime)
+    renderer.render(runtime)  # twice: nothing is left subscribed
+
+    assert not isinstance(renderer, IcoRuntimeNode)
+    assert runtime.toolbox.tools == tools
+    assert "Ready" in out.getvalue()
+    runtime.deactivate()

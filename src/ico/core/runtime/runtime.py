@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import itertools
+import threading
 from collections.abc import Sequence
+from dataclasses import replace
 
 from ico.core.operator import IcoOperatorProtocol
+from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
@@ -190,6 +194,9 @@ class IcoRuntime(IcoRuntimeNode):
 
         self.toolbox = IcoRuntimeToolBox(runtime=self, tools=tools)
         self.add_runtime_children(self.toolbox)
+        self._requests = itertools.count(1)
+        self._replies: dict[int, list[IcoRuntimeEvent]] = {}
+        self._replies_lock = threading.Lock()
 
     # ────────────────────────────────────────────────
     # Event coordination and distribution
@@ -226,9 +233,45 @@ class IcoRuntime(IcoRuntimeNode):
         """
         super().on_event(event)
 
+        if event.reply_to is not None:
+            # An answer to a query goes to the one who asked, not to the tools.
+            with self._replies_lock:
+                replies = self._replies.get(event.reply_to)
+                if replies is not None:
+                    replies.append(event)
+            return None
+
         self.toolbox.on_forward_event(event)
 
         return event
+
+    def query(self, command: IcoRuntimeCommand) -> list[IcoRuntimeEvent]:
+        """Broadcast ``command`` and return the events that answer it.
+
+        The command gets a request number; the nodes that answer it bubble
+        events with ``reply_to`` set to that number. They are collected
+        here and not forwarded to the tools. Runners in worker processes
+        answer through their channels before they acknowledge the command,
+        so their answers are collected too.
+
+        Example:
+            >>> states = runtime.query(IcoStateRequestCommand.create())
+            >>> {e.trace.reverse(): e.state for e in states}
+
+        Returns:
+            The answers, in the order they arrived; each one's ``trace`` is
+            its path in the runtime tree.
+        """
+        request = next(self._requests)
+        replies: list[IcoRuntimeEvent] = []
+        with self._replies_lock:
+            self._replies[request] = replies
+        try:
+            self.broadcast_command(replace(command, request=request))
+        finally:
+            with self._replies_lock:
+                del self._replies[request]
+        return replies
 
     # ────────────────────────────────────────────────
     # Flow execution coordination

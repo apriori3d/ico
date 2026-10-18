@@ -4,8 +4,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from ico.core.runtime.command import IcoRuntimeCommand
-from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
     RuntimeTraversalInfo,
@@ -16,7 +14,6 @@ from ico.core.runtime.state import (
     IcoStateEvent,
     IcoStateRequestCommand,
 )
-from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.runtime.worker import IcoRunner
 from ico.core.tree_utils import TreePathIndex
 from ico.describe.rich_style import DescribeStyle
@@ -38,12 +35,11 @@ from ico.describe.utils import import_all_renderers
 RendererTypes: TypeAlias = RuntimeRowRenderer | RuntimeCustomRenderer
 
 
-class RuntimeTreeRenderer(IcoRuntimeTool):
-    """
-    Runtime tree visualization tool using Rich console rendering.
+class RuntimeTreeRenderer:
+    """Renders a runtime tree with the state of every node (Rich console).
 
-    Provides real-time runtime state display with configurable columns,
-    state monitoring, and event-driven updates during execution.
+    The states are asked from the runtime with ``IcoRuntime.query``; the
+    renderer is not a tool of the runtime it draws.
     """
 
     options: RuntimeRendererOptions
@@ -60,8 +56,6 @@ class RuntimeTreeRenderer(IcoRuntimeTool):
         options: RuntimeRendererOptions | None = None,
         console: Console | None = None,
     ) -> None:
-        super().__init__()
-
         self.options = options or RuntimeRendererOptions()
         self.console = console or Console()
 
@@ -80,20 +74,6 @@ class RuntimeTreeRenderer(IcoRuntimeTool):
             table.add_column(column, no_wrap=True)
         return table
 
-    def on_command(self, command: IcoRuntimeCommand) -> None:
-        # While subscribed to collect states, the renderer is a tool of the
-        # runtime it draws: it does not report a state of its own.
-        if isinstance(command, IcoStateRequestCommand):
-            return
-        super().on_command(command)
-
-    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
-        super().on_forward_event(event)
-
-        if isinstance(event, IcoStateEvent):
-            runtime_index = event.trace.reverse()
-            self._node_states[runtime_index] = event.state
-
     @overload
     def render(self, node: IcoRuntime, collect_state: bool = True) -> None: ...
 
@@ -103,17 +83,15 @@ class RuntimeTreeRenderer(IcoRuntimeTool):
     def render(
         self, node: IcoRuntimeNode | IcoRuntime, collect_state: bool = True
     ) -> None:
-        # Use tool api to collect state from all nodes
+        # Ask every node (also in worker processes) for its state.
         if collect_state:
             assert isinstance(node, IcoRuntime)
-            self._node_states = {}
-            # Subscribe as a temporary tool of this runtime only, and always
-            # unsubscribe, also when a node fails to answer.
-            node.toolbox.add_tool(self)
-            try:
-                node.broadcast_command(IcoStateRequestCommand.create())
-            finally:
-                node.toolbox.remove_tool(self)
+            answers = node.query(IcoStateRequestCommand.create())
+            self._node_states = {
+                answer.trace.reverse(): answer.state
+                for answer in answers
+                if isinstance(answer, IcoStateEvent)
+            }
 
         self._table = self._create_table()
 

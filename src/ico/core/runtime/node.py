@@ -181,7 +181,7 @@ class IcoRuntimeNode(ABC):
         if isinstance(command, IcoStateRequestCommand):
             # Respond with current state
             self.bubble_event(
-                IcoStateEvent.create(state=self.state),
+                IcoStateEvent.create(state=self.state, reply_to=command.request),
             )
             return
 
