@@ -280,7 +280,9 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
         assert self.channel is not None
 
         runner_channel = self.channel.invert()  # Invert channel for runner
-        flow_factory = self.flow_factory
+        flow_factory = self.runner_flow_factory
+        if flow_factory is None:
+            flow_factory = self.flow_factory
         name = self.name
 
         # Return a pickleable factory that preserves generic typing

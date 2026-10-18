@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import operator
 import threading
+import time
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Any, cast, final
 
@@ -34,11 +35,12 @@ from ico.tools.profiler.table import (
 
 @final
 class _Frame:
-    __slots__ = ("tokens", "nested")
+    __slots__ = ("tokens", "nested", "began")
 
-    def __init__(self, tokens: list[int], metrics: int) -> None:
+    def __init__(self, tokens: list[int], metrics: int, began: int) -> None:
         self.tokens = tokens
         self.nested = [0] * metrics
+        self.began = began
 
 
 class _Stack(threading.local):
@@ -52,13 +54,19 @@ _stack = _Stack()
 @final
 class NodeProbe:
     """The probe of one node (an ``IcoProbe``): records into ``table`` under
-    ``key``."""
+    ``key``.
 
-    __slots__ = ("key", "table", "_metrics")
+    A ``timed`` probe (async streams and their pool members) also records
+    the busy time of its calls and the active time of its iterators, from
+    ``perf_counter_ns``, for the utilization of pools.
+    """
 
-    def __init__(self, key: str, table: ProfileTable) -> None:
+    __slots__ = ("key", "table", "timed", "_metrics")
+
+    def __init__(self, key: str, table: ProfileTable, *, timed: bool = False) -> None:
         self.key = key
         self.table = table
+        self.timed = timed
         self._metrics = table.metrics
 
     # ─── IcoProbe ───
@@ -94,6 +102,7 @@ class NodeProbe:
         started = [
             (i, m, m.start()) for i, m in enumerate(self._metrics) if not m.thread_bound
         ]
+        began = time.perf_counter_ns() if self.timed else 0
         kind = VALUE
         try:
             return await fn(item)
@@ -104,17 +113,20 @@ class NodeProbe:
             elapsed: list[int | None] = [None] * len(self._metrics)
             for i, metric, token in started:
                 elapsed[i] = metric.stop(token)
-            self.table.shard().record(self.key, kind, elapsed, elapsed)
+            busy = time.perf_counter_ns() - began if self.timed else 0
+            self.table.shard().record(self.key, kind, elapsed, elapsed, busy)
 
     # ─── Frames ───
 
     def enter(self) -> _Frame:
-        frame = _Frame([m.start() for m in self._metrics], len(self._metrics))
+        began = time.perf_counter_ns() if self.timed else 0
+        frame = _Frame([m.start() for m in self._metrics], len(self._metrics), began)
         _stack.frames.append(frame)
         return frame
 
     def exit(self, frame: _Frame, kind: int) -> None:
         elapsed = [m.stop(t) for m, t in zip(self._metrics, frame.tokens, strict=True)]
+        busy = time.perf_counter_ns() - frame.began if self.timed else 0
         frames = _stack.frames
         frames.pop()  # ``frame``: every enter has its exit on the same thread
         own: list[int | None] = [
@@ -124,7 +136,9 @@ class NodeProbe:
             parent = frames[-1].nested
             for i, value in enumerate(elapsed):
                 parent[i] += value
-        self.table.shard().record(self.key, kind, cast(list[int | None], elapsed), own)
+        self.table.shard().record(
+            self.key, kind, cast(list[int | None], elapsed), own, busy
+        )
 
 
 @final
@@ -135,12 +149,14 @@ class _TimedIterator(Iterator[Any]):
     totals use it) and passes ``close()`` on.
     """
 
-    __slots__ = ("_inner", "_probe", "_started")
+    __slots__ = ("_inner", "_probe", "_started", "_began")
 
     def __init__(self, inner: Iterator[Any], probe: NodeProbe) -> None:
         self._inner = inner
         self._probe = probe
         self._started = False
+        self._began = 0
+        """``perf_counter_ns`` at the first ``next()`` (timed probes)."""
 
     def __iter__(self) -> _TimedIterator:
         return self
@@ -148,17 +164,29 @@ class _TimedIterator(Iterator[Any]):
     def __next__(self) -> Any:
         probe = self._probe
         frame = probe.enter()
+        if probe.timed and not self._started and not self._began:
+            self._began = frame.began
         try:
             value = next(self._inner)
         except StopIteration:
             probe.exit(frame, END)
+            self._finish()
             raise
         except BaseException:
             probe.exit(frame, NEXT_ERROR)
+            self._finish()
             raise
         probe.exit(frame, ITEM if self._started else START)
         self._started = True
         return value
+
+    def _finish(self) -> None:
+        """Record the active time of a timed iterator, once."""
+        if self._began:
+            probe = self._probe
+            active = time.perf_counter_ns() - self._began
+            self._began = 0
+            probe.table.shard().record_active(probe.key, active)
 
     def __length_hint__(self) -> int:
         hint = operator.length_hint(self._inner, -1)

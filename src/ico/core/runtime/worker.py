@@ -253,6 +253,10 @@ class IcoWorker(
 
     channel: IcoChannel[I, O] | None
     flow_factory: Callable[[], IcoOperatorProtocol[I, O]]
+    runner_flow_factory: Callable[[], IcoOperatorProtocol[I, O]] | None = None
+    """The factory the runner builds its flow with, when set (a profiler
+    sets one that builds an instrumented flow); else ``flow_factory``. The
+    signature, ``describe`` and the plan keep using ``flow_factory``."""
     subtree_factory: Callable[[], IcoRuntimeNode]
 
     # Placeholder for runner in runtime tree (actual runner exists in separate process).

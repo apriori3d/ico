@@ -7,10 +7,18 @@ import time
 from collections.abc import Callable, Sequence
 from typing import Any, TypedDict, final
 
+from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.tool import IcoRuntimeTool
 from ico.tools.profiler.metrics import DEFAULT_METRICS, IcoMetric
 from ico.tools.profiler.probe import NodeProbe
-from ico.tools.profiler.table import NodeProfile, ProfileTable
+from ico.tools.profiler.remote import IcoProfileEvent, peak_rss
+from ico.tools.profiler.table import (
+    Layout,
+    NodeProfile,
+    ProfileTable,
+    merge_into,
+    profiles,
+)
 
 CALIBRATION_CALLS = 2000
 
@@ -18,6 +26,14 @@ CALIBRATION_CALLS = 2000
 class MetricInfo(TypedDict):
     name: str
     unit: str
+
+
+class ProcessInfo(TypedDict):
+    source: str
+    """``main`` for the process of the tool, else the runtime path of the
+    runner's profile node."""
+    peak_rss: int | None
+    """Peak resident memory in bytes, if known."""
 
 
 class ProfileSnapshot(TypedDict):
@@ -31,6 +47,8 @@ class ProfileSnapshot(TypedDict):
     overhead: float
     """Estimated seconds spent in the probes themselves (in the self time of
     the nodes that called them)."""
+    processes: list[ProcessInfo]
+    """The main process and every runner process that reported."""
     final: bool
 
 
@@ -66,6 +84,8 @@ class ProfilerTool(IcoRuntimeTool):
         "_stop",
         "_emit_lock",
         "_per_frame",
+        "_remote",
+        "_remote_lock",
     )
 
     def __init__(
@@ -102,6 +122,9 @@ class ProfilerTool(IcoRuntimeTool):
         self._stop = threading.Event()
         self._emit_lock = threading.Lock()
         self._per_frame: float | None = None
+        self._remote: dict[str, IcoProfileEvent] = {}
+        """The latest profile of every runner process, by source."""
+        self._remote_lock = threading.Lock()
 
     # ─── Lifecycle ───
 
@@ -109,6 +132,8 @@ class ProfilerTool(IcoRuntimeTool):
         super().on_activate()
         self._frame_cost()  # calibrate before the run, outside its frames
         self.table.reset()
+        with self._remote_lock:
+            self._remote.clear()
         self._started, self._stopped = self.clock(), None
         if self.on_profile is not None and self.interval is not None:
             self._stop.clear()
@@ -131,15 +156,31 @@ class ProfilerTool(IcoRuntimeTool):
     def snapshot(self) -> ProfileSnapshot:
         """The profile measured so far (final after deactivation)."""
         merged = self.table.merged()
+        layout = Layout()
+        layout.update(self.table.layout)
+        processes: list[ProcessInfo] = [{"source": "main", "peak_rss": peak_rss()}]
+        with self._remote_lock:
+            remote = sorted(self._remote.items())
+        for source, event in remote:
+            layout.update(event.layout)
+            merge_into(merged, event.nodes)
+            processes.append({"source": source, "peak_rss": event.peak_rss})
         frames = sum(node.frames for node in merged.values())
         now = self._stopped if self._stopped is not None else self.clock()
         return {
-            "nodes": self.table.profiles(merged),
+            "nodes": profiles(self.table.metrics, layout, merged),
             "metrics": [{"name": m.name, "unit": m.unit} for m in self.table.metrics],
             "elapsed": now - self._started if self._started is not None else 0.0,
             "overhead": frames * self._frame_cost(),
+            "processes": processes,
             "final": self._stopped is not None,
         }
+
+    def on_forward_event(self, event: IcoRuntimeEvent) -> None:
+        super().on_forward_event(event)
+        if isinstance(event, IcoProfileEvent):
+            with self._remote_lock:
+                self._remote[str(event.trace.reverse())] = event
 
     def _tick(self) -> None:
         interval = self.interval

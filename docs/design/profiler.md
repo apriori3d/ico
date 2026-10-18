@@ -1,7 +1,7 @@
 # Profiler: design
 
-Status: item 1 of section 10 implemented (2026-10-18); items 2–4 are
-proposals. Ports the idea of apriori3d/ico#17 (branch
+Status: items 1 and 2 of section 10 implemented (2026-10-18); items 3–4
+are proposals. Ports the idea of apriori3d/ico#17 (branch
 `feature/profiler` and its stash) onto current `main`.
 
 ## 1. Goal
@@ -128,9 +128,12 @@ chain, not its child.
 - **Parallel nodes** (`IcoAsyncStream`): workers run in other threads
   (`asyncio.to_thread`) or processes, so their time does not nest. The
   report shows the stream's wall time per output item and the **pool
-  utilization**: the busy time of its members divided by the stream's
-  active time × `pool_size`. Low utilization means the input is the
-  bottleneck; high utilization means the workers are.
+  utilization**: the busy time of its members (the duration of their
+  calls) divided by the stream's active time (from the first to the final
+  `next()` of each of its iterators) × `pool_size`. Both are measured with
+  `perf_counter_ns` within one process, independently of the metrics. Low
+  utilization means the input is the bottleneck; high utilization means
+  the workers are.
 - **`IcoWorker` portal:** the portal's call time minus the runner's root
   time for the same calls is the transfer overhead (pickling, queues),
   reported per worker key.
@@ -154,9 +157,11 @@ The hook is used instead of replacing `_fn`, because `describe`, the plan
 renderers and signature checks inspect `_fn` (its `__self__`, whether it
 is a bound method). With the hook, `_fn` stays the original. Without a
 probe, the cost is one attribute check per call.
-- `IcoWorker` (and nested workers), in item 2 of section 10:
-  `flow_factory` is replaced by a pickleable
-  `ProfiledFlowFactory(inner, key_prefix, metrics, interval)` (section 4).
+- `IcoWorker` (and nested workers): its `runner_flow_factory` is set to a
+  pickleable `ProfiledFlowFactory(inner, root_key, metrics, interval)`
+  (section 4). `runner_flow_factory` is the factory the runner builds its
+  flow with (`flow_factory` when unset). `flow_factory` itself stays, so
+  the worker's signature and the plan with remote flows do not change.
 
 Properties:
 
@@ -193,15 +198,19 @@ paths; they are unrelated.
 1. It builds the inner flow and instruments it with a table of this
    process. Keys are prefixed with the worker's key, so they match the main
    process's plan. Nested workers are instrumented the same way.
-2. It returns the flow under `_ProfileHost`: an `IcoOperator` (it passes
+2. It returns the flow under `ProfileHost`: an `IcoOperator` (it passes
    items through to the flow) that is also an `IcoRuntimeNode`.
    `IcoRunner` discovers it in the flow (`discover_and_connect_runtime_nodes`)
    like `IcoProgress`.
-3. `_ProfileHost` bubbles `IcoProfileEvent(snapshot)`, which carries this
-   process's cumulative table and its peak RSS:
-   - at most every `interval` seconds (default 1 s), checked on the probe
-     path when a frame closes, so no timer thread is needed;
+3. `ProfileHost` bubbles `IcoProfileEvent(layout, nodes, peak_rss)`, which
+   carries this process's cumulative aggregates, the layout they describe
+   (labels, pools, workers) and the peak RSS:
+   - after an item, at most every `interval` seconds (default 1 s);
    - once more on deactivation (the final one).
+
+   Events are sent from the runner's main thread only, between items, so
+   they never race with items on the worker channel. Pool threads inside
+   the runner never send.
 
 The runner's root flow is wrapped only inside the runner process, so the
 main process's plan is unchanged.
@@ -210,9 +219,12 @@ Snapshots are **cumulative**: a lost or throttled snapshot loses nothing,
 and the tool keeps the latest snapshot per source (the event's trace path,
 unique per runner) and sums over sources.
 
-**To verify in the implementation:** the final event of a runner must
-reach the worker before the runner acknowledges deactivation (a test with
-`MPWorker` and a single item).
+The final event reaches the tool: a runner sends it while handling the
+deactivate command, and the worker waits for the acknowledgement of that
+command, handling the events that come first. Workers deactivate before
+the tools (post-order, the toolbox is the last child of the runtime). Tests
+with `MPWorker` and `interval=None` check this: all runner measurements
+come from the final event.
 
 ### 4.3 The main process
 
@@ -266,9 +278,10 @@ profiler.snapshot()                          # the final ProfileSnapshot
               "std": 0.004, "min": 0.018, "max": 0.061,
               "p50": 0.025, "p95": 0.034, "p99": 0.05},
      "cpu":  {"total": 2.7, "self": 2.6, "count": 120, "...": "..."}},
-   "startup": null, "end": null}],
+   "startup": null, "end": null, "utilization": null, "transfer": null}],
  "metrics": [{"name": "wall", "unit": "s"}, {"name": "cpu", "unit": "s"}],
- "elapsed": 4.2, "overhead": 0.0005, "final": true}
+ "elapsed": 4.2, "overhead": 0.0005,
+ "processes": [{"source": "main", "peak_rss": 512000000}], "final": true}
 ```
 
 - `total` and `self` cover all events of the node; `count` and the
@@ -278,8 +291,10 @@ profiler.snapshot()                          # the final ProfileSnapshot
   final `next()`.
 - `label` is the registry reference, else the node name, else the function
   name, else the class name.
-- Item 2 adds `utilization` (async streams) and `processes` (peak RSS per
-  runner).
+- `utilization` (async streams) and `transfer` (workers) are `null` for
+  other nodes.
+- `processes`: `[{"source": "main", "peak_rss": …}, {"source": "<runtime
+  path of a runner's host>", "peak_rss": …}, …]`.
 - The inclusive subtree time is computed from the plan tree by the report.
 
 ## 7. Presentation
@@ -334,7 +349,7 @@ The metric protocol and the snapshot leave room for each of these.
      length hints kept, merging of shards, thread pools, unchanged
      describe / signature.
 2. **Remote flows.**
-   - What: `ProfiledFlowFactory`, `_ProfileHost`, `IcoProfileEvent`,
+   - What: `ProfiledFlowFactory`, `ProfileHost`, `IcoProfileEvent`,
      merging by source, peak RSS, worker transfer overhead, pool
      utilization.
    - Tests: `MPWorker`, factory pools, a nested worker, the final snapshot

@@ -11,7 +11,10 @@ from ico.core.context_operator import IcoContextOperator
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
 from ico.core.probe import get_probe, set_probe
+from ico.core.runtime.worker import IcoWorker
 from ico.tools.profiler.probe import NodeProbe
+from ico.tools.profiler.remote import ProfiledFlowFactory
+from ico.tools.profiler.table import ProfileTable
 
 if TYPE_CHECKING:
     from ico.tools.profiler.tool import ProfilerTool
@@ -41,16 +44,29 @@ def instrument(flow: F, profiler: ProfilerTool) -> F:
     measured under its first key. The flow stays instrumented: build a flow
     for a profiled run (as :func:`ico.spec.run` does).
 
-    Not measured yet: the flows of workers in other processes (``MPWorker``
-    runners); their portal calls are.
+    The flows of workers (``MPWorker``) are instrumented in their runner
+    processes when the workers activate: their keys continue below the
+    worker's key, as in the plan with remote flows.
 
     Returns:
         ``flow`` itself.
     """
-    table = profiler.table
+    instrument_table(flow, profiler.table, ROOT_KEY, profiler.interval)
+    return flow
+
+
+def instrument_table(
+    flow: IcoNodeProtocol, table: ProfileTable, root_key: str, interval: float | None
+) -> None:
+    """Instrument ``flow`` into ``table``, its root keyed ``root_key``.
+
+    Workers get a runner flow factory that instruments their flow in the
+    runner process (keys continue below the worker's key) and reports it
+    with ``IcoProfileEvent``.
+    """
     seen: set[int] = set()
 
-    def visit(node: IcoNodeProtocol, key: str) -> None:
+    def visit(node: IcoNodeProtocol, key: str, member: bool) -> None:
         if id(node) in seen:
             return
         seen.add(id(node))
@@ -62,20 +78,42 @@ def instrument(flow: F, profiler: ProfilerTool) -> F:
                 node,
             )
             if get_probe(operator) is None:
-                set_probe(operator, NodeProbe(key, table))
+                timed = member or isinstance(node, IcoAsyncStream)
+                set_probe(operator, NodeProbe(key, table, timed=timed))
                 table.add_node(key, label(operator), type(operator).__name__)
-        if (
-            isinstance(node, IcoAsyncStream)
-            and cast(IcoAsyncStream[Any, Any], node).pool_from_factory
-        ):
-            for member in node.children:
-                visit(member, f"{key}.0")
+        if isinstance(node, IcoWorker):
+            _instrument_worker(cast(IcoWorker[Any, Any], node), key, table, interval)
+        if isinstance(node, IcoAsyncStream):
+            stream = cast(IcoAsyncStream[Any, Any], node)
+            members = [
+                (child, f"{key}.0" if stream.pool_from_factory else f"{key}.{i}")
+                for i, child in enumerate(node.children)
+            ]
+            keys = tuple(dict.fromkeys(k for _, k in members))
+            table.layout.pools[key] = (keys, stream.pool_size)
+            for child, child_key in members:
+                visit(child, child_key, True)
             return
         for i, child in enumerate(node.children):
-            visit(child, f"{key}.{i}")
+            visit(child, f"{key}.{i}", False)
 
-    visit(flow, ROOT_KEY)
-    return flow
+    visit(flow, root_key, False)
+
+
+def _instrument_worker(
+    worker: IcoWorker[Any, Any], key: str, table: ProfileTable, interval: float | None
+) -> None:
+    # The runner's flow is the worker's last child in the plan.
+    remote = f"{key}.{len(worker.children)}"
+    table.layout.workers[key] = remote
+    if isinstance(worker.runner_flow_factory, ProfiledFlowFactory):
+        return
+    inner = worker.runner_flow_factory
+    if inner is None:
+        inner = worker.flow_factory
+    worker.runner_flow_factory = ProfiledFlowFactory(
+        inner, remote, table.metrics, interval
+    )
 
 
 def label(node: IcoNodeProtocol) -> str:

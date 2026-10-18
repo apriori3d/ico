@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TypedDict, final
 
 from ico.tools.profiler.metrics import IcoMetric
@@ -53,12 +53,38 @@ class NodeProfile(TypedDict):
     the first item); ``None`` for a node that returned no iterator."""
     end: dict[str, StatsView] | None
     """The final ``next()`` of each iterator (cleanup)."""
+    utilization: float | None
+    """Async streams: the busy time of the pool members divided by the time
+    the stream was active times the pool size."""
+    transfer: float | None
+    """Workers: seconds of portal calls (wall) not spent in the runner's
+    flow: pickling, queues, waiting for the runner."""
 
 
 @dataclass(frozen=True, slots=True)
 class NodeInfo:
     label: str
     type: str
+
+
+@dataclass(slots=True)
+class Layout:
+    """What the aggregates of a table describe; sent with remote snapshots."""
+
+    nodes: dict[str, NodeInfo] = field(default_factory=dict[str, NodeInfo])
+    """Instrumented nodes by key."""
+    pools: dict[str, tuple[tuple[str, ...], int]] = field(
+        default_factory=dict[str, tuple[tuple[str, ...], int]]
+    )
+    """Async stream key → the keys of its pool members and the pool size."""
+    workers: dict[str, str] = field(default_factory=dict[str, str])
+    """Worker key → the key of the root of its runner's flow."""
+
+    def update(self, other: Layout) -> None:
+        for key, info in other.nodes.items():
+            self.nodes.setdefault(key, info)
+        self.pools.update(other.pools)
+        self.workers.update(other.workers)
 
 
 @final
@@ -75,6 +101,8 @@ class NodeAggregate:
         "events",
         "startup",
         "end",
+        "busy",
+        "active",
     )
 
     def __init__(self, metrics: int) -> None:
@@ -87,11 +115,21 @@ class NodeAggregate:
         self.events = [Stats() for _ in range(metrics)]
         self.startup = [Stats() for _ in range(metrics)]
         self.end = [Stats() for _ in range(metrics)]
+        self.busy = 0
+        """Nanoseconds in calls of a pool member (timed probes only)."""
+        self.active = 0
+        """Nanoseconds from the first to the last ``next()`` of each iterator
+        (timed probes only)."""
 
     def record(
-        self, kind: int, elapsed: Sequence[int | None], own: Sequence[int | None]
+        self,
+        kind: int,
+        elapsed: Sequence[int | None],
+        own: Sequence[int | None],
+        busy: int,
     ) -> None:
         self.frames += 1
+        self.busy += busy
         if kind in (VALUE, OPEN, CALL_ERROR):
             self.calls += 1
         elif kind in (START, ITEM):
@@ -120,6 +158,8 @@ class NodeAggregate:
         self.items += other.items
         self.errors += other.errors
         self.frames += other.frames
+        self.busy += other.busy
+        self.active += other.active
         for i in range(len(self.total)):
             self.total[i] += other.total[i]
             self.own[i] += other.own[i]
@@ -146,12 +186,21 @@ class Shard:
         kind: int,
         elapsed: Sequence[int | None],
         own: Sequence[int | None],
+        busy: int = 0,
     ) -> None:
         with self.lock:
-            node = self.nodes.get(key)
-            if node is None:
-                node = self.nodes[key] = NodeAggregate(self.metrics)
-            node.record(kind, elapsed, own)
+            node = self._node(key)
+            node.record(kind, elapsed, own, busy)
+
+    def record_active(self, key: str, active: int) -> None:
+        with self.lock:
+            self._node(key).active += active
+
+    def _node(self, key: str) -> NodeAggregate:
+        node = self.nodes.get(key)
+        if node is None:
+            node = self.nodes[key] = NodeAggregate(self.metrics)
+        return node
 
 
 @final
@@ -165,14 +214,13 @@ class ProfileTable:
         if len(set(names)) != len(names):
             raise ValueError(f"metric names must be unique, got {names}")
         self.metrics: tuple[IcoMetric, ...] = tuple(metrics)
-        self.nodes: dict[str, NodeInfo] = {}
-        """Registered nodes by key, in plan order."""
+        self.layout = Layout()
         self._shards: list[Shard] = []
         self._lock = threading.Lock()
         self._local = threading.local()
 
     def add_node(self, key: str, label: str, type_name: str) -> None:
-        self.nodes.setdefault(key, NodeInfo(label, type_name))
+        self.layout.nodes.setdefault(key, NodeInfo(label, type_name))
 
     def shard(self) -> Shard:
         """The shard of the calling thread."""
@@ -205,39 +253,91 @@ class ProfileTable:
                     target.merge(node)
         return out
 
-    def profiles(self, merged: dict[str, NodeAggregate]) -> list[NodeProfile]:
-        """Profiles of all registered nodes, in plan order."""
-        empty = NodeAggregate(len(self.metrics))
-        out: list[NodeProfile] = []
-        for key, info in self.nodes.items():
-            node = merged.get(key, empty)
-            metrics: dict[str, MetricView] = {}
-            for i, metric in enumerate(self.metrics):
-                view = node.events[i].view(metric.scale)
-                metrics[metric.name] = {
-                    **view,
-                    "total": node.total[i] * metric.scale,
-                    "self": node.own[i] * metric.scale,
-                }
-            out.append(
-                {
-                    "key": key,
-                    "label": info.label,
-                    "type": info.type,
-                    "calls": node.calls,
-                    "items": node.items,
-                    "errors": node.errors,
-                    "metrics": metrics,
-                    "startup": self._phase(node.startup),
-                    "end": self._phase(node.end),
-                }
-            )
-        return out
 
-    def _phase(self, stats: list[Stats]) -> dict[str, StatsView] | None:
-        if all(s.count == 0 for s in stats):
-            return None
-        return {
-            metric.name: stats[i].view(metric.scale)
-            for i, metric in enumerate(self.metrics)
-        }
+def merge_into(
+    target: dict[str, NodeAggregate], source: dict[str, NodeAggregate]
+) -> None:
+    """Add the aggregates of ``source`` (e.g. of another process)."""
+    for key, node in source.items():
+        existing = target.get(key)
+        if existing is None:
+            existing = target[key] = NodeAggregate(len(node.total))
+        existing.merge(node)
+
+
+def profiles(
+    metrics: Sequence[IcoMetric],
+    layout: Layout,
+    merged: dict[str, NodeAggregate],
+) -> list[NodeProfile]:
+    """Profiles of all nodes of ``layout``, in plan order."""
+    empty = NodeAggregate(len(metrics))
+    wall = next((i for i, m in enumerate(metrics) if m.name == "wall"), None)
+    out: list[NodeProfile] = []
+    for key in sorted(layout.nodes, key=_path):
+        info = layout.nodes[key]
+        node = merged.get(key, empty)
+        views: dict[str, MetricView] = {}
+        for i, metric in enumerate(metrics):
+            view = node.events[i].view(metric.scale)
+            views[metric.name] = {
+                **view,
+                "total": node.total[i] * metric.scale,
+                "self": node.own[i] * metric.scale,
+            }
+        out.append(
+            {
+                "key": key,
+                "label": info.label,
+                "type": info.type,
+                "calls": node.calls,
+                "items": node.items,
+                "errors": node.errors,
+                "metrics": views,
+                "startup": _phase(metrics, node.startup),
+                "end": _phase(metrics, node.end),
+                "utilization": _utilization(layout, merged, key),
+                "transfer": _transfer(metrics, layout, merged, key, wall),
+            }
+        )
+    return out
+
+
+def _path(key: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in key.split("."))
+
+
+def _phase(
+    metrics: Sequence[IcoMetric], stats: list[Stats]
+) -> dict[str, StatsView] | None:
+    if all(s.count == 0 for s in stats):
+        return None
+    return {
+        metric.name: stats[i].view(metric.scale) for i, metric in enumerate(metrics)
+    }
+
+
+def _utilization(
+    layout: Layout, merged: dict[str, NodeAggregate], key: str
+) -> float | None:
+    pool = layout.pools.get(key)
+    stream = merged.get(key)
+    if pool is None or stream is None or stream.active <= 0:
+        return None
+    members, size = pool
+    busy = sum(merged[m].busy for m in members if m in merged)
+    return busy / (stream.active * size)
+
+
+def _transfer(
+    metrics: Sequence[IcoMetric],
+    layout: Layout,
+    merged: dict[str, NodeAggregate],
+    key: str,
+    wall: int | None,
+) -> float | None:
+    remote = layout.workers.get(key)
+    if remote is None or wall is None or key not in merged or remote not in merged:
+        return None
+    portal, runner = merged[key].total[wall], merged[remote].total[wall]
+    return max(portal - runner, 0) * metrics[wall].scale
