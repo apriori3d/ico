@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import multiprocessing
+import time
 from collections.abc import Callable
 from multiprocessing import get_context
 from multiprocessing.context import SpawnContext, SpawnProcess
@@ -388,10 +389,8 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
         assert self._runner_process is not None
 
         try:
-            # Gracefully join the runner process
-            if self._runner_process.is_alive():
-                # Wait for worker process to exit
-                self._runner_process.join(timeout=5)
+            # Wait for the runner process to exit
+            _wait_for_exit(self._runner_process, timeout=5)
 
         except Exception as e:
             self.bubble_event(IcoFaultEvent.create(e))
@@ -518,6 +517,22 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
 # ────────────────────────────────────────────────────────────────────────────
 # Pickleable runner factory for cross-process initialization
 # ────────────────────────────────────────────────────────────────────────────
+
+
+def _wait_for_exit(process: SpawnProcess, timeout: float) -> None:
+    """Wait until ``process`` exits or ``timeout`` seconds pass.
+
+    Polls ``waitpid`` (``is_alive``) instead of ``Process.join``: ``join``
+    waits for the process sentinel, a pipe whose write end the runner
+    inherits, and so does every child the runner starts without closing
+    its fds (e.g. ``torch_shm_manager``). Such a child outlives the runner
+    and would make ``join`` wait for the whole timeout.
+    """
+    deadline = time.monotonic() + timeout
+    delay = 0.001
+    while process.is_alive() and time.monotonic() < deadline:
+        time.sleep(delay)
+        delay = min(delay * 2, 0.05)
 
 
 def _exit_if_parent_gone() -> None:

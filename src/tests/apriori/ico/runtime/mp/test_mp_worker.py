@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 import time
 
 import pytest
@@ -193,6 +195,43 @@ def test_worker_clean_shutdown() -> None:
     time.sleep(0.1)
 
     assert not mp_process.is_alive, "Worker process did not exit cleanly"
+
+
+# ───────────────────────────────────────────────
+# Test: A child of the runner does not delay deactivation
+# ───────────────────────────────────────────────
+
+GRANDCHILD_SECONDS = 3.0
+
+
+def start_grandchild(x: float) -> float:
+    """Start a process that inherits the runner's fds and outlives it.
+
+    Like ``torch_shm_manager``, it keeps the write end of the runner's
+    process sentinel open.
+    """
+    subprocess.Popen(
+        [sys.executable, "-c", f"import time; time.sleep({GRANDCHILD_SECONDS})"],
+        close_fds=False,
+    )
+    return x
+
+
+def op_start_grandchild() -> FloatOperator:
+    return FloatOperator(start_grandchild)
+
+
+def test_a_child_of_the_runner_does_not_delay_deactivation() -> None:
+    mp_process = MPWorker(op_start_grandchild)
+    mp_process.activate()
+    assert mp_process(1.0) == 1.0
+
+    start = time.perf_counter()
+    mp_process.deactivate()
+    elapsed = time.perf_counter() - start
+
+    assert not mp_process.is_alive
+    assert elapsed < GRANDCHILD_SECONDS / 2
 
 
 if __name__ == "__main__":
