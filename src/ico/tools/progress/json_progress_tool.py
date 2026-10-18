@@ -10,7 +10,11 @@ from typing import final
 
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import IcoRuntimeNode
-from ico.core.runtime.progress import IcoProgress, IcoProgressEvent
+from ico.core.runtime.progress import (
+    IcoProgress,
+    IcoProgressEvent,
+    IcoProgressTotalEvent,
+)
 from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.tree_utils import TreePathIndex
 
@@ -23,6 +27,8 @@ class _NodeProgress:
     key: str
     label: str
     total: float | None
+    fixed: bool = True
+    """Whether ``total`` is the node's own (else it came from its stream)."""
     done: float = 0.0
     started: float | None = None
     last_emit: float | None = None
@@ -106,7 +112,10 @@ class JsonProgressTool(IcoRuntimeTool):
         if isinstance(node, IcoProgress):
             label = node.name or f"Progress {len(self._nodes)}"
             self._nodes[path] = _NodeProgress(
-                key=str(path), label=label, total=node.total
+                key=str(path),
+                label=label,
+                total=node.total,
+                fixed=node.total is not None,
             )
 
     # ─── Lifecycle ───
@@ -134,6 +143,9 @@ class JsonProgressTool(IcoRuntimeTool):
 
     def on_forward_event(self, event: IcoRuntimeEvent) -> None:
         super().on_forward_event(event)
+        if isinstance(event, IcoProgressTotalEvent):
+            self._start(event)
+            return
         if not isinstance(event, IcoProgressEvent):
             return
 
@@ -151,10 +163,23 @@ class JsonProgressTool(IcoRuntimeTool):
                 # First update, or the next iteration of a finished node.
                 state.done = 0.0
                 state.started = now
+                if finished and not state.fixed:
+                    state.total = None  # a stream total held for one iteration
             state.done += event.advance
             state.dirty = True
             if state.last_emit is None or now - state.last_emit >= 1.0 / self.max_rate:
                 self._emit(state, now)
+
+    def _start(self, event: IcoProgressTotalEvent) -> None:
+        """A node without a fixed total starts an iteration of known size."""
+        state = self._nodes.get(event.trace.reverse())
+        if state is None:
+            return
+        with self._lock:
+            state.total = event.total
+            state.done = 0.0
+            state.started = self.clock()
+            self._emit(state, state.started)
 
     def _emit(self, state: _NodeProgress, now: float) -> None:
         elapsed = now - state.started if state.started is not None else 0.0
