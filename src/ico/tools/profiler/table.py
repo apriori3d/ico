@@ -48,10 +48,11 @@ class NodeProfile(TypedDict):
     items: int
     errors: int
     metrics: dict[str, MetricView]
-    startup: dict[str, StatsView] | None
+    startup: dict[str, MetricView] | None
     """The first ``next()`` of each iterator the node returned (setup before
-    the first item); ``None`` for a node that returned no iterator."""
-    end: dict[str, StatsView] | None
+    the first item); ``None`` for a node that returned no iterator. Its
+    ``self`` excludes the startup of the upstream it pulled."""
+    end: dict[str, MetricView] | None
     """The final ``next()`` of each iterator (cleanup)."""
     utilization: float | None
     """Async streams: the busy time of the pool members divided by the time
@@ -101,6 +102,8 @@ class NodeAggregate:
         "events",
         "startup",
         "end",
+        "startup_own",
+        "end_own",
         "busy",
         "active",
     )
@@ -115,6 +118,8 @@ class NodeAggregate:
         self.events = [Stats() for _ in range(metrics)]
         self.startup = [Stats() for _ in range(metrics)]
         self.end = [Stats() for _ in range(metrics)]
+        self.startup_own = [0] * metrics
+        self.end_own = [0] * metrics
         self.busy = 0
         """Nanoseconds in calls of a pool member (timed probes only)."""
         self.active = 0
@@ -152,6 +157,10 @@ class NodeAggregate:
             self.own[i] += own[i] or 0
             if target is not None:
                 target[i].add(value)
+            if kind == START:
+                self.startup_own[i] += own[i] or 0
+            elif kind == END:
+                self.end_own[i] += own[i] or 0
 
     def merge(self, other: NodeAggregate) -> None:
         self.calls += other.calls
@@ -166,6 +175,8 @@ class NodeAggregate:
             self.events[i].merge(other.events[i])
             self.startup[i].merge(other.startup[i])
             self.end[i].merge(other.end[i])
+            self.startup_own[i] += other.startup_own[i]
+            self.end_own[i] += other.end_own[i]
 
 
 @final
@@ -294,8 +305,8 @@ def profiles(
                 "items": node.items,
                 "errors": node.errors,
                 "metrics": views,
-                "startup": _phase(metrics, node.startup),
-                "end": _phase(metrics, node.end),
+                "startup": _phase(metrics, node.startup, node.startup_own),
+                "end": _phase(metrics, node.end, node.end_own),
                 "utilization": _utilization(layout, merged, key),
                 "transfer": _transfer(metrics, layout, merged, key, wall),
             }
@@ -308,12 +319,17 @@ def _path(key: str) -> tuple[int, ...]:
 
 
 def _phase(
-    metrics: Sequence[IcoMetric], stats: list[Stats]
-) -> dict[str, StatsView] | None:
+    metrics: Sequence[IcoMetric], stats: list[Stats], own: list[int]
+) -> dict[str, MetricView] | None:
     if all(s.count == 0 for s in stats):
         return None
     return {
-        metric.name: stats[i].view(metric.scale) for i, metric in enumerate(metrics)
+        metric.name: {
+            **stats[i].view(metric.scale),
+            "total": stats[i].sum * metric.scale,
+            "self": own[i] * metric.scale,
+        }
+        for i, metric in enumerate(metrics)
     }
 
 
