@@ -238,15 +238,41 @@ function renderPlanTable(plan, profile) {
   return table;
 }
 
-function renderPlan(run, card) {
-  if (!run.has_plan) return;
+// The plan block of a card is created once; polls only update it.
+function createPlan(run) {
   const details = el("details", "plan");
-  details.open = openPlans.has(run.id);
-  const summary = el("summary", null, run.has_profile ? "Pipeline · profile" : "Pipeline");
-  details.append(summary);
+  const summary = el("summary");
   const graph = el("div", "graph");
-  details.append(graph);
-  const fill = async () => {
+  details.append(summary, graph);
+  const view = { details, summary, graph, run, loading: false, shown: null };
+  // Handle the click itself, not the "toggle" event: toggle fires later,
+  // and a poll may have updated the card by then, losing the state.
+  summary.addEventListener("click", (event) => {
+    event.preventDefault();
+    const id = view.run.id;
+    if (openPlans.has(id)) openPlans.delete(id); else openPlans.add(id);
+    details.open = openPlans.has(id);
+    if (details.open) fillPlan(view);
+  });
+  return view;
+}
+
+function updatePlan(view, run) {
+  view.run = run;
+  const title = run.has_profile ? "Pipeline · profile" : "Pipeline";
+  if (view.summary.textContent !== title) view.summary.textContent = title;
+  view.details.open = openPlans.has(run.id);
+  if (view.details.open) fillPlan(view);
+}
+
+// Fetches what is missing or may have changed, and swaps the table only
+// when its data did change: the shown table stays until then, so the plan
+// never blinks.
+async function fillPlan(view) {
+  if (view.loading) return;
+  view.loading = true;
+  const run = view.run;
+  try {
     if (!plans.has(run.id)) plans.set(run.id, await getPlan(run.id));
     const cached = profiles.get(run.id);
     if (run.has_profile && (run.state === "running" || !cached || cached.state !== run.state)) {
@@ -254,41 +280,58 @@ function renderPlan(run, card) {
     }
     const plan = plans.get(run.id);
     const profile = profiles.has(run.id) ? profiles.get(run.id).cells : null;
-    graph.replaceChildren(
-      plan ? renderPlanTable(plan, profile) : el("div", "kind", "no plan"),
-    );
-  };
-  // Handle the click itself, not the "toggle" event: toggle fires later,
-  // and the page may have been re-rendered by then, losing the state.
-  summary.addEventListener("click", (event) => {
-    event.preventDefault();
-    if (openPlans.has(run.id)) openPlans.delete(run.id); else openPlans.add(run.id);
-    details.open = openPlans.has(run.id);
-    if (details.open) fill();
-  });
-  if (details.open) fill();
-  card.append(details);
+    const shown = JSON.stringify([plan, profile]);
+    if (shown !== view.shown) {
+      view.shown = shown;
+      view.graph.replaceChildren(
+        plan ? renderPlanTable(plan, profile) : el("div", "kind", "no plan"),
+      );
+    }
+  } finally {
+    view.loading = false;
+  }
 }
 
-// ─── Runs ───
+// ─── Runs: one card per run, kept between polls and updated in place ───
 
-function renderRun(run) {
-  const card = el("section", "run");
+const cards = new Map(); // run id → {card, live, plan}
+
+// The parts of a card that change with every poll; cheap to rebuild.
+function renderLive(run) {
+  const live = el("div");
   const head = el("div", "head");
   head.append(el("span", "state " + run.state, run.state));
   head.append(el("span", "title", run.title));
   const started = new Date(run.started).toLocaleTimeString();
   head.append(el("span", "time", started + " · " + duration(run.elapsed)));
-  card.append(head);
+  live.append(head);
   if (run.progress.length) {
     const bars = el("div", "bars");
     run.progress.forEach((node) => bars.append(renderBar(node)));
-    card.append(bars);
+    live.append(bars);
   }
-  if (run.summary) card.append(el("div", "summary", run.summary));
-  if (run.error) card.append(el("div", "error", run.error));
-  renderPlan(run, card);
-  return card;
+  if (run.summary) live.append(el("div", "summary", run.summary));
+  if (run.error) live.append(el("div", "error", run.error));
+  return live;
+}
+
+function updateCard(run) {
+  let view = cards.get(run.id);
+  if (!view) {
+    view = { card: el("section", "run"), live: null, plan: null };
+    cards.set(run.id, view);
+  }
+  const live = renderLive(run);
+  if (view.live) view.live.replaceWith(live); else view.card.prepend(live);
+  view.live = live;
+  if (run.has_plan) {
+    if (!view.plan) {
+      view.plan = createPlan(run);
+      view.card.append(view.plan.details);
+    }
+    updatePlan(view.plan, run);
+  }
+  return view.card;
 }
 
 function render(status) {
@@ -299,14 +342,24 @@ function render(status) {
     newestSeen = newest.id;
     openPlans.add(newest.id);
   }
-  const scroll = window.scrollY;
-  root.replaceChildren();
   if (!status.runs.length) {
-    root.append(el("div", "empty", "No runs yet."));
+    cards.clear();
+    root.replaceChildren(el("div", "empty", "No runs yet."));
     return;
   }
-  status.runs.forEach((run) => root.append(renderRun(run)));
-  window.scrollTo(0, scroll);
+  const ids = new Set(status.runs.map((run) => run.id));
+  for (const [id, view] of cards) {
+    if (!ids.has(id)) {
+      view.card.remove();
+      cards.delete(id);
+    }
+  }
+  const empty = root.querySelector(".empty");
+  if (empty) empty.remove();
+  status.runs.forEach((run, i) => {
+    const card = updateCard(run);
+    if (root.children[i] !== card) root.insertBefore(card, root.children[i] || null);
+  });
 }
 
 async function poll() {
