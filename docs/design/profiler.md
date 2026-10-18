@@ -145,8 +145,8 @@ chain, not its child.
 `instrument(flow, profiler)` walks the flow and, for each node:
 
 - `IcoOperator` and subclasses (chain, stream, source, sink, filter,
-  pipeline, worker portal, …): sets the probe hook of the instance
-  (`ico.core.probe.set_probe`). `IcoOperator.__call__` calls
+  pipeline, worker portal, …): sets the public hook `operator.probe`
+  (`ico.core.probe.IcoProbe`). `IcoOperator.__call__` calls
   `probe.call(self._fn, item)` when a probe is set, else `self._fn(item)`.
   Every node calls its children through `child(item)`, so composites are
   measured without special cases.
@@ -157,18 +157,27 @@ The hook is used instead of replacing `_fn`, because `describe`, the plan
 renderers and signature checks inspect `_fn` (its `__self__`, whether it
 is a bound method). With the hook, `_fn` stays the original. Without a
 probe, the cost is one attribute check per call.
-- `IcoWorker` (and nested workers): its `runner_flow_factory` is set to a
-  pickleable `ProfiledFlowFactory(inner, root_key, metrics, interval)`
-  (section 4). `runner_flow_factory` is the factory the runner builds its
-  flow with (`flow_factory` when unset). `flow_factory` itself stays, so
-  the worker's signature and the plan with remote flows do not change.
+- `IcoWorker` (and nested workers): sets the public hook
+  `worker.runner_probe` (`ico.core.probe.IcoRunnerProbe`) to a pickleable
+  `RunnerProfiler(root_key, metrics, interval)` (section 4). The runner
+  builds its flow from `flow_factory` and runs `runner_probe.wrap(flow)`.
+  `flow_factory` stays, so the worker's signature and the plan with remote
+  flows do not change.
+
+Both hooks are public attributes, documented as hooks for tools and `None`
+normally: tools set them from other modules, which a private attribute
+would not allow by convention.
 
 Properties:
 
-- Instrumentation is idempotent: a probed node is skipped.
-- It mutates the given flow. A flow built only for one run (as in
-  `ico.spec.run` and ico-mcp) is the intended use, so no `uninstrument`
-  (YAGNI).
+- Instrumenting twice into one profiler changes nothing; another profiler
+  takes the nodes over (its probes replace the earlier profiler's); probes
+  of other tools are kept.
+- It mutates the given flow, so a profiled run needs a flow of its own,
+  without nodes shared with other flows. Registered functions are shared
+  nodes of the registry: `ico.spec.run(..., profiler=...)` builds the flow
+  fresh (`registry_context(fresh=True)`), so the registry stays
+  uninstrumented. No `uninstrument` (YAGNI).
 - Tests check that `signature`, `describe` and `plan_view` of an
   instrumented flow equal those of the original.
 
@@ -193,9 +202,9 @@ paths; they are unrelated.
 
 ### 4.2 Runner processes
 
-`ProfiledFlowFactory.__call__` runs in the runner process:
+`RunnerProfiler.wrap(flow)` runs in the runner process:
 
-1. It builds the inner flow and instruments it with a table of this
+1. It instruments the flow the runner built with a table of this
    process. Keys are prefixed with the worker's key, so they match the main
    process's plan. Nested workers are instrumented the same way.
 2. It returns the flow under `ProfileHost`: an `IcoOperator` (it passes
@@ -349,7 +358,7 @@ The metric protocol and the snapshot leave room for each of these.
      length hints kept, merging of shards, thread pools, unchanged
      describe / signature.
 2. **Remote flows.**
-   - What: `ProfiledFlowFactory`, `ProfileHost`, `IcoProfileEvent`,
+   - What: `RunnerProfiler`, `ProfileHost`, `IcoProfileEvent`,
      merging by source, peak RSS, worker transfer overhead, pool
      utilization.
    - Tests: `MPWorker`, factory pools, a nested worker, the final snapshot

@@ -368,11 +368,15 @@ def build(
     return registry_context(registry).build(root)
 
 
-def registry_context(registry: IcoRegistry | None = None) -> BuildContext:
+def registry_context(
+    registry: IcoRegistry | None = None, *, fresh: bool = False
+) -> BuildContext:
     """A build context resolving ``op`` references through ``registry``.
 
     Use it instead of :func:`build` to keep ``BuildContext.paths`` after a
-    build, e.g. to locate errors raised while the flow runs.
+    build, e.g. to locate errors raised while the flow runs. ``fresh``
+    creates new instances of registered functions too, instead of using the
+    registered nodes (e.g. for a flow that will be instrumented).
     """
     from ico.registry.registry import default_registry
 
@@ -381,7 +385,7 @@ def registry_context(registry: IcoRegistry | None = None) -> BuildContext:
     def lookup(ref: str) -> _Target:
         return _Target.from_entry(target.get(ref))
 
-    return BuildContext(lookup)
+    return BuildContext(lookup, fresh=fresh)
 
 
 def _signature_text(node: IcoNodeProtocol, fallback: str) -> str:

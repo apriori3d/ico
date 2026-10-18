@@ -85,8 +85,9 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
     """
 
     fn: Callable[[I, C], O]
-    _probe: IcoProbe | None = None
-    """Called instead of ``fn`` when set (see :mod:`ico.core.probe`)."""
+    probe: IcoProbe | None = None
+    """Hook for tools (profilers): when set, called instead of ``fn``;
+    ``None`` normally (see :mod:`ico.core.probe`)."""
 
     def __init__(
         self,
@@ -127,7 +128,7 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
             This delegates to the wrapped function, enabling the operator
             to be used as a callable: operator(item, context).
         """
-        probe = self._probe
+        probe = self.probe
         if probe is None:
             return self.fn(item, context)
         return cast(O, probe.call_with_context(self.fn, item, context))

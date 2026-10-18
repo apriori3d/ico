@@ -1,7 +1,7 @@
 """Profiling in worker runner processes.
 
-A profiled worker's runner builds its flow with :class:`ProfiledFlowFactory`:
-the flow is instrumented into a table of the runner process, with keys
+A profiled worker's ``runner_probe`` is a :class:`RunnerProfiler`: in the
+runner process, it instruments the flow the runner built into a table of the runner process, with keys
 below the worker's key, and wrapped in :class:`ProfileHost`. The host is a
 runtime node of the runner: after an item, at most every ``interval``
 seconds, and once more on deactivation, it bubbles an
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, final
 
@@ -48,28 +48,23 @@ class IcoProfileEvent(IcoRuntimeEvent):
 
 
 @final
-class ProfiledFlowFactory:
-    """A worker's runner flow factory that instruments the flow it builds.
+@dataclass(frozen=True, slots=True)
+class RunnerProfiler:
+    """A worker's ``runner_probe`` (``IcoRunnerProbe``): instruments the flow
+    its runner built and wraps it in a :class:`ProfileHost`.
 
-    Pickleable when the wrapped factory and the metrics are.
+    Pickleable when the metrics are.
     """
 
-    def __init__(
-        self,
-        inner: Callable[[], IcoOperatorProtocol[Any, Any]],
-        root_key: str,
-        metrics: Sequence[IcoMetric],
-        interval: float | None,
-    ) -> None:
-        self.inner = inner
-        self.root_key = root_key
-        self.metrics = tuple(metrics)
-        self.interval = interval
+    root_key: str
+    metrics: tuple[IcoMetric, ...]
+    interval: float | None
 
-    def __call__(self) -> IcoOperatorProtocol[Any, Any]:
+    def wrap(
+        self, flow: IcoOperatorProtocol[Any, Any]
+    ) -> IcoOperatorProtocol[Any, Any]:
         from ico.tools.profiler.instrument import instrument_table
 
-        flow = self.inner()
         table = ProfileTable(self.metrics)
         instrument_table(flow, table, self.root_key, self.interval)
         return ProfileHost(flow, table, self.interval)

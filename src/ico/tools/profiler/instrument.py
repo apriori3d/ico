@@ -10,10 +10,9 @@ from ico.core.async_stream import IcoAsyncStream
 from ico.core.context_operator import IcoContextOperator
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
-from ico.core.probe import get_probe, set_probe
 from ico.core.runtime.worker import IcoWorker
 from ico.tools.profiler.probe import NodeProbe
-from ico.tools.profiler.remote import ProfiledFlowFactory
+from ico.tools.profiler.remote import RunnerProfiler
 from ico.tools.profiler.table import ProfileTable
 
 if TYPE_CHECKING:
@@ -39,10 +38,12 @@ def instrument(flow: F, profiler: ProfilerTool) -> F:
     built from a factory share the key of the first member, as the plan
     shows one of them, so their measurements merge.
 
-    An operator that already has a probe is left as is (instrumenting twice
-    changes nothing), and a node used at several places of the flow is
-    measured under its first key. The flow stays instrumented: build a flow
-    for a profiled run (as :func:`ico.spec.run` does).
+    Instrumenting twice into one profiler changes nothing; another
+    profiler takes the nodes over; probes of other tools are kept. A node
+    used at several places of the flow is measured under its first key. The
+    flow stays instrumented, so build a flow of its own for a profiled run,
+    without shared nodes such as registered functions (as
+    :func:`ico.spec.run` does with a fresh build).
 
     The flows of workers (``MPWorker``) are instrumented in their runner
     processes when the workers activate: their keys continue below the
@@ -60,8 +61,8 @@ def instrument_table(
 ) -> None:
     """Instrument ``flow`` into ``table``, its root keyed ``root_key``.
 
-    Workers get a runner flow factory that instruments their flow in the
-    runner process (keys continue below the worker's key) and reports it
+    Workers get a runner probe that instruments their flow in the runner
+    process (keys continue below the worker's key) and reports it
     with ``IcoProfileEvent``.
     """
     seen: set[int] = set()
@@ -77,9 +78,13 @@ def instrument_table(
                 | IcoAsyncOperator[Any, Any],
                 node,
             )
-            if get_probe(operator) is None:
+            probe = operator.probe
+            # Replace a probe of an earlier profiler, keep other tools' probes.
+            if probe is None or (
+                isinstance(probe, NodeProbe) and probe.table is not table
+            ):
                 timed = member or isinstance(node, IcoAsyncStream)
-                set_probe(operator, NodeProbe(key, table, timed=timed))
+                operator.probe = NodeProbe(key, table, timed=timed)
                 table.add_node(key, label(operator), type(operator).__name__)
         if isinstance(node, IcoWorker):
             _instrument_worker(cast(IcoWorker[Any, Any], node), key, table, interval)
@@ -106,14 +111,10 @@ def _instrument_worker(
     # The runner's flow is the worker's last child in the plan.
     remote = f"{key}.{len(worker.children)}"
     table.layout.workers[key] = remote
-    if isinstance(worker.runner_flow_factory, ProfiledFlowFactory):
-        return
-    inner = worker.runner_flow_factory
-    if inner is None:
-        inner = worker.flow_factory
-    worker.runner_flow_factory = ProfiledFlowFactory(
-        inner, remote, table.metrics, interval
-    )
+    probe = RunnerProfiler(remote, table.metrics, interval)
+    current = worker.runner_probe
+    if current is None or (isinstance(current, RunnerProfiler) and current != probe):
+        worker.runner_probe = probe
 
 
 def label(node: IcoNodeProtocol) -> str:

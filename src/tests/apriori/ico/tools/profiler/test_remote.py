@@ -20,7 +20,7 @@ from ico.tools.profiler import (
     ProfileSnapshot,
     instrument,
 )
-from ico.tools.profiler.remote import ProfiledFlowFactory, ProfileHost
+from ico.tools.profiler.remote import ProfileHost, RunnerProfiler
 from ico.tools.profiler.table import Layout, NodeAggregate, NodeInfo, ProfileTable
 
 # Module-level: spawned runner processes import this module.
@@ -145,23 +145,24 @@ def test_worker_signature_and_plan_with_remote_flows_are_unchanged() -> None:
     instrument(flow, ProfilerTool(interval=None))
     assert (plan_view(flow, options), worker.signature) == before
     assert worker.flow_factory is make_flow
-    assert isinstance(worker.runner_flow_factory, ProfiledFlowFactory)
+    assert isinstance(worker.runner_probe, RunnerProfiler)
 
 
-def test_instrumenting_twice_wraps_the_runner_factory_once() -> None:
+def test_instrumenting_twice_sets_the_runner_probe_once() -> None:
     worker = make_worker()
     profiler = ProfilerTool(interval=None)
     instrument(worker, profiler)
-    factory = worker.runner_flow_factory
+    probe = worker.runner_probe
     instrument(worker, profiler)
-    assert worker.runner_flow_factory is factory
+    assert worker.runner_probe is probe
 
 
-def test_the_runner_factory_and_events_pickle() -> None:
+def test_the_runner_probe_and_events_pickle() -> None:
     worker = make_worker()
     instrument(worker, ProfilerTool(interval=None))
-    factory = pickle.loads(pickle.dumps(worker.runner_flow_factory))
-    host = factory()
+    probe = pickle.loads(pickle.dumps(worker.runner_probe))
+    host = probe.wrap(make_flow())
+    assert isinstance(host, ProfileHost)
     assert host(3) == 6
 
     node = NodeAggregate(2)

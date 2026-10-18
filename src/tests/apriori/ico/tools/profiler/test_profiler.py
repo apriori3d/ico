@@ -2,7 +2,7 @@ import asyncio
 import operator
 import time
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -37,6 +37,11 @@ def inc(x: int) -> int:
 @register("prof.double", 1, registry=REGISTRY)
 def double(x: int) -> int:
     return x * 2
+
+
+def registered() -> list[IcoOperator[Any, Any]]:
+    """The shared registered nodes of this module."""
+    return [cast(IcoOperator[Any, Any], op) for op in (inc, double)]
 
 
 class Clock:
@@ -191,6 +196,26 @@ def test_plan_and_signature_are_unchanged() -> None:
     assert (plan_view(flow), flow.signature) == before
 
 
+def test_spec_export_is_unchanged() -> None:
+    flow = IcoStream(inc | double)
+    before = to_spec(flow)
+    try:
+        instrument(flow, ProfilerTool(interval=None))
+        assert to_spec(flow) == before
+    finally:
+        for node in registered():
+            node.probe = None  # registered nodes are shared
+
+
+def test_another_profiler_takes_the_nodes_over() -> None:
+    first, second = ProfilerTool(interval=None), ProfilerTool(interval=None)
+    op = instrument(IcoOperator(double), first)
+    instrument(op, second)
+    op(1)
+    assert first.snapshot()["nodes"][0]["calls"] == 0
+    assert second.snapshot()["nodes"][0]["calls"] == 1
+
+
 def test_instrumenting_twice_measures_once() -> None:
     profiler = ProfilerTool(interval=None)
     op = instrument(instrument(IcoOperator(inc), profiler), profiler)
@@ -309,3 +334,11 @@ def test_spec_run_with_a_profiler() -> None:
     assert nodes["prof.inc@1"]["calls"] == 1
     assert nodes["prof.double@1"]["key"] == "0.1"
     assert profiler.snapshot()["final"]
+
+
+def test_profiled_spec_runs_do_not_touch_registered_nodes() -> None:
+    profilers = [ProfilerTool(interval=None), ProfilerTool(interval=None)]
+    for profiler in profilers:
+        run(to_spec(inc | double), 3, registry=REGISTRY, profiler=profiler)
+        assert by_label(profiler.snapshot())["prof.inc@1"]["calls"] == 1
+    assert all(node.probe is None for node in registered())

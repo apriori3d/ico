@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Generic
 
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O
+from ico.core.probe import IcoRunnerProbe
 from ico.core.runtime.channel.channel import IcoChannel
 from ico.core.runtime.command import (
     IcoActivateCommand,
@@ -253,10 +254,10 @@ class IcoWorker(
 
     channel: IcoChannel[I, O] | None
     flow_factory: Callable[[], IcoOperatorProtocol[I, O]]
-    runner_flow_factory: Callable[[], IcoOperatorProtocol[I, O]] | None = None
-    """The factory the runner builds its flow with, when set (a profiler
-    sets one that builds an instrumented flow); else ``flow_factory``. The
-    signature, ``describe`` and the plan keep using ``flow_factory``."""
+    runner_probe: IcoRunnerProbe | None = None
+    """Hook for tools (profilers): when set, the runner runs
+    ``runner_probe.wrap(flow)`` instead of the flow it built from
+    ``flow_factory``; ``None`` normally (see :mod:`ico.core.probe`)."""
     subtree_factory: Callable[[], IcoRuntimeNode]
 
     # Placeholder for runner in runtime tree (actual runner exists in separate process).
@@ -587,6 +588,7 @@ class IcoRunner(
         runtime_children: Sequence[IcoRuntimeNode] | None = None,
         state_model: BaseStateModel | None = None,
         name: str | None = None,
+        probe: IcoRunnerProbe | None = None,
     ) -> None:
         """Initialize runner with computation flow and communication channel.
 
@@ -600,6 +602,7 @@ class IcoRunner(
             runtime_children: Additional runtime children for runner's subtree.
             state_model: Custom state model (defaults to RunnerStateModel).
             name: Optional name for runner identification.
+            probe: The worker's ``runner_probe``: wraps the built flow.
 
         Runner Setup:
             • Runtime tree initialization with RunnerStateModel
@@ -614,7 +617,8 @@ class IcoRunner(
             runtime_children=runtime_children,
             state_model=state_model or RunnerStateModel(),
         )
-        self.flow = flow_factory()
+        flow = flow_factory()
+        self.flow = flow if probe is None else probe.wrap(flow)
         self.channel = channel
 
         # Connect to runtime port to enable command and event handling for remote runtime
