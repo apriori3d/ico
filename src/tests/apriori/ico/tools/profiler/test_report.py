@@ -125,3 +125,28 @@ def test_durations() -> None:
         "3.4ms",
         "1.25s",
     )
+
+
+def test_first_call_is_startup_and_rare_outliers_show_their_max() -> None:
+    clock = Clock()
+    calls = 0
+
+    def load(x: int) -> int:
+        nonlocal calls
+        calls += 1
+        # Lazy setup on the first call, one slow call later, else 2ms.
+        clock.advance(500 if calls == 1 else 300 if calls == 20 else 2)
+        return x
+
+    profiler = ProfilerTool(metrics=[FakeWall(clock)], interval=None)
+    op = instrument(IcoOperator(load), profiler)
+    for i in range(40):
+        op(i)
+    [node] = profiler.snapshot()["nodes"]
+    assert node["startup"] is not None
+    assert node["startup"]["wall"]["self"] == 0.5
+    wall = node["metrics"]["wall"]
+    assert (wall["count"], wall["p95"]) == (39, 0.002)
+    [cells] = profile_cells(profiler.snapshot()).values()
+    assert cells["info"] == "startup 500.0ms · max 300.0ms"
+    assert cells["p95"] == "2.0ms"

@@ -86,7 +86,10 @@ def test_a_worker_flow_is_profiled_in_its_runner() -> None:
 
     # The portal's wall time not spent in the runner's flow.
     transfer = portal["transfer"]
-    assert transfer is not None and 0 <= transfer < portal["metrics"]["wall"]["total"]
+    wall = portal["metrics"]["wall"]
+    assert transfer is not None and 0 <= transfer < wall["total"]
+    # The portal waits while the runner works: its self is the transfer.
+    assert wall["self"] == transfer
 
     [main, runner] = snapshot["processes"]
     assert main["source"] == "main" and runner["source"] != "main"

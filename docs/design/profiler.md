@@ -100,6 +100,10 @@ What counts as one event of a node:
     separately: setup (opening a file, loading a model) would otherwise
     distort the max and p99 of the items. A provider that returns a list
     (`yield from load_all()`) shows nearly all its time as `startup`.
+  - The first call of each instance of a node returning values is
+    `startup` too: lazy initialization (opening a dataset in every worker
+    process) stays out of the distribution, so p95 describes the steady
+    state.
   - **`end`** is the time of the final `next()`.
   - An iterator that is not consumed to the end is closed by the garbage
     collector, and that time is not counted.
@@ -136,7 +140,10 @@ chain, not its child.
   the workers are.
 - **`IcoWorker` portal:** the portal's call time minus the runner's root
   time for the same calls is the transfer overhead (pickling, queues),
-  reported per worker key.
+  reported per worker key. The portal waits while its runner works in
+  another process, where frames cannot nest in the portal's, so the
+  portal's self excludes the runner's flow (wall-like metrics): its self is
+  the transfer, not the runner's work counted twice.
 - **Async operators** (`IcoAsyncOperator`): wall time only, without self
   time or CPU time, because a coroutine suspends across `await`.
 
@@ -335,8 +342,9 @@ profiler.snapshot()                          # the final ProfileSnapshot
   - p95: only for nodes with two or more events (no p95 for a sink called
     once).
   - Info: `util` (pools), `transfer` (workers), `startup` (the node's own
-    setup before its first item, at least 1 ms; it excludes the upstream's
-    startup it pulled), errors.
+    setup: first call or first item, at least 1 ms; it excludes the
+    upstream's startup it pulled), `max` when at least 1 ms and 10 × p95
+    (a rare slow call), errors.
   - The hottest node by self time is highlighted.
 - **Rich:** `print_profile(flow, snapshot)`.
 - **Live Board:**

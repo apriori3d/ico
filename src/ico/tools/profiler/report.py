@@ -33,6 +33,10 @@ PROFILE_COLUMNS: tuple[str, ...] = (
 
 STARTUP_MIN = 1e-3
 """Self startup below this (seconds) is not shown."""
+MAX_MIN = 1e-3
+MAX_FACTOR = 10
+"""The max of a node is shown when it is at least ``MAX_MIN`` seconds and
+``MAX_FACTOR`` times its p95: a rare slow call or item."""
 
 
 class ProfileCells(TypedDict):
@@ -54,7 +58,8 @@ class ProfileCells(TypedDict):
     p95: str
     """95th percentile of the wall time of a call or an item."""
     info: str
-    """Pool utilization, worker transfer, iterator startup, errors."""
+    """Pool utilization, worker transfer, startup (first call of a value
+    node, first ``next()`` of an iterator), a max far above p95, errors."""
     share_value: float
     """``share`` as a number (0..1), e.g. for a bar."""
     hot: bool
@@ -191,6 +196,16 @@ def _info(node: NodeProfile) -> str:
     # Its own setup only: not the startup of the upstream it pulled.
     if wall is not None and wall["self"] >= STARTUP_MIN:
         parts.append(f"startup {duration(wall['self'])}")
+    events = node["metrics"].get("wall")
+    if (
+        events is not None
+        and events["count"] >= 2
+        and events["max"] is not None
+        and events["p95"] is not None
+        and events["max"] >= MAX_MIN
+        and events["max"] >= MAX_FACTOR * events["p95"]
+    ):
+        parts.append(f"max {duration(events['max'])}")
     if node["errors"]:
         parts.append(f"{node['errors']} error(s)")
     return " · ".join(parts)
