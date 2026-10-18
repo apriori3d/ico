@@ -12,9 +12,10 @@ bubbles each result as an :class:`IcoSampleEvent` with a short preview and
 gives the probe it replaced (a profiler's) back after ``count`` results.
 Nothing is set until a sample is asked for.
 
-The request reaches runners as an :class:`IcoSampleCommand` without an
-acknowledgment, so it can be sent while a run uses the workers' channels;
-a runner takes it between items. Each process sends at most ``count``
+The request reaches runners as an :class:`IcoSampleCommand` through their
+control lanes, so a runner takes it at once, also in the middle of a long
+item (a video whose frames stream inside the worker). Each process sends
+at most ``count``
 samples: a pool of several workers may send more in all.
 """
 

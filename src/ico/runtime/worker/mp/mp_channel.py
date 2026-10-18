@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from multiprocessing import Queue
 from multiprocessing.context import SpawnContext
-from typing import Generic, final
+from typing import Generic, cast, final
 
 from ico.core.operator import I, O
 from ico.core.runtime.channel.channel import (
@@ -232,7 +232,7 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         • **Process Safety**: All operations safe across process boundaries
     """
 
-    __slots__ = "mp_context"
+    __slots__ = ("mp_context", "control_queue")
 
     mp_context: SpawnContext  # Multiprocessing context for queue creation
 
@@ -248,6 +248,7 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
         accept_commands: bool = True,
         accept_events: bool = True,
         strict_accept: bool = False,
+        control_queue: Queue[DataMessage[None] | RuntimeMessage] | None = None,
     ) -> None:
         """Initialize bidirectional multiprocessing channel with automatic queue creation.
 
@@ -261,6 +262,8 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
             accept_commands: Whether this channel accepts runtime commands.
             accept_events: Whether this channel accepts runtime events.
             strict_accept: Whether to enforce strict command/event acceptance rules.
+            control_queue: The queue of the control lane (worker → runner),
+                shared by a channel and its inverse; a new one by default.
 
         Initialization Process:
             1. **Endpoint Creation**: Auto-create missing endpoints using mp_context
@@ -305,6 +308,11 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
             )
             ```
         """
+        control = (
+            control_queue
+            if control_queue is not None
+            else cast("Queue[DataMessage[None] | RuntimeMessage]", mp_context.Queue())
+        )
         if not send_endpoint:
             sender_queue: Queue[DataMessage[I] | RuntimeMessage] = mp_context.Queue()
             send_endpoint = MPQueueSendEndpoint[I](sender_queue)
@@ -322,8 +330,11 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
             accept_commands=accept_commands,
             accept_events=accept_events,
             strict_accept=strict_accept,
+            control_sender=MPQueueSendEndpoint[None](control),
+            control_receiver=MPQueueReceiveEndpoint[None](control),
         )
         self.mp_context = mp_context
+        self.control_queue = control
 
     def invert(self) -> MPChannel[O, I]:
         """Create inverted channel pair for symmetric worker/runner communication.
@@ -382,4 +393,5 @@ class MPChannel(Generic[I, O], IcoChannel[I, O]):
             accept_commands=not self.accept_commands,
             accept_events=not self.accept_events,
             strict_accept=self.strict_accept,
+            control_queue=self.control_queue,
         )

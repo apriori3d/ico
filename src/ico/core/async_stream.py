@@ -13,7 +13,7 @@ from typing import Any, Generic, Literal, TypeAlias, TypeVar, final, overload
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.operator import I, IcoOperator, O
-from ico.core.runtime.cancel import check_cancelled
+from ico.core.runtime.cancel import IcoCancelled, check_cancelled
 from ico.core.runtime.worker import IcoWorkerDied
 from ico.core.signature import IcoSignature
 
@@ -450,8 +450,9 @@ class IcoAsyncStream(
     def _handle_failure(
         self, index: int, failure: _Failed, errors: list[ItemError]
     ) -> None:
-        """Apply the on_error policy to a failed item (raise, skip or collect)."""
-        if self.on_error == "raise":
+        """Apply the on_error policy to a failed item (raise, skip or collect);
+        a cancelled item ends the stream whatever the policy."""
+        if self.on_error == "raise" or isinstance(failure.error, IcoCancelled):
             raise failure.error
         if self.on_error == "collect":
             errors.append(
@@ -548,7 +549,11 @@ class IcoAsyncStream(
                 return await self._call_async(operator, item)
             except Exception as e:
                 retry = attempt  # number of the retry that would follow
-                if retry > policy.max_retries or not isinstance(e, policy.retry_on):
+                if (
+                    retry > policy.max_retries
+                    or not isinstance(e, policy.retry_on)
+                    or isinstance(e, IcoCancelled)
+                ):
                     return _Failed(e, item, attempt)
                 delay = policy.delay_before(retry)
                 if delay > 0:

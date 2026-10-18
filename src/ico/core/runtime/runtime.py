@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import itertools
 import threading
 from collections.abc import Sequence
@@ -8,7 +9,7 @@ from dataclasses import replace
 from ico.core.node import HasRemoteFlow, IcoNodeProtocol
 from ico.core.operator import IcoOperatorProtocol
 from ico.core.plan_keys import ROOT_KEY, assign_plan_keys, plan_nodes, remote_flow_key
-from ico.core.runtime.cancel import IcoCancelToken, cancellable
+from ico.core.runtime.cancel import IcoCancelCommand, IcoCancelToken, cancellable
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
@@ -207,6 +208,7 @@ class IcoRuntime(IcoRuntimeNode):
         # Plan keys before the tools register the nodes.
         self.plan_root = plan_root if plan_root is not None else closure
         self.cancel_token = cancel if cancel is not None else IcoCancelToken()
+        self.cancel_token.add_listener(self._cancel_runners)
         assign_plan_keys(self.plan_root)
 
         self.toolbox = IcoRuntimeToolBox(runtime=self, tools=tools)
@@ -295,16 +297,17 @@ class IcoRuntime(IcoRuntimeNode):
     # ────────────────────────────────────────────────
 
     def cancel(self, reason: str = "cancelled") -> None:
-        """Stop the run between items, from any thread: the item in progress
-        finishes, ``run`` raises ``IcoCancelled``. Deactivate as usual
-        afterwards; workers stop cleanly."""
+        """Stop the run between items, from any thread: ``run`` raises
+        ``IcoCancelled``. An item in a worker stops between its own inner
+        items (its runner is cancelled too); an item in this process
+        finishes. Deactivate as usual afterwards; workers stop cleanly."""
         self.cancel_token.cancel(reason)
 
     def sample(self, node: str, count: int = 1) -> None:
         """Preview the next ``count`` results of the node at plan key
         ``node``, from any thread, also during a run. Each one comes to the
         tools as an ``IcoSampleEvent`` (see :mod:`ico.core.runtime.sample`);
-        workers take the request while they are active, between items.
+        workers take the request while they are active, at once.
 
         Raises:
             ValueError: ``count`` is below 1, or ``node`` is not in the plan.
@@ -325,6 +328,16 @@ class IcoRuntime(IcoRuntimeNode):
                 if key == remote or key.startswith(remote + "."):
                     return
         raise ValueError(f"no node {key} in the plan")
+
+    def _cancel_runners(self, reason: str) -> None:
+        """Tell the runners of the workers to stop their items too. On a
+        thread of its own: ``cancel`` may be called from a signal handler."""
+
+        def send() -> None:
+            with contextlib.suppress(Exception):  # best effort: workers may be gone
+                self.broadcast_command(IcoCancelCommand(reason=reason))
+
+        threading.Thread(target=send, name="ico-cancel", daemon=True).start()
 
     def run(self) -> IcoRuntime:
         """Execute complete computation flow with runtime coordination and monitoring.
