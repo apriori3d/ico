@@ -341,7 +341,7 @@ class IcoChannel(Generic[I, O], ABC):
 
         Event Propagation:
             Enables distributed event bubbling by forwarding runtime events
-            (state changes, errors, heartbeats) to remote processes.
+            (progress, prints, faults) to remote processes.
         """
         message = EventMessage(self._message_id, payload, ack=wait_for_ack)
         self._send(message)

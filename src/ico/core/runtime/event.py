@@ -25,7 +25,6 @@ class IcoRuntimeEvent:
 
     Event Types:
         • State events: Node lifecycle changes (idle, ready, running, fault)
-        • Heartbeat events: Periodic health and status updates
         • Fault events: Error conditions requiring intervention
         • Progress events: Execution progress and completion status
 
@@ -43,36 +42,6 @@ class IcoRuntimeEvent:
     """The ``request`` of the command this event answers (see
     ``IcoRuntime.query``); ``None`` for an event that is not an answer.
     Answers go to the one who asked, not to the tools."""
-
-
-@final
-@dataclass(slots=True, frozen=True)
-class IcoHeartbeatEvent(IcoRuntimeEvent):
-    """Periodic health check event for runtime tree monitoring.
-
-    IcoHeartbeatEvent provides regular status updates from runtime nodes,
-    enabling monitoring tools to verify that nodes are alive and responsive.
-    Used for distributed system health monitoring and failure detection.
-
-    Heartbeat Architecture:
-        • Periodic generation: Nodes emit heartbeats at regular intervals
-        • Health monitoring: Confirms node responsiveness and availability
-        • Failure detection: Missing heartbeats indicate node problems
-        • Distributed coordination: Enables cluster health awareness
-
-    Usage:
-        Monitoring tools subscribe to heartbeat events to track runtime
-        tree health and detect failed or unresponsive nodes for recovery.
-    """
-
-    @staticmethod
-    def create() -> IcoHeartbeatEvent:
-        """Create new heartbeat event for status monitoring.
-
-        Returns:
-            Heartbeat event with empty trace (to be populated during bubbling).
-        """
-        return IcoHeartbeatEvent(trace=TreePathIndex())
 
 
 @final

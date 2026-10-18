@@ -83,7 +83,6 @@ class IcoPrinter(IcoRuntimeNode):
     Runtime Integration:
         - Embeds in computation flows as runtime child
         - Events captured by print-aware ICO tools
-        - State transitions: ready → running → ready
         - Compatible with distributed execution (events serialize)
 
     Usage Patterns:
@@ -121,14 +120,6 @@ class IcoPrinter(IcoRuntimeNode):
         Args:
             message: Text content to print/output
 
-        Process:
-            1. Transition to running state
-            2. Create and bubble IcoPrintEvent
-            3. Return to ready state
-
-        State Changes:
-            ready → running → ready
-
         Runtime Effects:
             - Event propagates up runtime tree
             - Tools receive event via on_backward_event()
@@ -140,9 +131,7 @@ class IcoPrinter(IcoRuntimeNode):
             printer("Hello World")  # Message sent to runtime tools
             ```
         """
-        self.state_model.running()
         self.bubble_event(IcoPrintEvent.create(message=message))
-        self.state_model.ready()
 
 
 # ─────────────────────────────────────────────

@@ -72,3 +72,32 @@ if __name__ == "__main__":
     import pytest
 
     sys.exit(pytest.main([__file__]))
+
+
+# ──── Test: items do not change states ────
+
+
+def test_items_leave_monitor_states_alone() -> None:
+    from ico.core.runtime.progress import IcoProgress
+    from ico.core.runtime.runtime import IcoRuntime
+
+    progress: IcoProgress[int] = IcoProgress(total=3)
+    seen: list[type] = []
+
+    def look(item: int) -> int:
+        seen.append(type(progress.state))
+        return item
+
+    flow = (
+        IcoSource[int](lambda: iter([1, 2, 3]))
+        | (progress | IcoOperator(look)).stream()
+        | IcoSink[int](lambda item: None)
+    )
+    runtime = IcoRuntime(flow).activate()
+    runtime.run()
+
+    assert seen == [ReadyState] * 3  # not Running while an item passes
+    after_run = type(progress.state)
+    runtime.deactivate()
+    assert after_run is ReadyState
+    assert isinstance(progress.state, IdleState)

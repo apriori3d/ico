@@ -80,7 +80,7 @@ class RuntimeMessage(ChannelMessage):
 
     Runtime Control Categories:
         • Commands: Lifecycle control (activate, run, deactivate)
-        • Events: Status feedback (state changes, errors, heartbeats)
+        • Events: Status feedback (progress, prints, faults)
         • Acknowledgments: Message delivery confirmation
 
     Distributed Runtime Integration:
@@ -106,7 +106,6 @@ class CommandMessage(RuntimeMessage):
 
     Supported Commands:
         • IcoActivateCommand: Resource allocation and runner preparation
-        • IcoRunCommand: Execution initiation across distributed nodes
         • IcoDeactivateCommand: Graceful shutdown and cleanup
 
     Usage:
@@ -136,7 +135,6 @@ class EventMessage(RuntimeMessage):
     Event Types:
         • IcoStateEvent: Runner state changes and lifecycle updates
         • IcoFaultEvent: Error conditions requiring worker intervention
-        • IcoHeartbeatEvent: Runner health and liveness indicators
 
     Usage:
         Critical for distributed error handling, monitoring, and runtime

@@ -101,14 +101,12 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         1. **Computation Flow**: Source → [Progress] → Operator → Sink
         2. **Runtime Tree**: Runtime → Progress (child) → Tools
         3. **Event Bubbling**: Progress events bubble to monitoring tools
-        4. **State Management**: Automatic running/ready state transitions
 
     Progress Tracking Flow:
         1. Data item enters IcoProgress node
-        2. _before_call(): Transitions to running state, generates progress event
+        2. _before_call(): counts the item, generates a progress event
         3. super().__call__(): Identity processing (data passes through unchanged)
-        4. _after_call(): Transitions back to ready state
-        5. Progress event bubbles up runtime tree to tools
+        4. Progress event bubbles up runtime tree to tools
 
     Example - Basic Data Processing Progress:
         ```python
@@ -222,27 +220,8 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         self._count_lock = threading.Lock()
 
     def _before_call(self, item: IInv) -> None:
-        """Process item entry with progress event generation.
-
-        Overrides IcoMonitor._before_call to add progress tracking functionality
-        while maintaining automatic state management and runtime coordination.
-
-        Args:
-            item: Data item about to be processed.
-
-        Progress Tracking:
-            1. Call parent _before_call(): Automatic transition to running state
-            2. Generate IcoProgressEvent: Create progress advancement event
-            3. Bubble event: Send progress event up runtime tree to tools
-
-        Event Flow:
-            IcoProgress → Runtime Tree → Progress Tools → Display Update
-
-        Note:
-            Each item advances progress by 1 unit. Progress tools calculate
-            completion percentage based on item count vs total expected.
-        """
-        super()._before_call(item)
+        """Count the item; bubble an ``IcoProgressEvent`` when one is due
+        (see ``interval``)."""
         advance = self._count()
         if advance:
             self.bubble_event(IcoProgressEvent.create(advance=advance))
