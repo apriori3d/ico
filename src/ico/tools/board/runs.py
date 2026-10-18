@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from typing import Literal, Protocol, TypedDict
 
 from ico.describe.plan.json_renderer import PlanView
+from ico.tools.profiler.report import ProfileCells, profile_cells
+from ico.tools.profiler.tool import ProfileSnapshot
 
 RunState = Literal["running", "done", "failed"]
 
@@ -46,6 +48,7 @@ class RunView(TypedDict):
     error: str | None
     summary: str | None
     has_plan: bool
+    has_profile: bool
 
 
 class BoardSource(Protocol):
@@ -57,6 +60,11 @@ class BoardSource(Protocol):
 
     def plan(self, run_id: str) -> PlanView | None:
         """The plan of a run, if known."""
+        ...
+
+    def profile(self, run_id: str) -> dict[str, ProfileCells] | None:
+        """The profile of a run by plan key (see ``plan["keys"]``), if
+        profiled."""
         ...
 
 
@@ -74,6 +82,7 @@ class BoardRun:
         self._clock = time.monotonic()
         self._duration: float | None = None
         self._progress: dict[str, NodeProgress] = {}
+        self._profile: dict[str, ProfileCells] | None = None
         self._lock = lock
 
     def progress(self, snapshot: ProgressSnapshot) -> None:
@@ -81,6 +90,16 @@ class BoardRun:
         node = _node(snapshot)
         with self._lock:
             self._progress[node["key"]] = node
+
+    def profile(self, snapshot: ProfileSnapshot) -> None:
+        """Keep the latest profile of the run (a ``ProfilerTool`` snapshot)."""
+        cells = profile_cells(snapshot)
+        with self._lock:
+            self._profile = cells
+
+    def profile_cells(self) -> dict[str, ProfileCells] | None:
+        with self._lock:
+            return self._profile
 
     def finish(self, error: str | None = None, *, summary: str | None = None) -> None:
         """Mark the run ``done``, or ``failed`` with an error message.
@@ -111,6 +130,7 @@ class BoardRun:
                 "error": self.error,
                 "summary": self.summary,
                 "has_plan": self.plan is not None,
+                "has_profile": self._profile is not None,
             }
 
 
@@ -143,6 +163,11 @@ class BoardRuns:
         with self._lock:
             run = self._runs.get(run_id)
         return run.plan if run is not None else None
+
+    def profile(self, run_id: str) -> dict[str, ProfileCells] | None:
+        with self._lock:
+            run = self._runs.get(run_id)
+        return run.profile_cells() if run is not None else None
 
 
 def _node(snapshot: ProgressSnapshot) -> NodeProgress:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TypedDict, final
 
@@ -26,6 +26,9 @@ END = 5
 """The ``next()`` that raised ``StopIteration``: in ``end``."""
 NEXT_ERROR = 6
 """A ``next()`` that raised another exception."""
+FIRST = 7
+"""The first call of a node instance that returned a value (lazy setup,
+e.g. opening a dataset): a call, in ``startup``."""
 
 
 class MetricView(StatsView):
@@ -34,7 +37,8 @@ class MetricView(StatsView):
 
     total: float
     self: float
-    """``total`` minus the time of the probed calls nested in it."""
+    """``total`` minus the time of the probed calls nested in it; for a
+    worker portal, also minus its runner's flow (the transfer is left)."""
 
 
 class NodeProfile(TypedDict):
@@ -48,10 +52,14 @@ class NodeProfile(TypedDict):
     items: int
     errors: int
     metrics: dict[str, MetricView]
-    startup: dict[str, StatsView] | None
-    """The first ``next()`` of each iterator the node returned (setup before
-    the first item); ``None`` for a node that returned no iterator."""
-    end: dict[str, StatsView] | None
+    startup: dict[str, MetricView] | None
+    """Setup: the first call of each instance of a node returning values
+    (lazy initialization, e.g. one per worker process), and the first
+    ``next()`` of each iterator a node returned (setup before the first
+    item); ``None`` without either. Kept out of the distribution, so that
+    ``p95`` describes the steady state. Its ``self`` excludes the startup
+    of the upstream an iterator pulled."""
+    end: dict[str, MetricView] | None
     """The final ``next()`` of each iterator (cleanup)."""
     utilization: float | None
     """Async streams: the busy time of the pool members divided by the time
@@ -101,6 +109,8 @@ class NodeAggregate:
         "events",
         "startup",
         "end",
+        "startup_own",
+        "end_own",
         "busy",
         "active",
     )
@@ -115,6 +125,8 @@ class NodeAggregate:
         self.events = [Stats() for _ in range(metrics)]
         self.startup = [Stats() for _ in range(metrics)]
         self.end = [Stats() for _ in range(metrics)]
+        self.startup_own = [0] * metrics
+        self.end_own = [0] * metrics
         self.busy = 0
         """Nanoseconds in calls of a pool member (timed probes only)."""
         self.active = 0
@@ -130,7 +142,7 @@ class NodeAggregate:
     ) -> None:
         self.frames += 1
         self.busy += busy
-        if kind in (VALUE, OPEN, CALL_ERROR):
+        if kind in (VALUE, OPEN, CALL_ERROR, FIRST):
             self.calls += 1
         elif kind in (START, ITEM):
             self.items += 1
@@ -140,7 +152,7 @@ class NodeAggregate:
             self.events
             if kind in (VALUE, ITEM)
             else self.startup
-            if kind == START
+            if kind in (START, FIRST)
             else self.end
             if kind == END
             else None
@@ -152,6 +164,10 @@ class NodeAggregate:
             self.own[i] += own[i] or 0
             if target is not None:
                 target[i].add(value)
+            if kind in (START, FIRST):
+                self.startup_own[i] += own[i] or 0
+            elif kind == END:
+                self.end_own[i] += own[i] or 0
 
     def merge(self, other: NodeAggregate) -> None:
         self.calls += other.calls
@@ -166,6 +182,8 @@ class NodeAggregate:
             self.events[i].merge(other.events[i])
             self.startup[i].merge(other.startup[i])
             self.end[i].merge(other.end[i])
+            self.startup_own[i] += other.startup_own[i]
+            self.end_own[i] += other.end_own[i]
 
 
 @final
@@ -277,13 +295,22 @@ def profiles(
     for key in sorted(layout.nodes, key=_path):
         info = layout.nodes[key]
         node = merged.get(key, empty)
+        own = _without_runner(metrics, layout, merged, key, node.own, lambda r: r.total)
+        startup_own = _without_runner(
+            metrics,
+            layout,
+            merged,
+            key,
+            node.startup_own,
+            lambda r: [s.sum for s in r.startup],
+        )
         views: dict[str, MetricView] = {}
         for i, metric in enumerate(metrics):
             view = node.events[i].view(metric.scale)
             views[metric.name] = {
                 **view,
                 "total": node.total[i] * metric.scale,
-                "self": node.own[i] * metric.scale,
+                "self": own[i] * metric.scale,
             }
         out.append(
             {
@@ -294,12 +321,35 @@ def profiles(
                 "items": node.items,
                 "errors": node.errors,
                 "metrics": views,
-                "startup": _phase(metrics, node.startup),
-                "end": _phase(metrics, node.end),
+                "startup": _phase(metrics, node.startup, startup_own),
+                "end": _phase(metrics, node.end, node.end_own),
                 "utilization": _utilization(layout, merged, key),
                 "transfer": _transfer(metrics, layout, merged, key, wall),
             }
         )
+    return out
+
+
+def _without_runner(
+    metrics: Sequence[IcoMetric],
+    layout: Layout,
+    merged: dict[str, NodeAggregate],
+    key: str,
+    values: list[int],
+    runner: Callable[[NodeAggregate], list[int]],
+) -> list[int]:
+    """Self values of a node. A worker portal waits while its runner works
+    in another process, where the runner's frames cannot nest in the
+    portal's: its self (and self startup) exclude the runner's flow (for
+    metrics that are not thread-bound; its CPU time is its own anyway),
+    leaving the transfer."""
+    out = list(values)
+    remote = merged.get(layout.workers.get(key, ""))
+    if remote is not None:
+        subtract = runner(remote)
+        for i, metric in enumerate(metrics):
+            if not metric.thread_bound:
+                out[i] = max(out[i] - subtract[i], 0)
     return out
 
 
@@ -308,12 +358,17 @@ def _path(key: str) -> tuple[int, ...]:
 
 
 def _phase(
-    metrics: Sequence[IcoMetric], stats: list[Stats]
-) -> dict[str, StatsView] | None:
+    metrics: Sequence[IcoMetric], stats: list[Stats], own: list[int]
+) -> dict[str, MetricView] | None:
     if all(s.count == 0 for s in stats):
         return None
     return {
-        metric.name: stats[i].view(metric.scale) for i, metric in enumerate(metrics)
+        metric.name: {
+            **stats[i].view(metric.scale),
+            "total": stats[i].sum * metric.scale,
+            "self": own[i] * metric.scale,
+        }
+        for i, metric in enumerate(metrics)
     }
 
 

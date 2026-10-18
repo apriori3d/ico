@@ -126,8 +126,10 @@ def test_items_startup_end_and_self_time_of_a_lazy_chain() -> None:
     work = nodes["work"]
     assert (work["calls"], work["items"]) == (3, 0)
     assert work["metrics"]["wall"]["mean"] == 7
+    assert work["metrics"]["wall"]["count"] == 2  # the first call is startup
     assert work["metrics"]["wall"]["self"] == 21
-    assert work["startup"] is None
+    assert work["startup"] is not None
+    assert work["startup"]["wall"]["count"] == 1
 
     # The source is pulled by the stream: its time is the source's, not the
     # stream's, although the source is not a child of the stream.
@@ -265,7 +267,7 @@ def test_context_and_async_operators() -> None:
     flow = instrument(IcoSource(numbers) | pool | IcoSink(ignore), profiler)
     node = by_label(activate_run(flow, profiler))["fetch"]
     assert node["calls"] == 3
-    assert node["metrics"]["wall"]["count"] == 3
+    assert node["metrics"]["wall"]["count"] == 2  # and the first call: startup
     assert node["metrics"]["cpu"]["count"] == 0  # thread-bound: not measured
 
 

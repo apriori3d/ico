@@ -82,6 +82,12 @@
   }
   table.plan td { padding: 0 28px 0 0; white-space: pre; vertical-align: top; }
   table.plan tr:hover td { background: var(--chip); }
+  table.plan th { white-space: nowrap; }
+  table.plan th.num, table.plan td.num { text-align: right; padding: 0 10px; }
+  table.plan td.num { color: var(--muted); font-variant-numeric: tabular-nums; }
+  table.plan td.self { color: var(--text); }
+  table.plan tr.hot td.self { color: var(--fail); font-weight: 600; }
+  table.plan td.info { text-align: left; }
   .s-fn { color: var(--fn); }
   .s-type { color: var(--type); }
   .s-class_ { color: var(--class); }
@@ -110,7 +116,8 @@
 "use strict";
 
 // All data access goes through this adapter, so that the page can be hosted
-// elsewhere (e.g. as an MCP App) by replacing getStatus and getPlan.
+// elsewhere (e.g. as an MCP App) by replacing getStatus, getPlan and
+// getProfile.
 const token = new URLSearchParams(location.search).get("token") || "";
 async function getJson(path) {
   const sep = path.includes("?") ? "&" : "?";
@@ -122,9 +129,15 @@ async function getJson(path) {
 }
 const getStatus = () => getJson("api/runs");
 const getPlan = (runId) => getJson("api/plan?run=" + encodeURIComponent(runId));
+const getProfile = (runId) => getJson("api/profile?run=" + encodeURIComponent(runId));
 
 const POLL_MS = 1000;
 const plans = new Map();     // run id → plan view (fetched once)
+const profiles = new Map();  // run id → {state, cells}: refetched while running and once after
+const PROFILE_COLUMNS = [
+  ["self", "Self"], ["total", "Total"], ["share", "Share of work"], ["cpu", "CPU"],
+  ["count", "Count"], ["p95", "p95"], ["info", "Info"],
+];
 const openPlans = new Set(); // run ids whose plan is expanded
 let newestSeen = null;
 
@@ -184,16 +197,41 @@ function renderCell(cell, tag) {
   return td;
 }
 
-function renderPlanTable(plan) {
+// The profile joins the plan rows by plan key (plan.keys).
+function renderProfileCells(tr, cells) {
+  PROFILE_COLUMNS.forEach(([field]) => {
+    const td = el("td", "num " + field, cells ? cells[field] : "");
+    if (cells && field === "self" && cells.share_value > 0) {
+      // The share of work as a bar behind the self time, from the right.
+      const pct = Math.max(2, Math.round(100 * cells.share_value)) + "%";
+      td.style.backgroundImage =
+        "linear-gradient(to left, var(--track) " + pct + ", transparent " + pct + ")";
+    }
+    tr.append(td);
+  });
+  if (cells && cells.hot) tr.classList.add("hot");
+}
+
+function renderPlanTable(plan, profile) {
   const table = el("table", "plan");
   const head = el("tr");
-  plan.columns.forEach((name) => head.append(el("th", null, name)));
+  // The profile follows the flow column: Flow, profile, Signature, Name.
+  plan.columns.forEach((name, c) => {
+    head.append(el("th", null, name));
+    if (profile && c === 0) PROFILE_COLUMNS.forEach(([, n]) => head.append(el("th", "num", n)));
+  });
   const thead = el("thead");
   thead.append(head);
   const body = el("tbody");
-  plan.rows.forEach((row) => {
+  plan.rows.forEach((row, i) => {
     const tr = el("tr");
-    row.forEach((cell) => tr.append(renderCell(cell, "td")));
+    row.forEach((cell, c) => {
+      tr.append(renderCell(cell, "td"));
+      if (profile && c === 0) {
+        const key = plan.keys ? plan.keys[i] : null;
+        renderProfileCells(tr, key !== null ? profile[key] : null);
+      }
+    });
     body.append(tr);
   });
   table.append(thead, body);
@@ -204,14 +242,21 @@ function renderPlan(run, card) {
   if (!run.has_plan) return;
   const details = el("details", "plan");
   details.open = openPlans.has(run.id);
-  const summary = el("summary", null, "Pipeline");
+  const summary = el("summary", null, run.has_profile ? "Pipeline · profile" : "Pipeline");
   details.append(summary);
   const graph = el("div", "graph");
   details.append(graph);
   const fill = async () => {
     if (!plans.has(run.id)) plans.set(run.id, await getPlan(run.id));
+    const cached = profiles.get(run.id);
+    if (run.has_profile && (run.state === "running" || !cached || cached.state !== run.state)) {
+      profiles.set(run.id, { state: run.state, cells: await getProfile(run.id) });
+    }
     const plan = plans.get(run.id);
-    graph.replaceChildren(plan ? renderPlanTable(plan) : el("div", "kind", "no plan"));
+    const profile = profiles.has(run.id) ? profiles.get(run.id).cells : null;
+    graph.replaceChildren(
+      plan ? renderPlanTable(plan, profile) : el("div", "kind", "no plan"),
+    );
   };
   // Handle the click itself, not the "toggle" event: toggle fires later,
   // and the page may have been re-rendered by then, losing the state.

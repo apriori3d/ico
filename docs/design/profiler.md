@@ -1,7 +1,7 @@
 # Profiler: design
 
-Status: items 1 and 2 of section 10 implemented (2026-10-18); items 3–4
-are proposals. Ports the idea of apriori3d/ico#17 (branch
+Status: items 1–3 of section 10 implemented (2026-10-18); item 4
+(ico-mcp) is a proposal. Ports the idea of apriori3d/ico#17 (branch
 `feature/profiler` and its stash) onto current `main`.
 
 ## 1. Goal
@@ -100,6 +100,10 @@ What counts as one event of a node:
     separately: setup (opening a file, loading a model) would otherwise
     distort the max and p99 of the items. A provider that returns a list
     (`yield from load_all()`) shows nearly all its time as `startup`.
+  - The first call of each instance of a node returning values is
+    `startup` too: lazy initialization (opening a dataset in every worker
+    process) stays out of the distribution, so p95 describes the steady
+    state.
   - **`end`** is the time of the final `next()`.
   - An iterator that is not consumed to the end is closed by the garbage
     collector, and that time is not counted.
@@ -136,7 +140,10 @@ chain, not its child.
   the workers are.
 - **`IcoWorker` portal:** the portal's call time minus the runner's root
   time for the same calls is the transfer overhead (pickling, queues),
-  reported per worker key.
+  reported per worker key. The portal waits while its runner works in
+  another process, where frames cannot nest in the portal's, so the
+  portal's self excludes the runner's flow (wall-like metrics): its self is
+  the transfer, not the runner's work counted twice.
 - **Async operators** (`IcoAsyncOperator`): wall time only, without self
   time or CPU time, because a coroutine suspends across `await`.
 
@@ -320,12 +327,33 @@ profiler.snapshot()                          # the final ProfileSnapshot
 
 ## 7. Presentation
 
-- **Rich:** a `profile` column set for the plan renderer, which prints a
-  self / total / p95 / share column next to each plan row. Profiling then
-  looks like the familiar plan. The hottest node by self time is
-  highlighted.
-- **Live Board:** `BoardRun.profile(snapshot)`, and the plan table shows
-  the same columns, joined by `keys` (section 4.1).
+- **Cells:** `profile_cells(snapshot)` formats every node once, by plan key.
+  Both the Rich report and the Live Board use these cells and join them to
+  plan rows by `keys` (section 4.1).
+- **Columns:** they follow the flow column: Flow, then Self, Total, Share
+  of work, CPU, Count, p95, Info, then Signature and Name.
+  - Self: wall time of the node itself.
+  - Total: self of the node and of the nodes below it in the plan. With
+    parallel pools, it is work summed over threads, so it can exceed the
+    run's wall time.
+  - Share of work: self over the sum of all self times, in all threads and
+    processes.
+  - Count: items for iterator nodes, calls otherwise.
+  - p95: only for nodes with two or more events (no p95 for a sink called
+    once).
+  - Info: `util` (pools), `transfer` (workers), `startup` (the node's own
+    setup: first call or first item, at least 1 ms; it excludes the
+    upstream's startup it pulled), `max` when at least 1 ms and 10 × p95
+    (a rare slow call), errors.
+  - The hottest node by self time is highlighted.
+- **Rich:** `print_profile(flow, snapshot)`.
+- **Live Board:**
+  - `LiveBoardTool(profile=True)` owns a `ProfilerTool` (`tool.profiler`,
+    to instrument the flow with);
+  - `BoardRun.profile(snapshot)` keeps the latest profile and
+    `api/profile?run=` serves the cells;
+  - the page refetches the profile while the run is running and once
+    after it ends.
 - **ico-mcp** (a separate change there):
   - `run(profile=true)`;
   - the kernel attaches the tool and streams `profile` notifications to
