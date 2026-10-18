@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar, Literal, final
 
 CommandBroadcastOrder = Literal["pre", "post"]
@@ -38,6 +38,9 @@ class IcoRuntimeCommand:
     """
 
     broadcast_order: ClassVar[CommandBroadcastOrder] = "pre"
+    request: int | None = field(default=None, kw_only=True)
+    """Set by ``IcoRuntime.query``: the nodes answer with events whose
+    ``reply_to`` is this number."""
 
 
 @final

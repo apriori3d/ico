@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import final
 
 from ico.core.tree_utils import TreePathIndex
@@ -35,6 +35,10 @@ class IcoRuntimeEvent:
     """
 
     trace: TreePathIndex
+    reply_to: int | None = field(default=None, kw_only=True)
+    """The ``request`` of the command this event answers (see
+    ``IcoRuntime.query``); ``None`` for an event that is not an answer.
+    Answers go to the one who asked, not to the tools."""
 
 
 @final

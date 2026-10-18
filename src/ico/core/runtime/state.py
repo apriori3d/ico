@@ -314,13 +314,14 @@ class IcoStateEvent(IcoRuntimeEvent):
     state: IcoRuntimeState
 
     @staticmethod
-    def create(state: IcoRuntimeState) -> IcoStateEvent:
+    def create(state: IcoRuntimeState, reply_to: int | None = None) -> IcoStateEvent:
         """Create new state event with runtime state.
 
         Args:
             state: Current runtime state to include in event.
+            reply_to: The request this event answers, if any.
 
         Returns:
             Event instance for bubbling state information.
         """
-        return IcoStateEvent(state=state, trace=TreePathIndex())
+        return IcoStateEvent(state=state, trace=TreePathIndex(), reply_to=reply_to)
