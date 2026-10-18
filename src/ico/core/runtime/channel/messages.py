@@ -115,6 +115,9 @@ class CommandMessage(RuntimeMessage):
     """
 
     command: IcoRuntimeCommand
+    ack: bool = True
+    """Whether the sender waits for an acknowledgment; a command sent while
+    a run uses the channel (``IcoSampleCommand``) is sent without one."""
 
 
 @dataclass(slots=True, frozen=True)

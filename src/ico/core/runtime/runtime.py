@@ -5,15 +5,16 @@ import threading
 from collections.abc import Sequence
 from dataclasses import replace
 
-from ico.core.node import IcoNodeProtocol
+from ico.core.node import HasRemoteFlow, IcoNodeProtocol
 from ico.core.operator import IcoOperatorProtocol
-from ico.core.plan_keys import assign_plan_keys
+from ico.core.plan_keys import ROOT_KEY, assign_plan_keys, plan_nodes, remote_flow_key
 from ico.core.runtime.cancel import IcoCancelToken, cancellable
 from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
 )
+from ico.core.runtime.sample import IcoSampleCommand, start_sampling
 from ico.core.runtime.state import BaseStateModel
 from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.runtime.toolbox import IcoRuntimeToolBox
@@ -298,6 +299,32 @@ class IcoRuntime(IcoRuntimeNode):
         finishes, ``run`` raises ``IcoCancelled``. Deactivate as usual
         afterwards; workers stop cleanly."""
         self.cancel_token.cancel(reason)
+
+    def sample(self, node: str, count: int = 1) -> None:
+        """Preview the next ``count`` results of the node at plan key
+        ``node``, from any thread, also during a run. Each one comes to the
+        tools as an ``IcoSampleEvent`` (see :mod:`ico.core.runtime.sample`);
+        workers take the request while they are active, between items.
+
+        Raises:
+            ValueError: ``count`` is below 1, or ``node`` is not in the plan.
+        """
+        if count < 1:
+            raise ValueError(f"count must be at least 1, got {count}")
+        command = IcoSampleCommand(node=node, count=count)
+        if not start_sampling(self.plan_root, ROOT_KEY, command, self.bubble_event):
+            self._check_remote_key(node)
+        self.broadcast_command(command)
+
+    def _check_remote_key(self, key: str) -> None:
+        """Accept a key below a worker's remote flow (its runner checks it,
+        without building the flow here); reject any other."""
+        for planned in plan_nodes(self.plan_root):
+            if isinstance(planned.node, HasRemoteFlow):
+                remote = remote_flow_key(planned.key, planned.node)
+                if key == remote or key.startswith(remote + "."):
+                    return
+        raise ValueError(f"no node {key} in the plan")
 
     def run(self) -> IcoRuntime:
         """Execute complete computation flow with runtime coordination and monitoring.

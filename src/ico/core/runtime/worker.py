@@ -16,6 +16,7 @@ from ico.core.runtime.command import (
 )
 from ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
 from ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
+from ico.core.runtime.sample import IcoSampleCommand, start_sampling
 from ico.core.runtime.state import (
     BaseStateModel,
     IcoRuntimeState,
@@ -533,7 +534,9 @@ class IcoWorker(
             case _:
                 if is_ready:
                     assert self.channel is not None
-                    self.channel.send_command(command)
+                    self.channel.send_command(
+                        command, wait_for_ack=command.acknowledged
+                    )
 
         if command.broadcast_order == "post":
             super().on_command(command)
@@ -658,6 +661,8 @@ class IcoRunner(
             assign_plan_keys(flow, flow_key)  # before a probe wraps it
         self.flow = flow if probe is None else probe.wrap(flow)
         self.channel = channel
+        self._plan_flow = flow  # as built, for samples (a probe may wrap it)
+        self._flow_key = flow_key
 
         # Connect to runtime port to enable command and event handling for remote runtime
         channel.runtime_port = self
@@ -752,6 +757,11 @@ class IcoRunner(
             • Distributed coordination: Enables unified runtime tree control
         """
         self.broadcast_command(command)
+
+    def on_command(self, command: IcoRuntimeCommand) -> None:
+        if isinstance(command, IcoSampleCommand) and self._flow_key is not None:
+            start_sampling(self._plan_flow, self._flow_key, command, self.bubble_event)
+        super().on_command(command)
 
     def on_channel_event(self, event: IcoRuntimeEvent) -> None:
         """Handle events that should not be received by runner from worker.
