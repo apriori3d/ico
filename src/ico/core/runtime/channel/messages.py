@@ -141,6 +141,9 @@ class EventMessage(RuntimeMessage):
     """
 
     event: IcoRuntimeEvent
+    ack: bool = True
+    """Whether the sender waits for an acknowledgment; telemetry (progress,
+    profiles, answers to queries) is sent without one."""
 
 
 @dataclass(slots=True, frozen=True)

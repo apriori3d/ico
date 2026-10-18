@@ -784,5 +784,9 @@ class IcoRunner(
             • Distributed propagation: Events cross process boundaries
         """
         # Send event to upstream runtime
-        self.channel.send_event(event)
+        # Telemetry goes without waiting for an acknowledgment (the queue
+        # keeps the order, so answers and final reports still come before
+        # the acknowledgment of the command that caused them); a fault waits,
+        # the worker raises it.
+        self.channel.send_event(event, wait_for_ack=isinstance(event, IcoFaultEvent))
         return super().on_event(event)

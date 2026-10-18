@@ -53,7 +53,7 @@ def collect(**kwargs: Any) -> tuple[list[ProgressSnapshot], JsonProgressTool]:
 
 def test_snapshot_format_and_final_state() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
-    progress: IcoProgress[int] = IcoProgress(total=4, name="items")
+    progress: IcoProgress[int] = IcoProgress(total=4, name="items", interval=0)
     run(numbers(4) | progress.stream(), tool)
 
     initial, first, last = snapshots[0], snapshots[1], snapshots[-1]
@@ -69,7 +69,7 @@ def test_snapshot_format_and_final_state() -> None:
 
 def test_eta_from_rate() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(1.0))
-    progress: IcoProgress[int] = IcoProgress(total=10)
+    progress: IcoProgress[int] = IcoProgress(total=10, interval=0)
     run(numbers(3) | progress.stream(), tool)
 
     second = snapshots[2]  # after the initial one: 2 items, 1 s since start
@@ -79,7 +79,7 @@ def test_eta_from_rate() -> None:
 def test_throttle_per_node_and_final_state() -> None:
     # 0.1 s per event, at most 2 snapshots/s: one every 5 events, plus final.
     snapshots, tool = collect(max_rate=2.0, clock=FakeClock(0.1))
-    progress: IcoProgress[int] = IcoProgress(total=10)
+    progress: IcoProgress[int] = IcoProgress(total=10, interval=0)
     run(numbers(10) | progress.stream(), tool)
 
     assert [s["done"] for s in snapshots] == [0.0, 1.0, 6.0, 10.0]
@@ -87,7 +87,7 @@ def test_throttle_per_node_and_final_state() -> None:
 
 def test_no_duplicate_final_snapshot() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(1.0))
-    progress: IcoProgress[int] = IcoProgress(total=2)
+    progress: IcoProgress[int] = IcoProgress(total=2, interval=0)
     run(numbers(2) | progress.stream(), tool)
 
     assert [s["done"] for s in snapshots] == [0.0, 1.0, 2.0]
@@ -95,7 +95,7 @@ def test_no_duplicate_final_snapshot() -> None:
 
 def test_next_iteration_starts_from_zero() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(1.0))
-    progress: IcoProgress[int] = IcoProgress(total=3)
+    progress: IcoProgress[int] = IcoProgress(total=3, interval=0)
 
     def tick(x: int) -> int:
         return x
@@ -114,9 +114,9 @@ def test_next_iteration_starts_from_zero() -> None:
 
 def test_labels_from_flow() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(1.0))
-    named: IcoProgress[int] = IcoProgress(total=1, name="named")
-    first: IcoProgress[int] = IcoProgress(total=1)
-    second: IcoProgress[int] = IcoProgress(total=1)
+    named: IcoProgress[int] = IcoProgress(total=1, name="named", interval=0)
+    first: IcoProgress[int] = IcoProgress(total=1, interval=0)
+    second: IcoProgress[int] = IcoProgress(total=1, interval=0)
     run(numbers(1) | (named | first | second).stream(), tool)
 
     labels = {str(s["key"]): str(s["label"]) for s in snapshots}
@@ -125,8 +125,8 @@ def test_labels_from_flow() -> None:
 
 def test_initial_snapshots_list_all_nodes_in_flow_order() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(1.0))
-    first: IcoProgress[int] = IcoProgress(total=2, name="first")
-    second: IcoProgress[int] = IcoProgress(total=2, name="second")
+    first: IcoProgress[int] = IcoProgress(total=2, name="first", interval=0)
+    second: IcoProgress[int] = IcoProgress(total=2, name="second", interval=0)
     run(numbers(2) | (first | second).stream(), tool)
 
     initial = snapshots[:2]
@@ -145,7 +145,7 @@ def test_invalid_max_rate() -> None:
 
 
 def make_worker_flow() -> IcoOperator[int, int]:
-    progress: IcoProgress[int] = IcoProgress(total=100, name="Worker")
+    progress: IcoProgress[int] = IcoProgress(total=100, name="Worker", interval=0)
 
     def double(x: int) -> int:
         return x * 2
@@ -168,7 +168,7 @@ def test_worker_progress_has_own_keys() -> None:
 
 def test_unknown_total_counts_up_without_eta() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
-    progress: IcoProgress[int] = IcoProgress(name="scenes")
+    progress: IcoProgress[int] = IcoProgress(name="scenes", interval=0)
     run(numbers(5) | progress.stream(), tool)
 
     assert [s["done"] for s in snapshots] == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
@@ -216,7 +216,7 @@ def by_iteration(snapshots: list[ProgressSnapshot]) -> list[tuple[Any, Any]]:
 
 def test_a_stream_gives_its_length_to_a_progress_without_total() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
-    progress: IcoProgress[int] = IcoProgress(name="scenes")
+    progress: IcoProgress[int] = IcoProgress(name="scenes", interval=0)
     run(videos() | scenes_flow(scenes_list, progress).stream(), tool)
 
     assert by_iteration(snapshots) == [
@@ -234,7 +234,7 @@ def test_a_stream_gives_its_length_to_a_progress_without_total() -> None:
 
 def test_a_generator_gives_no_total() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
-    progress: IcoProgress[int] = IcoProgress(name="scenes")
+    progress: IcoProgress[int] = IcoProgress(name="scenes", interval=0)
     run(videos() | scenes_flow(scenes_gen, progress).stream(), tool)
 
     assert all(s["total"] is None for s in snapshots)
@@ -243,14 +243,14 @@ def test_a_generator_gives_no_total() -> None:
 
 def test_a_fixed_total_is_kept() -> None:
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
-    progress: IcoProgress[int] = IcoProgress(total=10, name="scenes")
+    progress: IcoProgress[int] = IcoProgress(total=10, name="scenes", interval=0)
     run(videos() | scenes_flow(scenes_list, progress).stream(), tool)
 
     assert all(s["total"] == 10 for s in snapshots)
 
 
 def test_only_the_stream_s_own_counters_get_its_length() -> None:
-    inner: IcoProgress[int] = IcoProgress(name="inner")
+    inner: IcoProgress[int] = IcoProgress(name="inner", interval=0)
 
     def numbers_of(n: int) -> Iterator[int]:
         return iter(list(range(n)))
@@ -263,7 +263,7 @@ def test_only_the_stream_s_own_counters_get_its_length() -> None:
 
 
 def make_scene_worker() -> IcoOperator[int, list[int]]:
-    progress: IcoProgress[int] = IcoProgress(name="Worker scenes")
+    progress: IcoProgress[int] = IcoProgress(name="Worker scenes", interval=0)
     return scenes_flow(scenes_list, progress)
 
 

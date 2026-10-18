@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import math
+import threading
+import time
 from dataclasses import dataclass
-from typing import Generic, final
+from typing import Any, Generic, final
 
 from ico.core.operator import IInv
 from ico.core.runtime.event import IcoRuntimeEvent
@@ -71,6 +74,10 @@ class IcoProgressTotalEvent(IcoRuntimeEvent):
 # ────────────────────────────────────────────────
 # Progress monitoring node
 # ────────────────────────────────────────────────
+
+
+DEFAULT_INTERVAL = 0.1
+"""Seconds within which a progress node sums items into one event."""
 
 
 class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
@@ -162,7 +169,7 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         are required, maintaining separation while enabling integration.
     """
 
-    __slots__ = ("total",)
+    __slots__ = ("total", "interval", "_pending", "_last_emit", "_count_lock")
 
     total: float | None  # Expected number of items; None when unknown
 
@@ -171,6 +178,7 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         total: float | None = None,
         *,
         name: str | None = None,
+        interval: float = DEFAULT_INTERVAL,
     ) -> None:
         """Initialize progress tracking node with expected total count.
 
@@ -179,10 +187,18 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
                 node, or ``None`` when the count is not known in advance
                 (tools then show a counter and a rate, without an ETA).
             name: Optional name for progress identification in monitoring tools.
+            interval: Seconds within which items are counted into one
+                event. An item that comes after a pause of at least
+                ``interval`` is reported at once, so slow items are reported
+                one by one; fast ones are summed (``advance = n``) into at
+                most one event per interval, and the rest is sent within an
+                interval, at the end of a stream's iteration and on
+                deactivation. ``0`` reports every item as its own event.
 
         Raises:
             ValueError: If ``total`` is not positive: use ``None`` for an
-                unknown count, so that a wrong total is not hidden.
+                unknown count, so that a wrong total is not hidden; or if
+                ``interval`` is negative.
 
         Initialization:
             • Dual inheritance: Both IcoMonitor and runtime node setup
@@ -194,8 +210,16 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
                 f"progress total must be positive, got {total!r}; "
                 "use no total for an unknown count"
             )
+        if interval < 0:
+            raise ValueError(
+                f"progress interval must not be negative, got {interval!r}"
+            )
         IcoMonitor.__init__(self, name=name)  # pyright: ignore[reportUnknownMemberType]
         self.total = total
+        self.interval = interval
+        self._pending = 0
+        self._last_emit = -math.inf
+        self._count_lock = threading.Lock()
 
     def _before_call(self, item: IInv) -> None:
         """Process item entry with progress event generation.
@@ -219,7 +243,43 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
             completion percentage based on item count vs total expected.
         """
         super()._before_call(item)
-        self.bubble_event(IcoProgressEvent.create(advance=1))
+        advance = self._count()
+        if advance:
+            self.bubble_event(IcoProgressEvent.create(advance=advance))
+
+    def _count(self) -> int:
+        """Count an item; the number of items to report now (0: later)."""
+        with self._count_lock:
+            self._pending += 1
+            now = time.monotonic()
+            if self.interval > 0 and now - self._last_emit < self.interval:
+                return 0
+            advance, self._pending, self._last_emit = self._pending, 0, now
+            return advance
+
+    def flush(self, *, due_only: bool = False) -> None:
+        """Report the items counted and not reported yet; with ``due_only``,
+        only when the last report is at least ``interval`` old."""
+        with self._count_lock:
+            now = time.monotonic()
+            if not self._pending or (
+                due_only and now - self._last_emit < self.interval
+            ):
+                return
+            advance, self._pending, self._last_emit = self._pending, 0, now
+        self.bubble_event(IcoProgressEvent.create(advance=advance))
+
+    def on_activate(self) -> None:
+        super().on_activate()
+        with self._count_lock:
+            self._pending, self._last_emit = 0, -math.inf
+        if self.interval > 0:
+            _flusher.add(self)
+
+    def on_deactivate(self) -> None:
+        _flusher.remove(self)
+        self.flush()
+        super().on_deactivate()
 
     def start(self, total: float) -> None:
         """Start an iteration of ``total`` items, for a node without a fixed
@@ -229,5 +289,44 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         Python knows it (``iter(list)``, ``iter(range(...))``), so a node
         counting the stream's items shows a percentage and an ETA.
         """
+        self.flush()  # the items of the previous iteration first
         if self.total is None:
             self.bubble_event(IcoProgressTotalEvent.create(total))
+
+
+class _Flusher:
+    """Sends the items progress nodes counted and have not reported, at most
+    one interval late, from one daemon thread per process; the thread runs
+    while some progress node is active."""
+
+    def __init__(self) -> None:
+        self._nodes: set[IcoProgress[Any]] = set()
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+
+    def add(self, node: IcoProgress[Any]) -> None:
+        with self._lock:
+            self._nodes.add(node)
+            if self._thread is None:
+                self._thread = threading.Thread(
+                    target=self._run, name="ico-progress-flush", daemon=True
+                )
+                self._thread.start()
+
+    def remove(self, node: IcoProgress[Any]) -> None:
+        with self._lock:
+            self._nodes.discard(node)
+
+    def _run(self) -> None:
+        while True:
+            time.sleep(DEFAULT_INTERVAL)
+            with self._lock:
+                nodes = list(self._nodes)
+                if not nodes:
+                    self._thread = None
+                    return
+            for node in nodes:
+                node.flush(due_only=True)
+
+
+_flusher = _Flusher()
