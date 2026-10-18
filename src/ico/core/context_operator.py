@@ -5,6 +5,7 @@ from typing import Any, Generic, Protocol, TypeVar, cast, overload, runtime_chec
 
 from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.operator import I, O
+from ico.core.probe import IcoProbe
 from ico.core.signature import IcoSignature
 
 # ────────────────────────────────────────────────
@@ -84,6 +85,8 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
     """
 
     fn: Callable[[I, C], O]
+    _probe: IcoProbe | None = None
+    """Called instead of ``fn`` when set (see :mod:`ico.core.probe`)."""
 
     def __init__(
         self,
@@ -124,7 +127,10 @@ class IcoContextOperator(Generic[I, C, O], IcoNode):
             This delegates to the wrapped function, enabling the operator
             to be used as a callable: operator(item, context).
         """
-        return self.fn(item, context)
+        probe = self._probe
+        if probe is None:
+            return self.fn(item, context)
+        return cast(O, probe.call_with_context(self.fn, item, context))
 
     @property
     def signature(self) -> IcoSignature:

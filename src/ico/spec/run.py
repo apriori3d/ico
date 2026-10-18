@@ -20,6 +20,7 @@ from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError, is_json
 if TYPE_CHECKING:
     from ico.core.runtime.tool import IcoRuntimeTool
     from ico.registry.registry import IcoRegistry
+    from ico.tools.profiler import ProfilerTool
 
 DEFAULT_MAX_ITEMS = 100
 
@@ -91,6 +92,7 @@ def run(
     max_items: int = DEFAULT_MAX_ITEMS,
     tools: Sequence[IcoRuntimeTool] = (),
     params: Mapping[str, JsonValue] | None = None,
+    profiler: ProfilerTool | None = None,
 ) -> RunResult:
     """Build a spec and run it once.
 
@@ -107,6 +109,9 @@ def run(
             progress to the caller.
         params: Values of the pipeline parameters of this run (see
             :mod:`ico.spec.params`); defaults apply to the others.
+        profiler: Profiles the run: the built flow is instrumented (keys
+            are paths in the plan of the spec's flow) and the tool is
+            attached; read the profile with ``profiler.snapshot()``.
 
     Returns:
         A :class:`RunResult`.
@@ -130,6 +135,12 @@ def run(
     root = spec.root if isinstance(spec, PipelineSpec) else spec
     context = registry_context(registry)
     flow = cast(IcoOperatorProtocol[Any, Any], context.build(root))
+    if profiler is not None:
+        from ico.tools.profiler import instrument
+
+        instrument(flow, profiler)
+        if profiler not in tools:
+            tools = [*tools, profiler]
 
     outputs: list[JsonValue] = []
     total = 0
