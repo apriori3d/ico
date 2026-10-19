@@ -20,6 +20,8 @@ class SampleSnapshot(TypedDict):
     index: int
     type: str
     preview: str
+    recent: bool
+    """A recent result (``IcoRuntime.keep_recent``), not one asked for."""
 
 
 @final
@@ -49,5 +51,6 @@ class JsonSampleTool(IcoRuntimeTool):
                     "index": event.index,
                     "type": event.type,
                     "preview": event.preview,
+                    "recent": event.recent,
                 }
             )
