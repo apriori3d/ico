@@ -320,19 +320,35 @@ class RecentProbe:
         return result
 
 
+def is_leaf_operator(node: IcoNodeProtocol) -> bool:
+    """Whether ``node`` is an operator of the domain: a wrapped function
+    (exactly ``IcoOperator``, ``IcoAsyncOperator`` or
+    ``IcoContextOperator``) or a class defined outside ICO; not a
+    structural node of the core."""
+    from ico.core.async_operator import IcoAsyncOperator
+    from ico.core.context_operator import IcoContextOperator
+    from ico.core.operator import IcoOperator
+
+    kind = type(node)
+    if kind in (IcoOperator, IcoAsyncOperator, IcoContextOperator):
+        return True
+    return is_sampled_kind(node) and not kind.__module__.startswith("ico.")
+
+
 def keep_recent(
     flow: IcoNodeProtocol,
     root_key: str,
     interval: float,
     emit: Callable[[IcoRuntimeEvent], None],
 ) -> None:
-    """Set a recent probe on every operator of ``flow`` (keyed from
+    """Set a recent probe on every leaf operator of ``flow`` (keyed from
     ``root_key``), over the probes already there (a profiler's); a second
-    call changes nothing."""
+    call changes nothing. Structural nodes (chains, progress, sinks, worker
+    portals, ...) are left out: their results repeat their neighbours'."""
     seen: set[int] = set()
     for planned in plan_nodes(flow, root_key=root_key):
         node = planned.node
-        if id(node) in seen or not is_sampled_kind(node):
+        if id(node) in seen or not is_leaf_operator(node):
             continue
         seen.add(id(node))
         operator = cast(Any, node)

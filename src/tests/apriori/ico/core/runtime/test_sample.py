@@ -295,9 +295,38 @@ def test_recent_results_are_previewed_now_and_then() -> None:
     assert 2 <= len(recent) <= 6  # about one per 0.1 s of 0.4 s, not 40
     assert [s["index"] for s in recent] == list(range(len(recent)))
     assert all(s["type"] == "int" for s in recent)
-    # Iterators (the source, the stream) are not previewed.
-    assert not any(s["preview"].startswith("<iterator") for s in samples.items)
+    # Only leaf operators: not the source and stream (iterators), the chain
+    # or the sink, whose results repeat their neighbours'.
+    assert {s["node"] for s in samples.items} == {key_of(flow, op)}
     assert isinstance(op.probe, RecentProbe)
+    structural = [p.node for p in plan_nodes(flow) if p.node is not op]
+    assert not any(
+        isinstance(getattr(n, "probe", None), RecentProbe) for n in structural
+    )
+
+
+def test_recent_leaves_out_progress_and_keeps_domain_classes() -> None:
+    from ico.core.runtime.progress import IcoProgress
+
+    class Halve(IcoOperator[int, int]):  # a domain class operator
+        def __init__(self) -> None:
+            super().__init__(fn=lambda x: x // 2)
+
+    progress = IcoProgress[int]()
+    halve = Halve()
+    flow = (
+        IcoSource(numbers)
+        | IcoStream(progress | IcoOperator(slow_double) | halve)
+        | IcoSink(ignore)
+    )
+    samples = Samples()
+    runtime = IcoRuntime(flow, tools=[samples.tool]).activate()
+    runtime.keep_recent(interval=0.1)
+    runtime.run().deactivate()
+
+    assert isinstance(halve.probe, RecentProbe)
+    assert not isinstance(progress.probe, RecentProbe)
+    assert key_of(flow, halve) in {s["node"] for s in samples.items}
 
 
 def test_recent_results_come_from_workers_and_keep_the_profiler() -> None:
