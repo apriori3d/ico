@@ -15,7 +15,13 @@ from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import (
     IcoRuntimeNode,
 )
-from ico.core.runtime.sample import IcoSampleCommand, start_sampling
+from ico.core.runtime.sample import (
+    RECENT_INTERVAL,
+    IcoRecentCommand,
+    IcoSampleCommand,
+    keep_recent,
+    start_sampling,
+)
 from ico.core.runtime.state import BaseStateModel
 from ico.core.runtime.tool import IcoRuntimeTool
 from ico.core.runtime.toolbox import IcoRuntimeToolBox
@@ -318,6 +324,15 @@ class IcoRuntime(IcoRuntimeNode):
         if not start_sampling(self.plan_root, ROOT_KEY, command, self.bubble_event):
             self._check_remote_key(node)
         self.broadcast_command(command)
+
+    def keep_recent(self, interval: float = RECENT_INTERVAL) -> None:
+        """Preview a result of every operator at most every ``interval``
+        seconds, also in workers (while they are active), as
+        ``IcoSampleEvent`` with ``recent``: what already passed a node can
+        be looked at later. Call it after ``activate``; it costs a clock
+        read per call of an operator."""
+        keep_recent(self.plan_root, ROOT_KEY, interval, self.bubble_event)
+        self.broadcast_command(IcoRecentCommand(interval=interval))
 
     def _check_remote_key(self, key: str) -> None:
         """Accept a key below a worker's remote flow (its runner checks it,

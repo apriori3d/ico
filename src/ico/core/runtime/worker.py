@@ -25,7 +25,12 @@ from ico.core.runtime.command import (
 from ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
 from ico.core.runtime.exceptions import IcoRuntimeError
 from ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
-from ico.core.runtime.sample import IcoSampleCommand, start_sampling
+from ico.core.runtime.sample import (
+    IcoRecentCommand,
+    IcoSampleCommand,
+    keep_recent,
+    start_sampling,
+)
 from ico.core.runtime.state import (
     BaseStateModel,
     IcoRuntimeState,
@@ -807,6 +812,10 @@ class IcoRunner(
     def on_command(self, command: IcoRuntimeCommand) -> None:
         if isinstance(command, IcoSampleCommand) and self._flow_key is not None:
             start_sampling(self._plan_flow, self._flow_key, command, self.bubble_event)
+        elif isinstance(command, IcoRecentCommand) and self._flow_key is not None:
+            keep_recent(
+                self._plan_flow, self._flow_key, command.interval, self.bubble_event
+            )
         elif isinstance(command, IcoCancelCommand):
             self._cancel.cancel(command.reason)
         super().on_command(command)
