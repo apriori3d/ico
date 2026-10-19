@@ -21,9 +21,10 @@ samples: a pool of several workers may send more in all.
 
 from __future__ import annotations
 
+import dataclasses
 import reprlib
 import threading
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, ClassVar, cast, final
 
@@ -34,7 +35,7 @@ from ico.core.runtime.command import IcoRuntimeCommand
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.tree_utils import TreePathIndex
 
-PREVIEW_CHARS = 200
+PREVIEW_CHARS = 400
 
 
 @final
@@ -80,21 +81,86 @@ _repr.maxlist = _repr.maxtuple = _repr.maxset = _repr.maxdict = 8
 
 def preview(value: object, max_chars: int = PREVIEW_CHARS) -> str:
     """A short text of ``value``: arrays and tensors by shape and dtype,
-    iterators by type, anything else by a shortened ``repr``."""
+    iterators by type, dataclasses and Pydantic models field by field
+    (each field shortened on its own, so that scalars after a large field
+    stay visible), lists and dicts by their first items and length,
+    anything else by a shortened ``repr``."""
+    return _cut(_preview(value, 0), max_chars)
+
+
+FIELD_CHARS = 60
+"""A field or element of a structured value is cut to this."""
+_ITEMS = 4
+_DEPTH = 2
+
+
+def _cut(text: str, max_chars: int) -> str:
+    return text if len(text) <= max_chars else text[: max_chars - 1] + "…"
+
+
+def _fields(value: object) -> list[str] | None:
+    """The field names of a dataclass instance or a Pydantic model."""
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return [f.name for f in dataclasses.fields(value)]
+    model_fields: object = getattr(type(value), "model_fields", None)
+    if isinstance(model_fields, dict):
+        return [str(name) for name in cast(dict[object, object], model_fields)]
+    return None
+
+
+def _sequence(
+    items: Sequence[object], open_: str, close: str, budget: int, depth: int
+) -> str:
+    """The first items that fit in ``budget``, then the length: the length
+    is never cut away."""
+    more = f"… {len(items)} items"
+    shown: list[str] = []
+    for i, item in enumerate(items[:_ITEMS]):
+        part = _cut(_preview(item, depth + 1), FIELD_CHARS)
+        rest = "" if i == len(items) - 1 else f", {more}"
+        if len(open_ + ", ".join([*shown, part]) + rest + close) > budget and shown:
+            break
+        shown.append(part)
+    if len(shown) < len(items):
+        shown.append(more)
+    return f"{open_}{', '.join(shown)}{close}"
+
+
+def _preview(value: object, depth: int) -> str:
     shape: object = getattr(value, "shape", None)
     dtype: object = getattr(value, "dtype", None)
     kind = type(value).__name__
     if shape and dtype is not None:
         dims = tuple(cast(tuple[int, ...], shape))
-        text = f"{kind}(shape={dims}, dtype={dtype})"
-    elif isinstance(value, Iterator):
-        text = f"<iterator {kind}>"
-    else:
-        try:
-            text = _repr.repr(value)
-        except Exception as e:
-            text = f"<repr failed: {type(e).__name__}>"
-    return text if len(text) <= max_chars else text[: max_chars - 1] + "…"
+        return f"{kind}(shape={dims}, dtype={dtype})"
+    if isinstance(value, Iterator):
+        return f"<iterator {kind}>"
+    if depth < _DEPTH:
+        names = _fields(value)
+        if names is not None:
+            parts = [
+                f"{name}={_cut(_preview(getattr(value, name, None), depth + 1), FIELD_CHARS)}"
+                for name in names
+            ]
+            return f"{kind}({', '.join(parts)})"
+        if isinstance(value, list | tuple):
+            items = cast(list[object] | tuple[object, ...], value)
+            open_, close = ("[", "]") if isinstance(value, list) else ("(", ")")
+            budget = FIELD_CHARS if depth > 0 else PREVIEW_CHARS
+            return _sequence(items, open_, close, budget, depth)
+        if isinstance(value, dict):
+            entries = list(cast(dict[object, object], value).items())
+            shown = [
+                f"{_cut(repr(k), FIELD_CHARS)}: {_cut(_preview(v, depth + 1), FIELD_CHARS)}"
+                for k, v in entries[:_ITEMS]
+            ]
+            if len(entries) > _ITEMS:
+                shown.append(f"… {len(entries)} items")
+            return "{" + ", ".join(shown) + "}"
+    try:
+        return _repr.repr(value)
+    except Exception as e:
+        return f"<repr failed: {type(e).__name__}>"
 
 
 class _Budget:
