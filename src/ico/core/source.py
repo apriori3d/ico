@@ -1,6 +1,7 @@
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, Generic, final
 
+from ico.core.length import passing_length
 from ico.core.operator import (
     IcoOperator,
     O,
@@ -87,7 +88,11 @@ class IcoSource(
             This is the function used by __call__. It calls the provider
             and yields each item, converting any Iterable to an Iterator.
         """
-        for item in self.provider():
+        provided = iter(self.provider())
+        return passing_length(provided, self._items(provided), same_items=True)
+
+    def _items(self, provided: Iterator[O]) -> Iterator[O]:
+        for item in provided:
             check_cancelled()
             yield item
 
