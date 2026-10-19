@@ -14,6 +14,7 @@ from ico.core.epoch import IcoEpoch
 from ico.core.filter import IcoFilter, keep
 from ico.core.fork import IcoFork, fork
 from ico.core.identity import IcoIdentity
+from ico.core.length import with_length
 from ico.core.node import HasRemoteFlow, IcoNode
 from ico.core.operator import IcoOperator, operator
 from ico.core.partition import IcoPartition, partition
@@ -123,6 +124,7 @@ __all__ = [
     "RichPrinterTool",
     "JsonProgressTool",
     "JsonSampleTool",
+    "with_length",
     "LiveBoardTool",
     "RichProgressTool",
     "WorkerFlow",
