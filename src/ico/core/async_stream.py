@@ -11,7 +11,7 @@ from collections.abc import (
 )
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, Generic, Literal, TypeAlias, TypeVar, final, overload
+from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast, final, overload
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.operator import I, IcoOperator, O
@@ -480,20 +480,42 @@ class IcoAsyncStream(
     ) -> None:
         """Feed items to workers, then report the item count and stop workers.
 
+        The next input is pulled on a thread of its own: a slow synchronous
+        upstream (a GPU stage before a CPU pool) does not stop this loop, so
+        workers get items and outputs are emitted while it computes, and an
+        upstream async stream runs its own loop on that thread.
+
         An exception raised by the input iterator is not an item error: it is
         reported with the count and re-raised by the consumer.
         """
         count = 0
         error: Exception | None = None
+        loop = asyncio.get_running_loop()
+        puller = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ico-input")
+        iterator = iter(input_stream)
+
+        def pull(context: contextvars.Context) -> object:
+            # The context carries the cancel token to the upstream loops.
+            return context.run(_pull, iterator)
+
         try:
-            for item in input_stream:
+            while True:
+                item = await loop.run_in_executor(
+                    puller, pull, contextvars.copy_context()
+                )
+                if item is _NO_ITEM:
+                    break
                 # Cancelled: stop scheduling; items in progress finish.
                 check_cancelled()
                 await ordering_buffer_ready.wait()
-                await in_queue.put((count, item))
+                await in_queue.put((count, cast(I, item)))
                 count += 1
         except Exception as e:
             error = e
+        finally:
+            # Do not wait for a pull in progress (an early exit while the
+            # upstream computes): it ends on its own thread.
+            puller.shutdown(wait=False, cancel_futures=True)
 
         await out_queue.put(_End(count, error))
 
@@ -589,6 +611,15 @@ class IcoAsyncStream(
                 calls.submit(_call_in, context, operator, item)
             )
         return result
+
+
+_NO_ITEM = object()
+"""The end of the input (see ``_pull``)."""
+
+
+def _pull(iterator: Iterator[T]) -> T | object:
+    """The next item of ``iterator``, or ``_NO_ITEM`` at its end."""
+    return next(iterator, _NO_ITEM)
 
 
 def _call_in(context: contextvars.Context, operator: Any, item: Any) -> Any:
