@@ -295,3 +295,22 @@ directory or threshold, a parameter replaces the value:
   the bound values: parameters belong to the spec document.
 - Only whole param values: no substitution inside strings or nested
   values until a real need appears.
+
+## Steps that hand over through files: `tap`
+
+Some steps are worth their side effect: they write their real result next
+to their input (masks, cleaned clips) and return a report, while the next
+step needs the same input again. Without help, every report carries its
+input and an adapter takes it out (`report → master`) between the steps.
+
+`{"kind": "tap", "children": [child]}` (`IcoTap`, `tap(child)`) runs the
+child on its input for the side effect and passes the input on: `I → I`,
+where `I` is the child's input. An iterator output of the child is
+consumed to the end first, so that its side effects happen; the output
+itself is dropped (a step whose report is wanted is not tapped, usually
+the last one). With `pipeline_ref`, a pipeline of steps on one input reads
+as the steps themselves:
+
+```
+master → tap(scan) → tap(refine) → tap(clean) → assemble
+```
