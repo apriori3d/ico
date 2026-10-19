@@ -4,6 +4,7 @@ import operator
 from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, Generic, cast, final
 
+from ico.core.length import passing_length
 from ico.core.operator import (
     I,
     IcoOperator,
@@ -95,18 +96,12 @@ class IcoStream(
         self.body = body_op
 
     def _stream_fn(self, items: Iterator[I]) -> Iterator[O]:
-        """Internal implementation that applies the body operator to each item.
+        """Apply the body to each item, lazily. One output per input: the
+        outputs keep the input's length hint, so progress totals survive a
+        chain of streams."""
+        return passing_length(items, self._iterate(items))
 
-        Args:
-            items: Iterator of input items to process.
-
-        Yields:
-            Transformed items after applying the body operator to each input.
-
-        Note:
-            This is the function used by __call__. It provides lazy evaluation
-            by yielding items one at a time as they're requested.
-        """
+    def _iterate(self, items: Iterator[I]) -> Iterator[O]:
         counters = self._counters()
         if counters:
             length = operator.length_hint(items, -1)

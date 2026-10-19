@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from typing import Any, Generic
 
+from ico.core.length import materialized
 from ico.core.operator import IcoOperator, IcoOperatorProtocol, IInv, wrap_operator
 from ico.core.signature import IcoSignature
 
@@ -53,6 +54,14 @@ class IcoFilter(Generic[IInv], IcoOperator[Iterator[IInv], Iterator[IInv]]):
         self.predicate = predicate_op
 
     def _filter_fn(self, items: Iterator[IInv]) -> Iterator[IInv]:
+        """Items already in memory are filtered at once, so the kept ones
+        keep a length (a progress total downstream); a lazy input stays
+        lazy (predicates are cheap, upstream work may not be)."""
+        if materialized(items):
+            return iter([item for item in items if self.predicate(item)])
+        return self._lazy(items)
+
+    def _lazy(self, items: Iterator[IInv]) -> Iterator[IInv]:
         for item in items:
             if self.predicate(item):
                 yield item
