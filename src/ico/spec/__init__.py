@@ -8,6 +8,7 @@ Example:
 from ico.spec.builders import BuildContext, SpecFactory, build, spec_builder
 from ico.spec.model import SPEC_VERSION, JsonValue, NodeSpec, PipelineSpec, SpecError
 from ico.spec.params import SpecParam, bind, spec_params
+from ico.spec.refs import inline, pipeline_refs
 from ico.spec.registry import (
     SpecContext,
     find_serializer,
@@ -22,6 +23,8 @@ __all__ = [
     "BuildContext",
     "bind",
     "build",
+    "inline",
+    "pipeline_refs",
     "run",
     "spec_params",
     "SpecParam",
