@@ -12,7 +12,7 @@ import pytest
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.plan_keys import plan_nodes, remote_flow_key
 from ico.core.runtime.runtime import IcoRuntime
-from ico.core.runtime.sample import SampleProbe, preview
+from ico.core.runtime.sample import PREVIEW_CHARS, SampleProbe, preview
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
@@ -173,8 +173,8 @@ def test_previews_are_short() -> None:
     assert preview(np.zeros((2, 3))) == "ndarray(shape=(2, 3), dtype=float64)"
     assert preview(np.float64(1.5)) == repr(np.float64(1.5))  # a scalar
     assert preview(iter([1])) == "<iterator list_iterator>"
-    assert preview(list(range(1000))) == "[0, 1, 2, 3, 4, 5, 6, 7, ...]"
-    assert len(preview("x" * 10_000)) <= 200
+    assert preview(list(range(1000))) == "[0, 1, 2, 3, … 1000 items]"
+    assert len(preview("x" * 10_000)) <= PREVIEW_CHARS
     assert len(preview({"k": "v" * 500}, max_chars=50)) == 50
 
     class Broken:
@@ -182,6 +182,45 @@ def test_previews_are_short() -> None:
             raise RuntimeError
 
     assert preview(Broken()).startswith("<Broken instance")
+
+
+def test_structured_values_are_previewed_field_by_field() -> None:
+    from dataclasses import dataclass
+
+    @dataclass(frozen=True)
+    class Layers:
+        """A scene being cleaned: big arrays first, the index after them."""
+
+        frames: Any
+        masks: list[Any]
+        caption: str
+        scene: int
+
+    value = Layers(
+        frames=np.zeros((17, 480, 640, 3), dtype=np.uint8),
+        masks=[np.zeros((480, 640), dtype=bool)] * 17,
+        caption="字" * 200,
+        scene=12,
+    )
+    text = preview(value)
+
+    assert text.startswith(
+        "Layers(frames=ndarray(shape=(17, 480, 640, 3), dtype=uint8), "
+    )
+    assert "masks=[ndarray(shape=(480, 640), dtype=bool), " in text
+    assert "… 17 items]" in text
+    assert text.endswith(", scene=12)")  # not cut away by the large fields
+    assert len(text) <= 300
+
+    class Model:  # a Pydantic model, by its model_fields
+        model_fields = {"path": None, "fps": None}  # noqa: RUF012
+
+        def __init__(self) -> None:
+            self.path = "/data/a.mp4"
+            self.fps = 25.0
+
+    assert preview(Model()) == "Model(path='/data/a.mp4', fps=25.0)"
+    assert preview({"a": 1, "b": [1, 2]}) == "{'a': 1, 'b': [1, 2]}"
 
 
 # A long item in a worker: a video whose frames stream inside the worker.
