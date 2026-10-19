@@ -215,3 +215,32 @@ def test_board_progress_has_the_plan_keys_of_its_rows() -> None:
     [node] = view["progress"]
     assert node["node"] == progress.plan_key
     assert node["node"] in plan["keys"]
+
+
+def test_a_board_on_a_given_port_keeps_it_across_restarts() -> None:
+    import socket
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    board = LiveBoard(BoardRuns(), port=port)
+    first = board.start()
+    board.stop()
+    second = board.start()
+    try:
+        assert f"http://127.0.0.1:{port}/?token=" in first
+        assert urlsplit(second).port == port
+        assert get(board, "/api/runs") == {"runs": []}
+    finally:
+        board.stop()
+
+
+def test_a_board_on_every_interface_names_this_machine() -> None:
+    import socket
+
+    board = LiveBoard(BoardRuns(), host="0.0.0.0")
+    url = board.start()
+    try:
+        assert url.startswith(f"http://{socket.gethostname()}:")
+    finally:
+        board.stop()

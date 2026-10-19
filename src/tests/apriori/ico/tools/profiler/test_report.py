@@ -89,7 +89,7 @@ def test_cells_of_a_lazy_chain() -> None:
 
     read = cells[keys["read"]]
     assert read["self"] == "130.0ms"
-    assert read["info"] == "startup 110.0ms"  # its own setup and first item
+    assert read["info"] == "first call 110.0ms"  # its own setup and first item
 
     each = cells[keys["each"]]
     assert each["self"] == "0µs"
@@ -149,5 +149,37 @@ def test_first_call_is_startup_and_rare_outliers_show_their_max() -> None:
     wall = node["metrics"]["wall"]
     assert (wall["count"], wall["p95"]) == (39, 0.002)
     [cells] = profile_cells(profiler.snapshot()).values()
-    assert cells["info"] == "startup 500.0ms · max 300.0ms"
+    assert cells["info"] == "first call 500.0ms · max 300.0ms"
     assert cells["p95"] == "2.0ms"
+
+
+def test_a_first_call_like_the_others_is_not_shown() -> None:
+    clock = Clock()
+
+    def encode(x: int) -> int:
+        clock.advance(5)  # every call alike, the first included
+        return x
+
+    profiler = ProfilerTool(metrics=[FakeWall(clock)], interval=None)
+    op = instrument(IcoOperator(encode), profiler)
+    for i in range(7):
+        op(i)
+    [cells] = profile_cells(profiler.snapshot()).values()
+    assert "first call" not in cells["info"]
+
+
+def test_first_calls_of_several_instances_show_their_mean() -> None:
+    from ico.tools.profiler.report import _info  # pyright: ignore[reportPrivateUsage]
+
+    def view(count: int, self_: float, p95: float | None) -> Any:
+        return {"count": count, "total": self_, "self": self_, "mean": None,
+                "std": None, "min": None, "max": None, "p50": None,
+                "p95": p95, "p99": None}  # fmt: skip
+
+    node: Any = {
+        "key": "0", "label": "load", "type": "IcoOperator", "calls": 20,
+        "items": 0, "errors": 0, "utilization": None, "transfer": None,
+        "metrics": {"wall": view(16, 0.032, 0.002)},
+        "startup": {"wall": view(4, 8.0, None)}, "end": None,
+    }  # fmt: skip
+    assert _info(node) == "first call 2.00s ×4"

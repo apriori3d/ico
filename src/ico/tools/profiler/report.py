@@ -193,12 +193,18 @@ def _info(node: NodeProfile) -> str:
         parts.append(f"transfer {duration(node['transfer'])}")
     startup = node["startup"]
     wall = startup.get("wall") if startup is not None else None
-    # Its own setup only: not the startup of the upstream it pulled; not for
-    # a node with a single event (a sink), which would be all startup.
-    single = node["calls"] + node["items"] <= 1
-    if wall is not None and wall["self"] >= STARTUP_MIN and not single:
-        parts.append(f"startup {duration(wall['self'])}")
     events = node["metrics"].get("wall")
+    # Its own setup only: not the startup of the upstream it pulled; not for
+    # a node with a single event (a sink), which would be all startup. Shown
+    # when a first call stands out from the steady state: one first call per
+    # worker of an operator called once per item is just an item.
+    single = node["calls"] + node["items"] <= 1
+    if wall is not None and wall["count"] > 0 and not single:
+        first = wall["self"] / wall["count"]
+        steady = events["p95"] if events is not None else None
+        if first >= STARTUP_MIN and (steady is None or first >= MAX_FACTOR * steady):
+            times = f" ×{wall['count']}" if wall["count"] > 1 else ""
+            parts.append(f"first call {duration(first)}{times}")
     if (
         events is not None
         and events["count"] >= 2

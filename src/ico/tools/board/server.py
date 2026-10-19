@@ -1,8 +1,8 @@
 """Live Board HTTP server: the board page and its JSON endpoints.
 
 Standard library only: a ``ThreadingHTTPServer`` in a daemon thread, bound
-to ``127.0.0.1`` on a free port, with a token generated per board in the
-URL. Endpoints (all need ``?token=``):
+to ``127.0.0.1`` on a free port by default (or a given host and port, e.g.
+for a LAN proxy), with a token generated per board in the URL. Endpoints (all need ``?token=``):
 
 - ``GET /``: the page (``board.html``, no external scripts);
 - ``GET /api/runs``: ``{"runs": [RunView, ...]}``, newest first;
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import secrets
+import socket
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,8 +35,17 @@ class LiveBoard:
         >>> board.stop()
     """
 
-    def __init__(self, source: BoardSource) -> None:
+    def __init__(self, source: BoardSource, *, host: str = HOST, port: int = 0) -> None:
+        """Args:
+        source: The runs to show.
+        host: The address to bind; ``0.0.0.0`` serves every interface (the
+            URL then names this machine). Anyone who can reach it and has
+            the URL's token sees the runs.
+        port: The port; ``0`` takes a free one at every start.
+        """
         self.source = source
+        self.host = host
+        self.port = port
         self.token = secrets.token_urlsafe(16)
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -46,12 +56,13 @@ class LiveBoard:
         if self._server is None:
             return None
         port = int(self._server.server_address[1])
-        return f"http://{HOST}:{port}/?token={self.token}"
+        host = socket.gethostname() if self.host in ("0.0.0.0", "") else self.host
+        return f"http://{host}:{port}/?token={self.token}"
 
     def start(self) -> str:
         """Start serving (once) and return the page URL."""
         if self._server is None:
-            self._server = ThreadingHTTPServer((HOST, 0), _handler(self))
+            self._server = ThreadingHTTPServer((self.host, self.port), _handler(self))
             self._server.daemon_threads = True
             self._thread = threading.Thread(
                 target=self._server.serve_forever, name="ico-live-board", daemon=True
@@ -62,7 +73,8 @@ class LiveBoard:
         return url
 
     def stop(self) -> None:
-        """Stop serving; the board can be started again (on a new port)."""
+        """Stop serving; the board can be started again (on a new port unless
+        one was given)."""
         server, thread = self._server, self._thread
         self._server = self._thread = None
         if server is not None:
