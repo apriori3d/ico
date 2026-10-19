@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 from collections.abc import (
     AsyncGenerator,
     AsyncIterator,
@@ -8,6 +9,7 @@ from collections.abc import (
     Iterator,
     Sequence,
 )
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Generic, Literal, TypeAlias, TypeVar, final, overload
 
@@ -374,9 +376,16 @@ class IcoAsyncStream(
         ordering_buffer_ready.set()
 
         live = _Live(len(self.pool))
+        # Synchronous operators run on threads of this run: on exit, also an
+        # early one, the calls still running are awaited, so that nothing
+        # uses a worker's channel once the stream has returned (its runtime
+        # deactivates the workers next).
+        calls = ThreadPoolExecutor(
+            max_workers=len(self.pool), thread_name_prefix="ico-pool"
+        )
         executors = [
             asyncio.create_task(
-                self._execute_operator(op, input_queue, results_queue, live)
+                self._execute_operator(op, input_queue, results_queue, live, calls)
             )
             for op in self.pool
         ]
@@ -446,6 +455,7 @@ class IcoAsyncStream(
                 for w in executors:
                     w.cancel()
                 await asyncio.gather(scheduler, *executors, return_exceptions=True)
+            calls.shutdown(wait=True)  # calls in progress end (see above)
 
     def _handle_failure(
         self, index: int, failure: _Failed, errors: list[ItemError]
@@ -499,6 +509,7 @@ class IcoAsyncStream(
         in_queue: asyncio.Queue[tuple[int, I] | None],
         out_queue: asyncio.Queue[_Message[O]],
         live: _Live,
+        calls: ThreadPoolExecutor,
     ) -> None:
         """Worker coroutine: process items until the termination signal.
 
@@ -521,7 +532,7 @@ class IcoAsyncStream(
                 if dead is not None:
                     outcome: O | _Failed = _Failed(dead, item, 0)
                 else:
-                    outcome = await self._call_with_retry(operator, item)
+                    outcome = await self._call_with_retry(operator, item, calls)
                 await out_queue.put((index, outcome))
                 if (
                     dead is None
@@ -539,6 +550,7 @@ class IcoAsyncStream(
         self,
         operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
         item: I,
+        calls: ThreadPoolExecutor,
     ) -> O | _Failed:
         """Call the operator, retrying failures according to the retry policy."""
         policy = self.retry
@@ -546,7 +558,7 @@ class IcoAsyncStream(
         while True:
             attempt += 1
             try:
-                return await self._call_async(operator, item)
+                return await self._call_async(operator, item, calls)
             except Exception as e:
                 retry = attempt  # number of the retry that would follow
                 if (
@@ -565,13 +577,23 @@ class IcoAsyncStream(
         self,
         operator: IcoOperator[I, O] | IcoAsyncOperator[I, O],
         item: I,
+        calls: ThreadPoolExecutor,
     ) -> O:
         """Async wrapper around operator call (compatible with sync operators)."""
         if isinstance(operator, IcoAsyncOperator):
             result = await operator(item)
         else:
-            result = await asyncio.to_thread(operator, item)
+            # Like asyncio.to_thread, on the threads of this run.
+            context = contextvars.copy_context()
+            result = await asyncio.wrap_future(
+                calls.submit(_call_in, context, operator, item)
+            )
         return result
+
+
+def _call_in(context: contextvars.Context, operator: Any, item: Any) -> Any:
+    """Call ``operator(item)`` in ``context`` (the caller's cancel token)."""
+    return context.run(operator, item)
 
 
 # ─── Internal messages ───

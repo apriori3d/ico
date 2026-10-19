@@ -144,3 +144,29 @@ def test_interleaved_runs_of_one_stream(ordered: bool) -> None:
         assert (a, b) == (expected_a, expected_b)
     else:
         assert (sorted(a), sorted(b)) == (expected_a, expected_b)
+
+
+def test_an_early_exit_waits_for_the_calls_in_progress() -> None:
+    # A failing item ends the stream while another item still runs on its
+    # thread: the stream returns only after that call has ended, so that
+    # nothing uses a worker's channel once the runtime deactivates it.
+    import time as _time
+
+    from ico.core.async_stream import IcoAsyncStream
+    from ico.core.operator import IcoOperator
+
+    finished: list[float] = []
+
+    def work(x: int) -> int:
+        if x == 0:
+            raise ValueError("first fails")
+        _time.sleep(0.3)
+        finished.append(_time.monotonic())
+        return x
+
+    pool = IcoAsyncStream(lambda: IcoOperator(work), pool_size=2, ordered=True)
+    with pytest.raises(ValueError, match="first fails"):
+        list(pool(iter([0, 1])))
+    raised = _time.monotonic()
+
+    assert len(finished) == 1 and finished[0] <= raised
