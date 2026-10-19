@@ -150,16 +150,20 @@ def test_an_early_exit_waits_for_the_calls_in_progress() -> None:
     # A failing item ends the stream while another item still runs on its
     # thread: the stream returns only after that call has ended, so that
     # nothing uses a worker's channel once the runtime deactivates it.
+    import threading
     import time as _time
 
     from ico.core.async_stream import IcoAsyncStream
     from ico.core.operator import IcoOperator
 
     finished: list[float] = []
+    second_started = threading.Event()
 
     def work(x: int) -> int:
         if x == 0:
+            second_started.wait(5)  # fail only once the other call runs
             raise ValueError("first fails")
+        second_started.set()
         _time.sleep(0.3)
         finished.append(_time.monotonic())
         return x
