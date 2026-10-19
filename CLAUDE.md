@@ -126,7 +126,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
     Throttle per node (default ≤ 2 updates/s) and always emit the final
     state.
 
-16. [ ] ICO Live Board: a browser dashboard in core, the browser
+16. [x] ICO Live Board: a browser dashboard in core, the browser
     counterpart of the console rendering (`describe` + `RichProgressTool`).
     - JSON backend for `describe` (plan view model), next to `RichText`:
       a render-neutral tree built by the existing per-node-type renderer
@@ -153,6 +153,32 @@ spec export in `src/ico/spec`, tests in `src/tests`.
       worker processes must appear on the board.
 
 Next: start `ico-mcp` (separate package) on top of items 10–16.
+
+Findings of the first domain (video cleaning on cube; numbers are those of
+`docs/proposals/2026-10-17-first-domain-session.md`, now in the
+`ico-mcp-video` repository). One PR each, in this order:
+
+17. [x] A worker survives an item error (finding 10): after an exception
+    in an item the portal leaves the worker in Fault, so every later item
+    fails with "Cannot transition to Sending state from non-Ready state"
+    (28 errors for one). A worker whose runner is alive goes back to Ready.
+18. [ ] `async_stream` behind a slow synchronous upstream (findings 11, 13,
+    18): the pool dispatches nothing while the scheduler blocks pulling
+    the next input (CPU workers idle, then one burst at the end, progress
+    at 0), and two `async_stream`s in a row fail ("Cannot run the event
+    loop while another loop is running"). Pull the input in a thread of
+    its own; one design for both, for GPU → CPU pipelines.
+19. [ ] Lengths flow through the chain (findings 3b, 14, 19, 20, 23):
+    a 1:1 `stream` and `filter` pass their input's `__length_hint__` on,
+    reducers can give one, a progress node takes its total from the item
+    (`"total": "len"`), and `total: null` means "unknown", not an error.
+20. [ ] `profile=true` breaks imports in an `MPWorker` (finding 9: scipy
+    docscrape while importing diffusers in the first call of a factory
+    pool). Reproduce first.
+21. [ ] Design, then implement (algebra, proposal G): `pipeline_ref`, a
+    saved pipeline as a node of another (finding 16; with ico-mcp), and
+    `tap`, a child run for its side effect that passes its input on
+    (finding 17).
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in

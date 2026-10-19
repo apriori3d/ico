@@ -23,6 +23,7 @@ from ico.core.runtime.command import (
     IcoRuntimeCommand,
 )
 from ico.core.runtime.event import IcoFaultEvent, IcoRuntimeEvent
+from ico.core.runtime.exceptions import IcoRuntimeError
 from ico.core.runtime.node import IcoRemotePlaceholderNode, IcoRuntimeNode
 from ico.core.runtime.sample import IcoSampleCommand, start_sampling
 from ico.core.runtime.state import (
@@ -445,12 +446,23 @@ class IcoWorker(
             return output
 
         except Exception as e:
+            # An item failed in a live runner, which reported it and takes
+            # the next item: the worker stays usable. Anything else (a dead
+            # runner, a broken channel) faults it.
+            item_failed = (
+                isinstance(e, IcoRuntimeError)
+                and self.state.is_ready
+                and self.runner_alive()
+            )
             reason = cancelled_reason()
-            if reason is not None:
+            if reason is not None and self.state.is_ready:
                 # The run was cancelled: the runner stopped its item.
                 self.state_model.ready()
                 raise IcoCancelled(reason) from e
-            self.state_model.fault()
+            if item_failed:
+                self.state_model.ready()
+            else:
+                self.state_model.fault()
             raise
 
     # ──────── Channel message handling ────────
@@ -759,9 +771,13 @@ class IcoRunner(
                 self.state_model.waiting()
 
             except Exception as e:
-                # Report runtime errors downstream to output channel and terminate
-                self.state_model.fault()
+                # The item failed: report it (the worker raises it for this
+                # item) and take the next one.
                 self.bubble_event(IcoFaultEvent.create(e))
+                if self.state.is_ready:
+                    self.state_model.waiting()
+                else:
+                    self.state_model.fault()
                 continue
 
     # ──────── Channel message handling ────────
