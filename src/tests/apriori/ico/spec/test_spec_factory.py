@@ -94,7 +94,13 @@ def test_factory_stream_rebuilt_with_distinct_workers() -> None:
 def test_explicit_pool_stream_roundtrip() -> None:
     stream = IcoAsyncStream([Scale(2), Scale(5)])
     rebuilt = roundtrip(stream)
-    assert run(rebuilt, [1, 2]) == run(stream, [1, 2])
+
+    # Which member takes which item depends on scheduling: compare the
+    # members, and that every output comes from one of them.
+    pool = cast(IcoAsyncStream[int, int], rebuilt).pool
+    assert [m.factor for m in pool if isinstance(m, Scale)] == [2, 5]
+    assert run(rebuilt, [1])[0] in (2, 5)
+    assert run(rebuilt, [3])[0] in (6, 15)
 
 
 def test_error_handling_roundtrip() -> None:
