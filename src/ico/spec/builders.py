@@ -555,6 +555,15 @@ def build_progress(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     return node
 
 
+@spec_builder("pipeline_ref")
+def build_pipeline_ref(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    name = spec.params.get("pipeline")
+    raise SpecError(
+        f"pipeline_ref {name!r} is not inlined: call ico.spec.inline(spec, "
+        "library) before building"
+    )
+
+
 @spec_builder("identity")
 def build_identity(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, 0)
