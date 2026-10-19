@@ -40,6 +40,7 @@ from ico.core.signature_check import (
 from ico.core.sink import IcoSink, sink
 from ico.core.source import IcoSource, source
 from ico.core.stream import IcoStream
+from ico.core.tap import IcoTap, tap
 from ico.core.tree_utils import TraversalInfo, TreePathIndex, TreeWalker
 
 # describe
@@ -79,6 +80,8 @@ __all__ = [
     "IcoEpoch",
     "IcoFilter",
     "keep",
+    "tap",
+    "IcoTap",
     "IcoFork",
     "fork",
     "IcoIdentity",

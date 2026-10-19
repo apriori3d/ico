@@ -29,6 +29,7 @@ from ico.core.process import IcoProcess
 from ico.core.route import IcoRoute
 from ico.core.signature import IcoSignature
 from ico.core.stream import IcoStream
+from ico.core.tap import IcoTap
 from ico.core.tree_utils import TreePathIndex
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
 
@@ -518,6 +519,12 @@ def build_route(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
 def build_filter(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, 1)
     return IcoFilter(ctx.op(spec.children[0]), name=spec.name)
+
+
+@spec_builder("tap")
+def build_tap(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    _children(spec, 1)
+    return IcoTap(ctx.op(spec.children[0]), name=spec.name)
 
 
 @spec_builder("partition")

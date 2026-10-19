@@ -34,6 +34,7 @@ from ico.core.signature import IcoSignature
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
+from ico.core.tap import IcoTap
 from ico.spec.model import JsonValue, NodeSpec, SpecError
 from ico.spec.registry import SpecContext, spec_serializer
 
@@ -308,6 +309,16 @@ def serialize_filter(node: IcoFilter[object], ctx: SpecContext) -> NodeSpec:
         name=node.name,
         sig=node_signature(node),
         children=(ctx.walk(node.predicate),),
+    )
+
+
+@spec_serializer(IcoTap)
+def serialize_tap(node: IcoTap[object], ctx: SpecContext) -> NodeSpec:
+    return NodeSpec(
+        kind="tap",
+        name=node.name,
+        sig=node_signature(node),
+        children=(ctx.walk(node.child),),
     )
 
 
