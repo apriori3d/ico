@@ -182,6 +182,14 @@ Findings of the first domain (video cleaning on cube; numbers are those of
     `tap`, a child run for its side effect that passes its input on
     (finding 17).
 
+Remote runs (design: `docs/design/remote.md`). One PR each:
+
+22. [ ] Jobs: request and events, `ico.remote.runner`, `LocalExecutor`
+    (subprocess), `file://` storage; end-to-end tests without network.
+23. [ ] S3 storage (`ico[remote]` extra): stage in / out, directories.
+24. [ ] `RunPodExecutor` and `runpod_handler`, against a fake RunPod API.
+25. [ ] Resume and cancel: work directory on a volume, job ids.
+
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.
