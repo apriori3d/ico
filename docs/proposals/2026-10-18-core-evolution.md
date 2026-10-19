@@ -1,8 +1,38 @@
 # Proposal: evolution of the ICO core
 
-Date: 2026-10-18. Status: proposal for discussion. Every item below is a
+Date: 2026-10-18. Status: A–D done, E and G in part (see the status
+section below, 2026-10-19). Every item below is a
 separate change: it gets its own short design and PR before any code, as
 `CLAUDE.md` requires; this document only sets the direction and the order.
+
+## Status (2026-10-19)
+
+| Item | Status |
+|---|---|
+| A. Plan key on every event | done: #51 (`node` on events, `IcoRuntime(plan_root=)`) |
+| B. Telemetry off the hot path | done: #52 (summed progress, no ack for telemetry) |
+| C. Control commands | done: cancel #53, sampling #55, both mid-item in workers through a control lane #57, recent results #64/#65; snapshot on request not done (no need yet) |
+| D. A smaller state model | done: #56 |
+| E. Hygiene | in part: shared event listeners #50; docstrings cut where code changed, no pass over the rest |
+| F. Data channel | not started (no measured need) |
+| G. Algebra | in part: `tap` #67, and `pipeline_ref` #66 at the spec level; `flat_map`, `zip`/`merge`, `scan`, one n-ary chain, context as data not started |
+| H. Description apart from the running instance | not started |
+
+Found in real use on the way and fixed: a worker survives an item error
+(#58); an async stream pulls its input on a thread, so a slow upstream
+does not stall its pool and two pools can follow each other (#59); an
+async stream waits for its calls in progress when it ends early (#61);
+stream lengths flow through sources, maps and filters (#60).
+
+Open questions, as answered so far:
+
+1. The plan key lives beside `trace`; nothing dropped yet.
+2. Cancellation is between items, also between the inner items of a long
+   item in a worker (#57); inside one operator call there is no check.
+3. No opt-in per flow: a sample is taken only on request, recent results
+   only with `keep_recent` / `spec.run(recent=True)`, and previews are
+   short and stay with the caller.
+4. H is not needed yet; G goes item by item.
 
 It follows a full read of `src/ico/core`, `src/ico/core/runtime`, the
 signatures, the registry and the spec, after the profiler work (#41–#46)
