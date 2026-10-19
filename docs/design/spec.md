@@ -296,6 +296,39 @@ directory or threshold, a parameter replaces the value:
 - Only whole param values: no substitution inside strings or nested
   values until a real need appears.
 
+## Pipelines in pipelines
+
+A pipeline made of other pipelines would otherwise copy their specs, so a
+fix in one of them has to be made in every copy. A `pipeline_ref` node
+stands for a saved pipeline instead:
+
+```json
+{"kind": "pipeline_ref", "name": "refine",
+ "params": {"pipeline": "refine_masks",
+            "bind": {"hold": 4, "work_dir": {"$param": "work_dir"}}}}
+```
+
+- `ico.spec.inline(spec, library)` replaces every reference by the root of
+  the pipeline it names, recursively, before `bind` and `build`: building,
+  workers, validation, plans, the profiler and samples see an ordinary
+  spec. `library(name)` returns a pipeline's spec; where pipelines are
+  stored is the caller's business (`ico-mcp` keeps them in files).
+- `bind` gives values to parameters of the inner pipeline: constants, or
+  references to parameters of the outer one. The inner parameters it does
+  not bind become parameters of the outer pipeline under their own names,
+  so a pipeline of pipelines exposes their configuration without repeating
+  it; two references that lift one name with different defaults are the
+  usual "declared differently" error. A `bind` key the pipeline does not
+  declare is an error.
+- The inlined root is named after the reference (its `name`, else the
+  pipeline's), so a plan shows where a part came from. Errors inside it are
+  located through the reference (`1.1` is the second child of the pipeline
+  at `1`).
+- Cycles (`a → b → a`) and nesting deeper than 8 are errors; a reference
+  that reaches `build` without being inlined is an error that says so.
+- `ico.spec.pipeline_refs` lists the pipelines a spec refers to directly
+  (for a library that reports what uses what).
+
 ## Steps that hand over through files: `tap`
 
 Some steps are worth their side effect: they write their real result next
