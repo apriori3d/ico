@@ -158,7 +158,7 @@ Findings of the first domain (video cleaning on cube; numbers are those of
 `docs/proposals/2026-10-17-first-domain-session.md`, now in the
 `ico-mcp-video` repository). One PR each, in this order:
 
-17. [ ] A worker survives an item error (finding 10): after an exception
+17. [x] A worker survives an item error (finding 10): after an exception
     in an item the portal leaves the worker in Fault, so every later item
     fails with "Cannot transition to Sending state from non-Ready state"
     (28 errors for one). A worker whose runner is alive goes back to Ready.
