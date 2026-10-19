@@ -103,6 +103,7 @@ def run(
     params: Mapping[str, JsonValue] | None = None,
     profiler: ProfilerTool | None = None,
     cancel: IcoCancelToken | None = None,
+    recent: bool = False,
 ) -> RunResult:
     """Build a spec and run it once.
 
@@ -125,6 +126,9 @@ def run(
         cancel: A token that stops the run between items when cancelled
             (from any thread): the result holds what was produced so far,
             with ``cancelled`` set to the reason.
+        recent: Preview a result of every operator now and then
+            (``IcoRuntime.keep_recent``), as ``IcoSampleEvent`` with
+            ``recent`` for the tools (e.g. a ``JsonSampleTool``).
 
     Returns:
         A :class:`RunResult`.
@@ -190,6 +194,8 @@ def run(
             runtime.deactivate()
         raise
     try:
+        if recent:
+            runtime.keep_recent()
         runtime.run()
     except IcoCancelled as e:
         cancelled = e.reason

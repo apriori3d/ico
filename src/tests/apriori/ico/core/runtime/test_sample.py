@@ -12,7 +12,7 @@ import pytest
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.plan_keys import plan_nodes, remote_flow_key
 from ico.core.runtime.runtime import IcoRuntime
-from ico.core.runtime.sample import PREVIEW_CHARS, SampleProbe, preview
+from ico.core.runtime.sample import PREVIEW_CHARS, RecentProbe, SampleProbe, preview
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
@@ -69,8 +69,20 @@ def test_samples_before_a_run_are_the_first_results() -> None:
     runtime.run().deactivate()
 
     assert samples.items == [
-        {"node": key_of(flow, op), "index": 0, "type": "int", "preview": "0"},
-        {"node": key_of(flow, op), "index": 1, "type": "int", "preview": "2"},
+        {
+            "node": key_of(flow, op),
+            "index": 0,
+            "type": "int",
+            "preview": "0",
+            "recent": False,
+        },
+        {
+            "node": key_of(flow, op),
+            "index": 1,
+            "type": "int",
+            "preview": "2",
+            "recent": False,
+        },
     ]
     assert op.probe is None  # gone after the samples
 
@@ -266,3 +278,62 @@ def test_samples_reach_a_worker_during_a_long_item() -> None:
     frames_seen = [int(s["preview"]) for s in samples.items]
     assert len(frames_seen) == 2
     assert all(f < 100 for f in frames_seen)  # from the first video, mid-item
+
+
+# ─── Recent results ───
+
+
+def test_recent_results_are_previewed_now_and_then() -> None:
+    op = IcoOperator(slow_double)  # 10 ms per item, 40 items
+    flow = IcoSource(numbers) | IcoStream(op) | IcoSink(ignore)
+    samples = Samples()
+    runtime = IcoRuntime(flow, tools=[samples.tool]).activate()
+    runtime.keep_recent(interval=0.1)
+    runtime.run().deactivate()
+
+    recent = [s for s in samples.items if s["recent"] and s["node"] == key_of(flow, op)]
+    assert 2 <= len(recent) <= 6  # about one per 0.1 s of 0.4 s, not 40
+    assert [s["index"] for s in recent] == list(range(len(recent)))
+    assert all(s["type"] == "int" for s in recent)
+    # Iterators (the source, the stream) are not previewed.
+    assert not any(s["preview"].startswith("<iterator") for s in samples.items)
+    assert isinstance(op.probe, RecentProbe)
+
+
+def test_recent_results_come_from_workers_and_keep_the_profiler() -> None:
+    worker = MPWorker(remote_flow)
+    profiler = ProfilerTool(interval=None)
+    flow = instrument(
+        IcoSource(numbers) | IcoStream(worker) | IcoSink(ignore), profiler
+    )
+    samples = Samples()
+    runtime = IcoRuntime(flow, tools=[profiler, samples.tool]).activate()
+    key = remote_flow_key(key_of(flow, worker), worker)
+    try:
+        runtime.keep_recent(interval=0.1)
+        runtime.run()
+    finally:
+        runtime.deactivate()
+
+    assert any(s["recent"] and s["node"] == key for s in samples.items)
+    [node] = [n for n in profiler.snapshot()["nodes"] if n["key"] == key]
+    startup = node["startup"]
+    calls = node["metrics"]["wall"]["count"] + (
+        startup["wall"]["count"] if startup else 0
+    )
+    assert calls == N  # the profiler still measured every call in the runner
+
+
+def test_spec_run_keeps_recent_results() -> None:
+    from ico.registry import IcoRegistry, register
+    from ico.spec import NodeSpec, run
+
+    registry = IcoRegistry()
+    register("recent.double", 1, registry=registry)(double)
+    samples = Samples()
+    spec = NodeSpec.from_dict(
+        {"kind": "stream", "children": [{"kind": "op", "op": "recent.double@1"}]}
+    )
+    run(spec, [1, 2, 3], registry=registry, tools=[samples.tool], recent=True)
+
+    assert [s["preview"] for s in samples.items if s["recent"]] == ["2"]  # throttled

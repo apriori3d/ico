@@ -24,6 +24,7 @@ from __future__ import annotations
 import dataclasses
 import reprlib
 import threading
+import time
 from collections.abc import Awaitable, Callable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, ClassVar, cast, final
@@ -36,6 +37,8 @@ from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.tree_utils import TreePathIndex
 
 PREVIEW_CHARS = 400
+RECENT_INTERVAL = 1.0
+"""Seconds between two recent previews of one node (see ``keep_recent``)."""
 
 
 @final
@@ -61,15 +64,20 @@ class IcoSampleEvent(IcoRuntimeEvent):
     """The type name of the result."""
     preview: str
     """A short text of the result: see :func:`preview`."""
+    recent: bool = False
+    """A recent result (``keep_recent``), not one asked for by ``sample``."""
 
     @staticmethod
-    def create(node: str, index: int, value: object) -> IcoSampleEvent:
+    def create(
+        node: str, index: int, value: object, *, recent: bool = False
+    ) -> IcoSampleEvent:
         return IcoSampleEvent(
             trace=TreePathIndex(),
             node=node,
             index=index,
             type=type(value).__name__,
             preview=preview(value),
+            recent=recent,
         )
 
 
@@ -244,6 +252,94 @@ def is_sampled_kind(node: IcoNodeProtocol) -> bool:
     from ico.core.operator import IcoOperator
 
     return isinstance(node, IcoOperator | IcoContextOperator | IcoAsyncOperator)
+
+
+@final
+@dataclass(slots=True, frozen=True)
+class IcoRecentCommand(IcoRuntimeCommand):
+    """Preview results of every operator now and then (see
+    ``IcoRuntime.keep_recent``)."""
+
+    acknowledged: ClassVar[bool] = False
+
+    interval: float
+
+
+@final
+class RecentProbe:
+    """The probe (``IcoProbe``) of an operator whose recent results are
+    previewed: calls the probe it wraps, and at most every ``interval``
+    seconds bubbles a preview of a result (iterators are skipped) as an
+    ``IcoSampleEvent`` with ``recent``. Stays for the run."""
+
+    __slots__ = ("key", "inner", "_interval", "_emit", "_last", "_index")
+
+    def __init__(
+        self,
+        key: str,
+        inner: IcoProbe | None,
+        interval: float,
+        emit: Callable[[IcoRuntimeEvent], None],
+    ) -> None:
+        self.key = key
+        self.inner = inner
+        self._interval = interval
+        self._emit = emit
+        self._last = -interval
+        self._index = 0
+
+    def _keep(self, value: object) -> None:
+        now = time.monotonic()
+        if now - self._last < self._interval or isinstance(value, Iterator):
+            return
+        self._last = now  # racy across threads at worst adds a preview
+        index, self._index = self._index, self._index + 1
+        self._emit(IcoSampleEvent.create(self.key, index, value, recent=True))
+
+    def call(self, fn: Callable[[Any], Any], item: Any) -> Any:
+        result = fn(item) if self.inner is None else self.inner.call(fn, item)
+        self._keep(result)
+        return result
+
+    def call_with_context(
+        self, fn: Callable[[Any, Any], Any], item: Any, context: Any
+    ) -> Any:
+        if self.inner is None:
+            result = fn(item, context)
+        else:
+            result = self.inner.call_with_context(fn, item, context)
+        self._keep(result)
+        return result
+
+    async def call_async(self, fn: Callable[[Any], Awaitable[Any]], item: Any) -> Any:
+        if self.inner is None:
+            result = await fn(item)
+        else:
+            result = await self.inner.call_async(fn, item)
+        self._keep(result)
+        return result
+
+
+def keep_recent(
+    flow: IcoNodeProtocol,
+    root_key: str,
+    interval: float,
+    emit: Callable[[IcoRuntimeEvent], None],
+) -> None:
+    """Set a recent probe on every operator of ``flow`` (keyed from
+    ``root_key``), over the probes already there (a profiler's); a second
+    call changes nothing."""
+    seen: set[int] = set()
+    for planned in plan_nodes(flow, root_key=root_key):
+        node = planned.node
+        if id(node) in seen or not is_sampled_kind(node):
+            continue
+        seen.add(id(node))
+        operator = cast(Any, node)
+        current = cast(IcoProbe | None, operator.probe)
+        if isinstance(current, RecentProbe):
+            continue
+        operator.probe = RecentProbe(planned.key, current, interval, emit)
 
 
 def start_sampling(
