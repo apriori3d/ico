@@ -167,9 +167,12 @@ def test_worker_progress_has_own_keys() -> None:
 
 
 def test_unknown_total_counts_up_without_eta() -> None:
+    def lazy() -> Iterator[int]:
+        yield from range(5)  # no length: the total stays unknown
+
     snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
     progress: IcoProgress[int] = IcoProgress(name="scenes", interval=0)
-    run(numbers(5) | progress.stream(), tool)
+    run(IcoSource(lazy) | progress.stream(), tool)
 
     assert [s["done"] for s in snapshots] == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
     assert all(s["total"] is None and s["eta"] is None for s in snapshots)

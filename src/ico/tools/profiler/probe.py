@@ -201,6 +201,11 @@ class _TimedIterator(Iterator[Any]):
             self._began = 0
             probe.table.shard().record_active(probe.key, active)
 
+    @property
+    def __wrapped__(self) -> Iterator[Any]:
+        """The iterator measured (see ``ico.core.length.materialized``)."""
+        return self._inner
+
     def __length_hint__(self) -> int:
         hint = operator.length_hint(self._inner, -1)
         return hint if hint >= 0 else cast(int, NotImplemented)

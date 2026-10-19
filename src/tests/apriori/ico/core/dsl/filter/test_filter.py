@@ -35,17 +35,28 @@ def test_keep_uses_truthiness() -> None:
     assert list(keep(first_char)(iter(["a", "", "b"]))) == ["a", "b"]
 
 
-def test_keep_is_lazy() -> None:
+def test_keep_is_lazy_over_a_lazy_input() -> None:
     seen: list[int] = []
 
     def track(x: int) -> bool:
         seen.append(x)
         return True
 
-    out = keep(track)(iter([1, 2, 3]))
+    def items() -> Iterator[int]:
+        yield from (1, 2, 3)
+
+    out = keep(track)(items())
     assert seen == []
     assert next(out) == 1
     assert seen == [1]
+
+
+def test_keep_over_items_in_memory_keeps_a_length() -> None:
+    import operator
+
+    out = keep(is_even)(iter([1, 2, 3, 4]))
+    assert operator.length_hint(out) == 2
+    assert list(out) == [2, 4]
 
 
 def test_keep_wraps_predicate_as_child() -> None:
