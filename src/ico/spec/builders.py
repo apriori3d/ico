@@ -266,8 +266,9 @@ class BuildContext:
         if target.cls is not None:
             # Constructor kwargs are validated by the class itself.
             create = cast(Callable[..., IcoNodeProtocol], target.cls)
+            kwargs = _resource_params(ref, target.cls, spec.params)
             try:
-                node: IcoNodeProtocol = create(**spec.params)
+                node: IcoNodeProtocol = create(**kwargs)
             except TypeError as e:
                 raise SpecError(f"Cannot create '{ref}' from params: {e}") from None
         else:
@@ -291,6 +292,26 @@ class BuildContext:
                 f"registry has {actual!r}."
             )
         return node
+
+
+def _resource_params(
+    ref: str, cls: type, params: Mapping[str, JsonValue]
+) -> dict[str, Any]:
+    """Constructor kwargs with resource params made into resources."""
+    from ico.registry.registry import init_params
+    from ico.resources.base import from_spec
+
+    kwargs: dict[str, Any] = dict(params)
+    for param in init_params(cls):
+        name, kind = param.name, param.resource
+        if kind is None:
+            continue
+        if name in kwargs:
+            try:
+                kwargs[name] = from_spec(params[name], kind)
+            except ValueError as e:
+                raise SpecError(f"Cannot create '{ref}': param '{name}': {e}") from None
+    return kwargs
 
 
 def _op_refs(spec: NodeSpec) -> set[str]:

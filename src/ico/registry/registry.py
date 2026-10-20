@@ -11,12 +11,14 @@ from ico.core.node import IcoNodeProtocol
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O, wrap_operator
 from ico.core.signature import IcoSignature
 from ico.registry.matching import EXACT, match_type
+from ico.resources.base import Resource, resource_meta, spec_of
 from ico.spec.model import JsonValue, is_json_value
 
 N = TypeVar("N", bound=IcoNodeProtocol)
 C = TypeVar("C", bound=type[IcoOperator[Any, Any]])
 
 Status: TypeAlias = Literal["draft", "verified", "stable"]
+ResourceClass: TypeAlias = type[Resource[Any]]
 STATUSES: tuple[Status, ...] = ("draft", "verified", "stable")
 
 # Attribute under which a registered node carries its metadata.
@@ -62,18 +64,29 @@ class ParamInfo:
         type: Formatted annotation, or ``None`` when not annotated.
         required: Whether the parameter has no default.
         default: Default value (meaningless when ``required``).
+        resource: The resource class of a parameter annotated with one
+            (see :mod:`ico.resources`); specs give it as
+            ``{"ref": "name@version", "params": {...}}``.
     """
 
     name: str
     type: str | None
     required: bool
     default: Any = None
+    resource: ResourceClass | None = None
 
     def card(self) -> dict[str, JsonValue]:
         out: dict[str, JsonValue] = {"name": self.name, "required": self.required}
         if self.type is not None:
             out["type"] = self.type
-        if not self.required and is_json_value(self.default):
+        if self.resource is not None:
+            meta = resource_meta(self.resource)
+            if meta is not None:
+                out["resource"] = meta.ref
+        spec = spec_of(cast(object, self.default))
+        if not self.required and spec is not None:
+            out["default"] = spec
+        elif not self.required and is_json_value(self.default):
             out["default"] = cast(JsonValue, self.default)
         return out
 
@@ -579,12 +592,18 @@ def init_params(cls: type) -> tuple[ParamInfo, ...]:
             )
         hint = cast(object, hints.get(param.name))
         required = param.default is param.empty
+        resource = (
+            cast(type[Resource[Any]], hint)
+            if isinstance(hint, type) and issubclass(hint, Resource)
+            else None
+        )
         params.append(
             ParamInfo(
                 name=param.name,
                 type=format_ico_type(hint) if hint is not None else None,
                 required=required,
                 default=None if required else cast(object, param.default),
+                resource=resource,
             )
         )
     return tuple(params)

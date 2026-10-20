@@ -92,6 +92,7 @@ def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
             its value is not JSON-compatible.
     """
     from ico.registry.registry import get_meta, init_params, registered_class
+    from ico.resources.base import spec_of
     from ico.spec.serializers import node_signature
 
     meta = get_meta(node)
@@ -108,6 +109,10 @@ def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
                     f"'{param.name}' must be stored in an attribute of the same name."
                 )
             value = cast(object, getattr(node, param.name))
+            spec = spec_of(value)
+            if spec is not None:
+                params[param.name] = spec
+                continue
             if not is_json_value(value):
                 raise SpecError(
                     f"Cannot export '{meta.ref}': parameter '{param.name}' = "

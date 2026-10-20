@@ -52,6 +52,9 @@ vision = [
     "matplotlib>=3.10.7"
 ]
 
+[project.scripts]
+ico = "ico.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/apriori3d/ico"
 Documentation = "https://github.com/apriori3d/ico/blob/main/README.md"
@@ -66,6 +69,9 @@ readme = "README.md"
 packages = [
     { include = "ico", from = "src" },
 ]
+
+[tool.poetry.scripts]
+ico = "ico.cli:main"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"

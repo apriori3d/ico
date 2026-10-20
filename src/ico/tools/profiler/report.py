@@ -141,6 +141,8 @@ class _ProfileRenderer(PlanRenderer):
             style="dim blue",
         )
         self.console.print(self._table)
+        if snapshot["resources"]:
+            self.console.print(_resource_table(snapshot))
 
     def _create_table(self) -> Table:
         # The profile follows the flow column: Flow, profile, Signature, Name.
@@ -217,3 +219,25 @@ def _info(node: NodeProfile) -> str:
     if node["errors"]:
         parts.append(f"{node['errors']} error(s)")
     return " · ".join(parts)
+
+
+def _resource_table(snapshot: ProfileSnapshot) -> Table:
+    """Resources: uses, time in use, loads and moves with their time,
+    reloads, size."""
+    table = Table(show_lines=False, show_edge=False, box=None, title_justify="left")
+    for column in ("Resource", "Uses", "In use", "Loads", "Load", "Moves", "Move",
+                   "Reloads", "Size", "On"):  # fmt: skip
+        table.add_column(
+            column,
+            no_wrap=True,
+            justify="left" if column in ("Resource", "On") else "right",
+        )
+    for row in snapshot["resources"]:
+        size = row["bytes"]
+        table.add_row(
+            row["ref"], str(row["uses"]), duration(row["in_use"]), str(row["loads"]),
+            duration(row["load_seconds"]), str(row["moves"]), duration(row["move_seconds"]),
+            Text(str(row["reloads"]), style="bold red" if row["reloads"] else ""),
+            f"{size / 1e9:.2f} GB" if size is not None else "", ", ".join(row["devices"]),
+        )  # fmt: skip
+    return table
