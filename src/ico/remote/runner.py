@@ -13,6 +13,12 @@ its events to ``emit``:
 4. uploads ``<workdir>/out`` to the job's ``out`` and puts URIs in place
    of the output paths under it.
 
+A job sent again with the same id into the same work directory resumes:
+its operators find the files they left, and every URI comes back to the
+local path it was downloaded to (``in/.staged.json``), without downloading
+it again. One runner at a time holds a work directory (``.lock``); another
+one ends with the error ``busy``.
+
 ``python -m ico.remote.runner --workdir DIR`` reads a job (JSON) from stdin
 and writes its events as JSON lines to stdout (operators' prints go to
 stderr); SIGTERM cancels the run between items.
@@ -28,7 +34,7 @@ import signal
 import sys
 import threading
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path, PurePosixPath
 from typing import IO, cast
 
@@ -67,6 +73,8 @@ def run_job(
                 "path": str(e.path) if e.path is not None else None,
             }
         )
+    except _BusyError as e:
+        emit({"event": "error", "code": "busy", "message": str(e)})
     except _LoadError as e:
         emit(
             {
@@ -87,6 +95,10 @@ def run_job(
         )
 
 
+class _BusyError(Exception):
+    pass
+
+
 class _LoadError(Exception):
     def __init__(self, message: str, errors: list[JsonValue]) -> None:
         super().__init__(message)
@@ -96,8 +108,31 @@ class _LoadError(Exception):
 def _run(job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None) -> None:
     workdir = workdir.resolve()
     (workdir / "out").mkdir(parents=True, exist_ok=True)
+    with _locked(workdir):
+        _run_locked(job, emit, workdir, cancel)
+
+
+@contextlib.contextmanager
+def _locked(workdir: Path) -> Iterator[None]:
+    """Hold the work directory; released when the process dies, too."""
+    with (workdir / ".lock").open("w") as lock:
+        if sys.platform != "win32":
+            import fcntl
+
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise _BusyError(
+                    f"another runner works in {workdir} (the same job id)"
+                ) from None
+        yield
+
+
+def _run_locked(
+    job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None
+) -> None:
     _load(job, workdir)
-    staged: dict[str, str] = {}
+    staged = _Staged(workdir / "in" / ".staged.json")
     input = _stage_in(job.input, workdir, staged)
     params = cast(JsonObject | None, _stage_in(job.params, workdir, staged))
     spec = _parse(job.spec)
@@ -170,18 +205,40 @@ def _load(job: Job, workdir: Path) -> None:
         raise _LoadError("operator modules failed to import", errors)
 
 
-def _stage_in(value: JsonValue, workdir: Path, staged: dict[str, str]) -> JsonValue:
+class _Staged:
+    """The local paths of downloaded URIs, kept in the work directory so
+    that a resumed job finds them."""
+
+    def __init__(self, manifest: Path) -> None:
+        self.manifest = manifest
+        self.paths: dict[str, str] = {}
+        if manifest.is_file():
+            self.paths = cast(dict[str, str], json.loads(manifest.read_text()))
+
+    def get(self, uri: str) -> str | None:
+        path = self.paths.get(uri)
+        return path if path is not None and Path(path).exists() else None
+
+    def add(self, uri: str, path: str) -> None:
+        self.paths[uri] = path
+        self.manifest.parent.mkdir(parents=True, exist_ok=True)
+        self.manifest.write_text(json.dumps(self.paths, indent=1))
+
+
+def _stage_in(value: JsonValue, workdir: Path, staged: _Staged) -> JsonValue:
     """``value`` with ``$JOB`` expanded and storage URIs downloaded."""
     if isinstance(value, str):
         text = value.replace(JOB_VAR, str(workdir))
         storage = storage_for(text)
         if storage is None:
             return text
-        if text not in staged:
-            local = _free(workdir / "in" / basename(text))
-            storage.get(text, local)
-            staged[text] = str(local)
-        return staged[text]
+        local = staged.get(text)
+        if local is None:
+            target = _free(workdir / "in" / basename(text))
+            storage.get(text, target)
+            local = str(target)
+            staged.add(text, local)
+        return local
     if isinstance(value, list):
         return [_stage_in(v, workdir, staged) for v in value]
     if isinstance(value, dict):

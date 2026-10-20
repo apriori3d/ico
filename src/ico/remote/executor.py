@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import IO, Protocol, cast
 
@@ -69,8 +70,10 @@ def submit(
     profile: bool = False,
     recent: bool = False,
     max_items: int | None = None,
+    id: str | None = None,
 ) -> JobHandle:
-    """Send one run of ``spec`` to ``executor``; see :class:`Job`."""
+    """Send one run of ``spec`` to ``executor``; see :class:`Job`. The same
+    ``id`` again resumes the job from its work directory."""
     job = Job(
         spec=spec_json(spec),
         input=input,
@@ -82,6 +85,8 @@ def submit(
         recent=recent,
         max_items=max_items,
     )
+    if id is not None:
+        job = replace(job, id=id)
     return executor.submit(job)
 
 
