@@ -161,9 +161,49 @@ pipeline saved by ico-mcp is a file: the script inlines it
 
 `ico-mcp init` adds a `Dockerfile`: the domain's environment (`uv sync`),
 `ffmpeg`, CUDA base; entry point `python -m ico.remote.runpod_handler`.
-Model weights come from RunPod's model cache (Hugging Face) or a network
-volume, not from the image. OCR runs on the GPU there (`paddlepaddle-gpu`
-in its own worker process).
+Model weights are not in the image (next section). OCR runs on the GPU
+there (`paddlepaddle-gpu` in its own worker process).
+
+## Assets on the remote side
+
+Weights are assets (`docs/proposals/2026-10-20-assets-and-resources.md`):
+pinned to a source revision and a sha256 in the domain's `assets.toml` /
+`assets.lock`. So they are fetched again from their source into the
+cloud, never uploaded from a machine that has them: cube uploads at a
+home connection's speed (117 GB: hours), a datacenter reads Hugging Face
+far faster, and the lock proves both copies equal.
+
+- **Where.** A RunPod network volume, mounted at `/runpod-volume` on
+  serverless workers; assets under `/runpod-volume/assets` (the worker's
+  `ICO_ASSETS_ROOT`), work directories beside them. Standard tier $0.07
+  per GB and month (117 GB ≈ $8/month); reads 200–400 MB/s.
+- **Datacenter.** A volume binds the endpoint to its datacenter. More
+  datacenters: one volume each (RunPod allows one per datacenter and does
+  not sync them), filled by its own prefetch from the same source.
+- **Prefetch job.** A job of its own kind on the same endpoint: the
+  manifest and lock travel in the job, the worker runs `ico.assets.fetch`
+  on the volume and streams `fetch` events (bytes per asset) and a result
+  with the state of each asset; resumable and verified as on any machine.
+  One prefetch per volume at a time: RunPod warns against concurrent
+  writes from several workers, and `flock` on a network volume is not
+  documented. Cost: the worker's time while downloading, about $0.1–0.3
+  for the full set, once per volume.
+- **Runs never fetch.** A run job carries the manifest in its `sources`,
+  so `asset(id)` resolves on the volume; a missing asset fails at the
+  operator that loads it. ico-mcp checks `spec_assets` against the
+  target before a run and proposes a prefetch with its size (the human's
+  word, as `fetch_assets`).
+- **Not RunPod's cached models.** They hold one Hugging Face model per
+  endpoint, a whole repository (all its files), without a documented
+  revision; our sets are subsets of several repositories at fixed
+  commits.
+- **Files without a public source** (own fine-tuned weights) are uploaded
+  once to S3 and get an `s3://` source in the manifest — when the first
+  such file appears.
+- **Cold starts.** Reading the Wan2.2 experts (~60 GB) from the volume
+  takes minutes. A worker that runs jobs in its own process keeps its
+  resource pool between jobs (ico item 31), so a warm worker reads them
+  once; measure on the first real run before anything more.
 
 ## Costs (RunPod, 2026-10)
 
@@ -189,9 +229,11 @@ to storage.
 3. ico 24: `RunPodExecutor` and `runpod_handler`, tested against a fake
    RunPod HTTP server.
 4. ico 25: resume and cancel semantics (work on a volume, job ids).
-5. ico-mcp 32: targets in `ico.toml`, `run(target=)`, code by value,
-   upload / download of local files.
-6. Domain: Dockerfile, endpoint, one real video; measure.
+5. ico: prefetch jobs (assets on a volume).
+6. ico-mcp 32: targets in `ico.toml`, `run(target=)`, code by value,
+   upload / download of local files, assets checked on the target.
+7. Domain: Dockerfile, endpoint with a network volume, prefetch, one real
+   video; measure (cold start included).
 
 ## Not now
 
