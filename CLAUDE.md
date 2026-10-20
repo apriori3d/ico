@@ -200,7 +200,7 @@ PR each:
     atomic, resumable, offline.
 28. [ ] `ico assets adopt` (files already on disk, after a full hash) and
     `gc` (listing first).
-29. [ ] Resources: `@resource`, `Resource[T]`, the pool (`use` / release,
+29. [x] Resources: `@resource`, `Resource[T]`, the pool (`use` / release,
     keys, RAM budget, LRU), resource params in cards and specs, profile
     rows.
 30. [ ] `spec_assets(spec, params)` through resources.
