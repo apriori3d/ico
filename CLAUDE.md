@@ -208,6 +208,8 @@ PR each:
 32. [x] Prefetch jobs (`docs/design/remote.md`, "Assets on the remote
     side"): `FetchJob` downloads assets into the worker's asset root (the
     network volume); runs that carry the manifest resolve `asset(id)`.
+33. [x] A run that carries the manifest ends at once with `missing_assets`
+    (ids, reasons, sizes) when an asset its spec needs is not there.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
