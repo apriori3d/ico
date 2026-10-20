@@ -9,9 +9,11 @@ from typing import Any, TypedDict, final
 
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.tool import IcoRuntimeTool
+from ico.resources.pool import pool
 from ico.tools.profiler.metrics import DEFAULT_METRICS, IcoMetric
 from ico.tools.profiler.probe import NodeProbe
 from ico.tools.profiler.remote import IcoProfileEvent, peak_rss
+from ico.tools.profiler.resources import ResourceProfile, ResourceStats
 from ico.tools.profiler.table import (
     Layout,
     NodeProfile,
@@ -49,6 +51,11 @@ class ProfileSnapshot(TypedDict):
     the nodes that called them)."""
     processes: list[ProcessInfo]
     """The main process and every runner process that reported."""
+    resources: list[ResourceProfile]
+    """Resources of the main process's pool used during the run (see
+    :mod:`ico.tools.profiler.resources`)."""
+    resource_peaks: dict[str, int]
+    """Most bytes the pool held at once, per device."""
     final: bool
 
 
@@ -86,6 +93,7 @@ class ProfilerTool(IcoRuntimeTool):
         "_per_frame",
         "_remote",
         "_remote_lock",
+        "_resources",
     )
 
     def __init__(
@@ -125,6 +133,7 @@ class ProfilerTool(IcoRuntimeTool):
         self._remote: dict[str, IcoProfileEvent] = {}
         """The latest profile of every runner process, by source."""
         self._remote_lock = threading.Lock()
+        self._resources = ResourceStats()
 
     # ─── Lifecycle ───
 
@@ -134,6 +143,8 @@ class ProfilerTool(IcoRuntimeTool):
         self.table.reset()
         with self._remote_lock:
             self._remote.clear()
+        self._resources = ResourceStats()
+        pool().add_listener(self._resources)
         self._started, self._stopped = self.clock(), None
         if self.on_profile is not None and self.interval is not None:
             self._stop.clear()
@@ -148,6 +159,7 @@ class ProfilerTool(IcoRuntimeTool):
         if timer is not None:
             self._stop.set()
             timer.join()
+        pool().remove_listener(self._resources)
         self._stopped = self.clock()
         self._emit()
 
@@ -173,6 +185,8 @@ class ProfilerTool(IcoRuntimeTool):
             "elapsed": now - self._started if self._started is not None else 0.0,
             "overhead": frames * self._frame_cost(),
             "processes": processes,
+            "resources": self._resources.rows(),
+            "resource_peaks": self._resources.peaks(),
             "final": self._stopped is not None,
         }
 
