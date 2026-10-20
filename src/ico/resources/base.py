@@ -26,7 +26,7 @@ import dataclasses
 import json
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast, get_type_hints
 
 from ico.spec.model import JsonValue, is_json_value
 
@@ -122,6 +122,18 @@ class Resource(Generic[T]):
                     f"resource {self.ref}: field {f.name!r} = {value!r} is not JSON"
                 )
             out[f.name] = cast(JsonValue, value)
+        return out
+
+    def assets(self) -> list[str]:
+        """The values of its :data:`~ico.assets.AssetId` fields."""
+        from ico.assets.ids import is_asset_hint
+
+        hints = get_type_hints(type(self), include_extras=True)
+        out: list[str] = []
+        for f in dataclasses.fields(cast(Any, self)):
+            value = cast(object, getattr(self, f.name))
+            if is_asset_hint(hints.get(f.name)) and isinstance(value, str) and value:
+                out.append(value)
         return out
 
     @property

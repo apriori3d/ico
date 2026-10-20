@@ -7,6 +7,7 @@ from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
 from typing import Any, Literal, TypeAlias, TypeVar, cast, get_type_hints, overload
 
+from ico.assets.ids import is_asset_hint, strip_annotated
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O, wrap_operator
 from ico.core.signature import IcoSignature
@@ -67,6 +68,7 @@ class ParamInfo:
         resource: The resource class of a parameter annotated with one
             (see :mod:`ico.resources`); specs give it as
             ``{"ref": "name@version", "params": {...}}``.
+        asset: The parameter is an :data:`~ico.assets.AssetId`.
     """
 
     name: str
@@ -74,6 +76,7 @@ class ParamInfo:
     required: bool
     default: Any = None
     resource: ResourceClass | None = None
+    asset: bool = False
 
     def card(self) -> dict[str, JsonValue]:
         out: dict[str, JsonValue] = {"name": self.name, "required": self.required}
@@ -83,6 +86,8 @@ class ParamInfo:
             meta = resource_meta(self.resource)
             if meta is not None:
                 out["resource"] = meta.ref
+        if self.asset:
+            out["asset"] = True
         spec = spec_of(cast(object, self.default))
         if not self.required and spec is not None:
             out["default"] = spec
@@ -579,7 +584,7 @@ def init_params(cls: type) -> tuple[ParamInfo, ...]:
 
     signature = inspect.signature(cls.__init__)
     try:
-        hints = get_type_hints(cls.__init__)
+        hints = get_type_hints(cls.__init__, include_extras=True)
     except Exception:  # unresolvable annotations: keep them unformatted
         hints = {}
 
@@ -590,7 +595,8 @@ def init_params(cls: type) -> tuple[ParamInfo, ...]:
                 f"Cannot register {cls.__name__}: __init__ must not take "
                 f"*args or **kwargs (found '{param.name}')."
             )
-        hint = cast(object, hints.get(param.name))
+        annotated = cast(object, hints.get(param.name))
+        hint = strip_annotated(annotated)
         required = param.default is param.empty
         resource = (
             cast(type[Resource[Any]], hint)
@@ -604,6 +610,7 @@ def init_params(cls: type) -> tuple[ParamInfo, ...]:
                 required=required,
                 default=None if required else cast(object, param.default),
                 resource=resource,
+                asset=is_asset_hint(annotated),
             )
         )
     return tuple(params)

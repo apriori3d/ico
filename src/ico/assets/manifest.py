@@ -44,12 +44,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, cast
 
-# tomllib from Python 3.11, tomli before (imported by name: type checkers
-# of one Python version would not find the other module).
-tomllib: Any = importlib.import_module(
-    "tomllib" if sys.version_info >= (3, 11) else "tomli"
-)
-
 VERSION = 1
 ID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 SHA1 = re.compile(r"^[0-9a-f]{40}$")
@@ -176,6 +170,12 @@ def load_lock(path: Path) -> dict[str, AssetLock]:
 
 
 def _read(path: Path) -> dict[str, object]:
+    # tomllib from Python 3.11, tomli before; imported by name (type checkers
+    # of one Python version would not find the other module) and lazily
+    # (``import ico`` stays stdlib and rich only).
+    tomllib: Any = importlib.import_module(
+        "tomllib" if sys.version_info >= (3, 11) else "tomli"
+    )
     try:
         return cast(dict[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
     except tomllib.TOMLDecodeError as e:

@@ -5,6 +5,7 @@ Example:
     >>> print(to_json(to_spec(flow)))
 """
 
+from ico.spec.assets import spec_assets
 from ico.spec.builders import BuildContext, SpecFactory, build, spec_builder
 from ico.spec.model import SPEC_VERSION, JsonValue, NodeSpec, PipelineSpec, SpecError
 from ico.spec.params import SpecParam, bind, spec_params
@@ -26,6 +27,7 @@ __all__ = [
     "inline",
     "pipeline_refs",
     "run",
+    "spec_assets",
     "spec_params",
     "SpecParam",
     "spec_builder",
