@@ -142,6 +142,22 @@ def _run_locked(
     manifest = workdir / "code" / "assets.toml"
     if manifest.is_file():
         os.environ["ICO_ASSETS_MANIFEST"] = str(manifest)
+        missing = _missing_assets(_parse(job.spec), job.params)
+        if missing:
+            ids = ", ".join(str(cast(JsonObject, m)["id"]) for m in missing)
+            size = sum(
+                int(cast(int, cast(JsonObject, m).get("size") or 0)) for m in missing
+            )
+            emit(
+                {
+                    "event": "error",
+                    "code": "missing_assets",
+                    "message": f"assets not here: {ids} ({size / 1e9:.2f} GB); "
+                    "prefetch them first",
+                    "assets": missing,
+                }
+            )
+            return
     staged = _Staged(workdir / "in" / ".staged.json")
     input = _stage_in(job.input, workdir, staged)
     params = cast(JsonObject | None, _stage_in(job.params, workdir, staged))
@@ -181,6 +197,31 @@ def _run_locked(
     if job.out is not None:
         out["outputs"] = _stage_out(out["outputs"], workdir / "out", job.out)
     emit({"event": "result", "result": out})
+
+
+def _missing_assets(
+    spec: PipelineSpec | NodeSpec, params: JsonObject | None
+) -> list[JsonValue]:
+    """The assets the spec needs that are not usable under the asset root
+    (``{"id", "reason", "size"}``), checked before anything is staged or
+    run; a spec whose assets cannot be told fails later, in the run."""
+    from ico.assets import AssetMissing, Assets
+    from ico.spec.assets import spec_assets
+
+    try:
+        needed = spec_assets(spec, params)
+    except SpecError:
+        return []
+    if not needed:
+        return []
+    store = Assets.from_env()
+    missing: list[JsonValue] = []
+    for id in needed:
+        try:
+            store.path(id)
+        except AssetMissing as e:
+            missing.append({"id": id, "reason": e.reason, "size": e.size})
+    return missing
 
 
 def _parse(spec: JsonObject) -> PipelineSpec | NodeSpec:

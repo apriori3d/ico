@@ -127,6 +127,26 @@ def test_a_run_resolves_the_assets_it_carries(hub: FakeHub, tmp_path: Path) -> N
     assert result(executor.submit(run))["outputs"] == ["> hello"]
 
 
+def test_a_run_without_its_assets_ends_at_once(hub: FakeHub, tmp_path: Path) -> None:
+    path = manifest(hub, tmp_path)
+    run = Job(
+        spec={"kind": "op", "op": "jobs.asset_text@1"},
+        input="> ",
+        packages=(Package("asset_ops", "draft"),),
+        sources={
+            "asset_ops/__init__.py": "",
+            "asset_ops/ops.py": ASSET_OPS,
+            "assets.toml": path.read_text(),
+            "assets.lock": path.with_name("assets.lock").read_text(),
+        },
+    )
+    [error] = events(LocalExecutor(tmp_path / "jobs").submit(run))
+
+    assert error["code"] == "missing_assets"
+    assert error["assets"] == [{"id": "notes", "reason": "missing", "size": 5}]
+    assert "prefetch them first" in error["message"]
+
+
 def test_prefetch_errors_and_cancel(hub: FakeHub, tmp_path: Path) -> None:
     path = manifest(hub, tmp_path)
     seen: list[JsonObject] = []
