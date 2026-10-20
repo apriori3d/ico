@@ -19,6 +19,13 @@ local path it was downloaded to (``in/.staged.json``), without downloading
 it again. One runner at a time holds a work directory (``.lock``); another
 one ends with the error ``busy``.
 
+A prefetch (:class:`~ico.remote.job.FetchJob`, :func:`fetch_job`) writes
+its manifest and lock into ``<workdir>/assets`` and downloads the assets
+into ``ICO_ASSETS_ROOT`` (the worker's volume), with ``fetch`` events per
+percent of each asset and a result with the state of every asset. A run
+job that carries ``assets.toml`` in its sources resolves ``asset(id)``
+against it.
+
 ``python -m ico.remote.runner --workdir DIR`` reads a job (JSON) from stdin
 and writes its events as JSON lines to stdout (operators' prints go to
 stderr); SIGTERM cancels the run between items.
@@ -42,7 +49,7 @@ from ico.core.runtime.cancel import IcoCancelToken
 from ico.describe.plan.json_renderer import plan_view
 from ico.registry.loader import load_operators
 from ico.registry.registry import Status
-from ico.remote.job import Job, JsonObject
+from ico.remote.job import AnyJob, FetchJob, Job, JsonObject, load_job
 from ico.remote.storage import basename, join, storage_for
 from ico.spec.builders import build
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
@@ -132,6 +139,9 @@ def _run_locked(
     job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None
 ) -> None:
     _load(job, workdir)
+    manifest = workdir / "code" / "assets.toml"
+    if manifest.is_file():
+        os.environ["ICO_ASSETS_MANIFEST"] = str(manifest)
     staged = _Staged(workdir / "in" / ".staged.json")
     input = _stage_in(job.input, workdir, staged)
     params = cast(JsonObject | None, _stage_in(job.params, workdir, staged))
@@ -279,10 +289,69 @@ def _stage_out(value: JsonValue, out_dir: Path, uri: str) -> JsonValue:
     return replace(value)
 
 
+# ─── Prefetch ───
+
+
+class _FetchCancelled(Exception):
+    pass
+
+
+def fetch_job(
+    job: FetchJob, emit: Emit, workdir: Path, cancel: IcoCancelToken | None = None
+) -> None:
+    """Download the assets of a prefetch; every outcome is an event."""
+    from ico.assets import AssetMissing, Assets, ManifestError, load_manifest
+    from ico.assets.fetch import FetchError, fetch
+    from ico.assets.hub import HubError
+    from ico.assets.store import DEFAULT_ROOT, ROOT_ENV
+
+    try:
+        directory = workdir.resolve() / "assets"
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "assets.toml").write_text(job.manifest, encoding="utf-8")
+        (directory / "assets.lock").write_text(job.lock, encoding="utf-8")
+        root = Path(os.environ.get(ROOT_ENV) or DEFAULT_ROOT).expanduser()
+        store = Assets(load_manifest(directory / "assets.toml"), root)
+        ids = list(job.ids) or None
+        shown: dict[str, int] = {}
+
+        def progress(id: str, done: int, total: int) -> None:
+            if cancel is not None and cancel.cancelled:
+                raise _FetchCancelled
+            percent = done * 100 // max(total, 1)
+            if percent > shown.get(id, -1):
+                shown[id] = percent
+                emit({"event": "fetch", "asset": id, "done": done, "total": total})
+
+        with _locked(workdir.resolve()):
+            after = fetch(store, ids, progress=progress)
+        assets: list[JsonValue] = [
+            {"id": s.id, "state": s.state, "size": s.size, "verified": s.verified}
+            for s in after
+        ]
+        emit({"event": "result", "result": {"root": str(root), "assets": assets}})
+    except _FetchCancelled:
+        emit({"event": "error", "code": "cancelled", "message": "the fetch was cancelled; "
+              "a later fetch continues the files"})  # fmt: skip
+    except _BusyError as e:
+        emit({"event": "error", "code": "busy", "message": str(e)})
+    except (AssetMissing, FetchError, HubError, ManifestError) as e:
+        emit({"event": "error", "code": "fetch_error", "message": str(e)})
+    except Exception as e:
+        emit(
+            {
+                "event": "error",
+                "code": "run_error",
+                "message": f"{type(e).__name__}: {e}",
+                "traceback": "".join(traceback.format_exception(e))[-TRACEBACK_LIMIT:],
+            }
+        )
+
+
 # ─── Process ───
 
 
-def serve(job: Job, workdir: Path, out: IO[str]) -> None:
+def serve(job: AnyJob, workdir: Path, out: IO[str]) -> None:
     """Run ``job``, writing its events to ``out`` as JSON lines."""
     lock = threading.Lock()
 
@@ -294,7 +363,10 @@ def serve(job: Job, workdir: Path, out: IO[str]) -> None:
 
     token = IcoCancelToken()
     signal.signal(signal.SIGTERM, lambda signum, frame: token.cancel("cancelled"))
-    run_job(job, emit, workdir, token)
+    if isinstance(job, FetchJob):
+        fetch_job(job, emit, workdir, token)
+    else:
+        run_job(job, emit, workdir, token)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -304,7 +376,7 @@ def main(argv: list[str] | None = None) -> None:
     # The events own the original stdout; operators' output goes to stderr.
     events = os.fdopen(os.dup(1), "w", encoding="utf-8")
     os.dup2(2, 1)
-    job = Job.from_dict(cast(JsonObject, json.loads(sys.stdin.read())))
+    job = load_job(cast(JsonObject, json.loads(sys.stdin.read())))
     serve(job, cast(Path, args.workdir), events)
 
 

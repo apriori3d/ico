@@ -15,13 +15,15 @@ from ico.remote.executor import (
     result,
     submit,
 )
-from ico.remote.job import Job, Package, RemoteError
-from ico.remote.runner import run_job
+from ico.remote.job import AnyJob, FetchJob, Job, Package, RemoteError, load_job
+from ico.remote.runner import fetch_job, run_job
 from ico.remote.runpod import RunPod, RunPodJob
 from ico.remote.storage import FileStorage, Storage, register_storage
 
 __all__ = [
+    "AnyJob",
     "Executor",
+    "FetchJob",
     "FileStorage",
     "Job",
     "JobHandle",
@@ -33,6 +35,8 @@ __all__ = [
     "RunPodJob",
     "Storage",
     "register_storage",
+    "fetch_job",
+    "load_job",
     "result",
     "run_job",
     "submit",

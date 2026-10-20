@@ -10,7 +10,8 @@ Environment: ``ICO_WORKDIRS`` (where work directories go; by default on
 the endpoint's network volume when one is mounted, which makes jobs
 resumable: cancel one to stop billing, send it again with the same id to
 continue), ``ICO_CODE`` (the runner's working directory: the domain's
-packages in the image).
+packages in the image), ``ICO_ASSETS_ROOT`` (assets; by default
+``assets`` on the network volume, filled by prefetch jobs).
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ async def handler(request: JsonObject) -> AsyncIterator[JsonObject]:
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         cwd=os.environ.get("ICO_CODE"),
+        env={**os.environ, **_asset_env()},
         limit=LINE_LIMIT,
     )
     assert process.stdin is not None and process.stdout is not None
@@ -70,6 +72,13 @@ def workdirs() -> Path:
     if configured:
         return Path(configured)
     return VOLUME / "ico-jobs" if VOLUME.is_dir() else Path("/tmp/ico-jobs")
+
+
+def _asset_env() -> dict[str, str]:
+    """``ICO_ASSETS_ROOT`` on the network volume, unless it is set."""
+    if os.environ.get("ICO_ASSETS_ROOT") or not VOLUME.is_dir():
+        return {}
+    return {"ICO_ASSETS_ROOT": str(VOLUME / "assets")}
 
 
 async def _stop(process: asyncio.subprocess.Process) -> None:

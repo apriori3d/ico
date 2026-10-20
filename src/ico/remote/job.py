@@ -11,7 +11,9 @@ outputs. See ``docs/design/remote.md``.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal, cast
 
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec
@@ -140,6 +142,67 @@ class Job:
             max_items=max_items if isinstance(max_items, int) else None,
             id=str(data.get("id") or uuid.uuid4().hex),
         )
+
+
+@dataclass(frozen=True)
+class FetchJob:
+    """A prefetch: download assets into the worker's asset root (a network
+    volume), as ``ico assets fetch`` does on any machine. The manifest and
+    its lock travel in the job; runs never fetch.
+
+    Attributes:
+        manifest: The text of ``assets.toml``.
+        lock: The text of ``assets.lock``.
+        ids: The assets to fetch; all of the manifest when empty.
+        id: The job id (its work directory).
+    """
+
+    manifest: str
+    lock: str
+    ids: tuple[str, ...] = ()
+    id: str = field(default_factory=lambda: uuid.uuid4().hex)
+
+    @classmethod
+    def from_files(cls, manifest: Path, ids: Sequence[str] = ()) -> FetchJob:
+        """A prefetch of ``manifest`` (``assets.toml``) and the
+        ``assets.lock`` beside it."""
+        lock = manifest.with_name("assets.lock")
+        return cls(
+            manifest=manifest.read_text(encoding="utf-8"),
+            lock=lock.read_text(encoding="utf-8"),
+            ids=tuple(ids),
+        )
+
+    def to_dict(self) -> JsonObject:
+        ids: list[JsonValue] = []
+        ids.extend(self.ids)
+        return {
+            "kind": "fetch",
+            "id": self.id,
+            "manifest": self.manifest,
+            "lock": self.lock,
+            "ids": ids,
+        }
+
+    @classmethod
+    def from_dict(cls, data: JsonObject) -> FetchJob:
+        return cls(
+            manifest=str(data["manifest"]),
+            lock=str(data["lock"]),
+            ids=tuple(str(i) for i in cast(list[JsonValue], data.get("ids") or [])),
+            id=str(data.get("id") or uuid.uuid4().hex),
+        )
+
+
+AnyJob = Job | FetchJob
+"""What executors send: a run of a spec, or a prefetch of assets."""
+
+
+def load_job(data: JsonObject) -> AnyJob:
+    """A job from its JSON (``kind`` ``fetch``, else a run)."""
+    return (
+        FetchJob.from_dict(data) if data.get("kind") == "fetch" else Job.from_dict(data)
+    )
 
 
 def spec_json(spec: PipelineSpec | NodeSpec | JsonObject) -> JsonObject:
