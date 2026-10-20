@@ -37,16 +37,18 @@ asset has one file: its own name).
 
 from __future__ import annotations
 
+import importlib
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:  # pragma: no cover
-    import tomli as tomllib
+# tomllib from Python 3.11, tomli before (imported by name: type checkers
+# of one Python version would not find the other module).
+tomllib: Any = importlib.import_module(
+    "tomllib" if sys.version_info >= (3, 11) else "tomli"
+)
 
 VERSION = 1
 ID = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
