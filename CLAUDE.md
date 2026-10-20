@@ -196,7 +196,7 @@ PR each:
 
 26. [x] Assets: `assets.toml` / `assets.lock` formats, `asset(id)`,
     `AssetMissing` (presence and sizes, never downloads).
-27. [ ] `ico assets lock / status / verify / fetch`: stdlib HTTPS, locks,
+27. [x] `ico assets lock / status / verify / fetch`: stdlib HTTPS, locks,
     atomic, resumable, offline.
 28. [ ] `ico assets adopt` (files already on disk, after a full hash) and
     `gc` (listing first).
