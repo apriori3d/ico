@@ -130,6 +130,31 @@ async function getJson(path) {
 const getStatus = () => getJson("api/runs");
 const getPlan = (runId) => getJson("api/plan?run=" + encodeURIComponent(runId));
 const getProfile = (runId) => getJson("api/profile?run=" + encodeURIComponent(runId));
+const getResources = (runId) => getJson("api/resources?run=" + encodeURIComponent(runId));
+const RESOURCE_COLUMNS = [
+  ["resource", "Resource"], ["process", "Process"], ["uses", "Uses"], ["in_use", "In use"],
+  ["loads", "Loads"], ["load", "Load"], ["moves", "Moves"], ["move", "Move"],
+  ["reloads", "Reloads"], ["size", "Size"], ["on", "On"],
+];
+
+// Loaded models of a profiled run: reloads in red (the RAM budget is too small).
+function renderResources(rows) {
+  const table = el("table", "plan");
+  const head = el("tr");
+  RESOURCE_COLUMNS.forEach(([key, name]) =>
+    head.append(el("th", ["resource", "process", "on"].includes(key) ? "" : "num", name)));
+  table.append(head);
+  for (const row of rows) {
+    const tr = el("tr");
+    RESOURCE_COLUMNS.forEach(([key]) => {
+      const cell = el("td", ["resource", "process", "on"].includes(key) ? "" : "num", row[key]);
+      if (key === "reloads" && row[key] !== "0") cell.style.color = "var(--hot, #c33)";
+      tr.append(cell);
+    });
+    table.append(tr);
+  }
+  return table;
+}
 
 const POLL_MS = 1000;
 const plans = new Map();     // run id → plan view (fetched once)
@@ -276,16 +301,18 @@ async function fillPlan(view) {
     if (!plans.has(run.id)) plans.set(run.id, await getPlan(run.id));
     const cached = profiles.get(run.id);
     if (run.has_profile && (run.state === "running" || !cached || cached.state !== run.state)) {
-      profiles.set(run.id, { state: run.state, cells: await getProfile(run.id) });
+      const [cells, resources] = await Promise.all([getProfile(run.id), getResources(run.id)]);
+      profiles.set(run.id, { state: run.state, cells, resources });
     }
     const plan = plans.get(run.id);
     const profile = profiles.has(run.id) ? profiles.get(run.id).cells : null;
-    const shown = JSON.stringify([plan, profile]);
+    const resources = profiles.has(run.id) ? profiles.get(run.id).resources : null;
+    const shown = JSON.stringify([plan, profile, resources]);
     if (shown !== view.shown) {
       view.shown = shown;
-      view.graph.replaceChildren(
-        plan ? renderPlanTable(plan, profile) : el("div", "kind", "no plan"),
-      );
+      const parts = [plan ? renderPlanTable(plan, profile) : el("div", "kind", "no plan")];
+      if (resources && resources.length) parts.push(el("div", "kind", "Resources"), renderResources(resources));
+      view.graph.replaceChildren(...parts);
     }
   } finally {
     view.loading = false;

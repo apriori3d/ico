@@ -17,7 +17,12 @@ from datetime import datetime, timezone
 from typing import Literal, Protocol, TypedDict
 
 from ico.describe.plan.json_renderer import PlanView
-from ico.tools.profiler.report import ProfileCells, profile_cells
+from ico.tools.profiler.report import (
+    ProfileCells,
+    ResourceCells,
+    profile_cells,
+    resource_cells,
+)
 from ico.tools.profiler.tool import ProfileSnapshot
 
 RunState = Literal["running", "done", "failed"]
@@ -69,6 +74,11 @@ class BoardSource(Protocol):
         profiled."""
         ...
 
+    def resources(self, run_id: str) -> list[ResourceCells] | None:
+        """The resource rows of a profiled run (uses, loads, reloads,
+        size), if profiled."""
+        ...
+
 
 class BoardRun:
     """One run of a :class:`BoardRuns`; its methods are thread-safe."""
@@ -85,6 +95,7 @@ class BoardRun:
         self._duration: float | None = None
         self._progress: dict[str, NodeProgress] = {}
         self._profile: dict[str, ProfileCells] | None = None
+        self._resources: list[ResourceCells] | None = None
         self._lock = lock
 
     def progress(self, snapshot: ProgressSnapshot) -> None:
@@ -96,12 +107,18 @@ class BoardRun:
     def profile(self, snapshot: ProfileSnapshot) -> None:
         """Keep the latest profile of the run (a ``ProfilerTool`` snapshot)."""
         cells = profile_cells(snapshot)
+        rows = resource_cells(snapshot)
         with self._lock:
             self._profile = cells
+            self._resources = rows
 
     def profile_cells(self) -> dict[str, ProfileCells] | None:
         with self._lock:
             return self._profile
+
+    def resource_rows(self) -> list[ResourceCells] | None:
+        with self._lock:
+            return self._resources
 
     def finish(self, error: str | None = None, *, summary: str | None = None) -> None:
         """Mark the run ``done``, or ``failed`` with an error message.
@@ -170,6 +187,11 @@ class BoardRuns:
         with self._lock:
             run = self._runs.get(run_id)
         return run.profile_cells() if run is not None else None
+
+    def resources(self, run_id: str) -> list[ResourceCells] | None:
+        with self._lock:
+            run = self._runs.get(run_id)
+        return run.resource_rows() if run is not None else None
 
 
 def _node(snapshot: ProgressSnapshot) -> NodeProgress:

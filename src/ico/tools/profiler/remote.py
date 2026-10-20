@@ -23,7 +23,9 @@ from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.tree_utils import TreePathIndex
+from ico.resources.pool import pool
 from ico.tools.profiler.metrics import IcoMetric
+from ico.tools.profiler.resources import ResourceProfile, ResourceStats
 from ico.tools.profiler.table import Layout, NodeAggregate, ProfileTable
 
 
@@ -37,13 +39,27 @@ class IcoProfileEvent(IcoRuntimeEvent):
     nodes: dict[str, NodeAggregate]
     peak_rss: int | None
     """Peak resident memory of the process in bytes, if known."""
+    resources: tuple[ResourceProfile, ...] = ()
+    """The resource rows of the process's pool (``process`` set by the
+    profiler tool that merges them)."""
+    resource_peaks: tuple[tuple[str, int], ...] = ()
+    """Most bytes the process's pool held at once, per device."""
 
     @staticmethod
     def create(
-        layout: Layout, nodes: dict[str, NodeAggregate], peak_rss: int | None
+        layout: Layout,
+        nodes: dict[str, NodeAggregate],
+        peak_rss: int | None,
+        resources: tuple[ResourceProfile, ...] = (),
+        resource_peaks: tuple[tuple[str, int], ...] = (),
     ) -> IcoProfileEvent:
         return IcoProfileEvent(
-            trace=TreePathIndex(), layout=layout, nodes=nodes, peak_rss=peak_rss
+            trace=TreePathIndex(),
+            layout=layout,
+            nodes=nodes,
+            peak_rss=peak_rss,
+            resources=resources,
+            resource_peaks=resource_peaks,
         )
 
 
@@ -92,6 +108,7 @@ class ProfileHost(IcoOperator[Any, Any], IcoRuntimeNode):
         self.interval = interval
         self.clock = clock
         self._last = clock()
+        self._resources = ResourceStats()
 
     def _run(self, item: Any) -> Any:
         out = self.flow(item)
@@ -103,15 +120,24 @@ class ProfileHost(IcoOperator[Any, Any], IcoRuntimeNode):
         super().on_activate()
         self.table.reset()
         self._last = self.clock()
+        self._resources = ResourceStats()
+        pool().add_listener(self._resources)
 
     def on_deactivate(self) -> None:
         super().on_deactivate()
+        pool().remove_listener(self._resources)
         self._emit()
 
     def _emit(self) -> None:
         self._last = self.clock()
         self.bubble_event(
-            IcoProfileEvent.create(self.table.layout, self.table.merged(), peak_rss())
+            IcoProfileEvent.create(
+                self.table.layout,
+                self.table.merged(),
+                peak_rss(),
+                tuple(self._resources.rows()),
+                tuple(sorted(self._resources.peaks().items())),
+            )
         )
 
 

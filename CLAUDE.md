@@ -210,6 +210,10 @@ PR each:
     network volume); runs that carry the manifest resolve `asset(id)`.
 33. [x] A run that carries the manifest ends at once with `missing_assets`
     (ids, reasons, sizes) when an asset its spec needs is not there.
+34. [x] Findings of the domain migration: worker processes send their pool's
+    resource rows with their profile events (rows carry the process);
+    the Live Board shows a resources table (`/api/resources`); a resource
+    field that hides a method of `Resource` (`size`) is rejected.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in

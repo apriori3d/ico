@@ -7,7 +7,7 @@ Live Board). Rows of the plan join them by ``plan_view(...)["keys"]``.
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from rich.console import Console
 from rich.table import Table
@@ -221,23 +221,69 @@ def _info(node: NodeProfile) -> str:
     return " · ".join(parts)
 
 
+class ResourceCells(TypedDict):
+    """A resource row of a profile, formatted (the board and the console)."""
+
+    resource: str
+    process: str
+    uses: str
+    in_use: str
+    loads: str
+    load: str
+    moves: str
+    move: str
+    reloads: str
+    size: str
+    on: str
+
+
+RESOURCE_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("resource", "Resource"), ("process", "Process"), ("uses", "Uses"),
+    ("in_use", "In use"), ("loads", "Loads"), ("load", "Load"), ("moves", "Moves"),
+    ("move", "Move"), ("reloads", "Reloads"), ("size", "Size"), ("on", "On"),
+)  # fmt: skip
+
+
+def resource_cells(snapshot: ProfileSnapshot) -> list[ResourceCells]:
+    """The resource rows of a profile, formatted: uses, time in use, loads
+    and moves with their time, reloads (the RAM budget is too small),
+    size and devices, per process."""
+    out: list[ResourceCells] = []
+    for row in snapshot["resources"]:
+        size = row["bytes"]
+        out.append(
+            {
+                "resource": row["ref"],
+                "process": row["process"],
+                "uses": str(row["uses"]),
+                "in_use": duration(row["in_use"]),
+                "loads": str(row["loads"]),
+                "load": duration(row["load_seconds"]),
+                "moves": str(row["moves"]),
+                "move": duration(row["move_seconds"]),
+                "reloads": str(row["reloads"]),
+                "size": f"{size / 1e9:.2f} GB" if size is not None else "",
+                "on": ", ".join(row["devices"]),
+            }
+        )
+    return out
+
+
 def _resource_table(snapshot: ProfileSnapshot) -> Table:
     """Resources: uses, time in use, loads and moves with their time,
     reloads, size."""
-    table = Table(show_lines=False, show_edge=False, box=None, title_justify="left")
-    for column in ("Resource", "Uses", "In use", "Loads", "Load", "Moves", "Move",
-                   "Reloads", "Size", "On"):  # fmt: skip
-        table.add_column(
-            column,
-            no_wrap=True,
-            justify="left" if column in ("Resource", "On") else "right",
-        )
-    for row in snapshot["resources"]:
-        size = row["bytes"]
-        table.add_row(
-            row["ref"], str(row["uses"]), duration(row["in_use"]), str(row["loads"]),
-            duration(row["load_seconds"]), str(row["moves"]), duration(row["move_seconds"]),
-            Text(str(row["reloads"]), style="bold red" if row["reloads"] else ""),
-            f"{size / 1e9:.2f} GB" if size is not None else "", ", ".join(row["devices"]),
-        )  # fmt: skip
+    table = Table(show_lines=False, show_edge=False, box=None)
+    for key, name in RESOURCE_COLUMNS:
+        left = key in ("resource", "process", "on")
+        table.add_column(name, no_wrap=True, justify="left" if left else "right")
+    for cells in resource_cells(snapshot):
+        row = cast(dict[str, str], cells)
+        values = [
+            Text(
+                row[key],
+                style="bold red" if key == "reloads" and row[key] != "0" else "",
+            )
+            for key, _ in RESOURCE_COLUMNS
+        ]
+        table.add_row(*values)
     return table

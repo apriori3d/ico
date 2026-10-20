@@ -106,6 +106,8 @@ def _handler(board: LiveBoard) -> type[BaseHTTPRequestHandler]:
                 self._json(board.source.plan(query.get("run", [""])[0]))
             elif url.path == "/api/profile":
                 self._json(board.source.profile(query.get("run", [""])[0]))
+            elif url.path == "/api/resources":
+                self._json(board.source.resources(query.get("run", [""])[0]))
             else:
                 self._send(HTTPStatus.NOT_FOUND, b"not found", "text/plain")
 

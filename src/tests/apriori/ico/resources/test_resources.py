@@ -179,6 +179,8 @@ def test_declaration_rules() -> None:
         resource("test.loose", 1)(Loose)
     with pytest.raises(ValueError, match="already"):
         resource("test.model", 1)(Clash)
+    with pytest.raises(TypeError, match="field\\(s\\) size that hide methods"):
+        resource("test.sized", 1)(Sized)
 
 
 @dataclass
@@ -189,6 +191,11 @@ class Loose(Resource[int]):
 @dataclass(frozen=True)
 class Clash(Resource[int]):
     pass
+
+
+@dataclass(frozen=True)
+class Sized(Resource[int]):
+    size: int = 1  # type: ignore[assignment]  # the hidden method under test
 
 
 # ─── Operators ───

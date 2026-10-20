@@ -2,6 +2,7 @@ import json
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -11,6 +12,7 @@ from ico import IcoOperator, IcoRuntime, LiveBoardTool, PlanView
 from ico.core.runtime.progress import IcoProgress
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
+from ico.resources import Resource, resource
 from ico.tools.board import BoardRuns, LiveBoard
 from ico.tools.profiler import instrument
 
@@ -189,6 +191,39 @@ def test_board_serves_the_profile_by_plan_key(
     ]
     assert profile[slow_key]["count"] == "4"
     assert "Share of work" in get(live, "/")
+
+
+@resource("test.board_table", 1)
+@dataclass(frozen=True)
+class BoardTable(Resource[list[int]]):
+    """A table for the board's resource rows."""
+
+    def load(self) -> list[int]:
+        return [1, 2, 3]
+
+
+def use_table(x: int) -> int:
+    with BoardTable().use() as table:
+        return x + table[0]
+
+
+def test_board_serves_the_resource_rows(board: tuple[BoardRuns, LiveBoard]) -> None:
+    runs, live = board
+    tool = LiveBoardTool(runs, profile=True)
+    assert tool.profiler is not None
+    flow = instrument(
+        IcoSource(numbers) | IcoOperator(use_table).stream() | IcoSink(ignore),
+        tool.profiler,
+    )
+    IcoRuntime(flow, tools=[tool]).activate().run().deactivate()
+
+    [view] = runs.runs()
+    [row] = get(live, f"/api/resources?run={view['id']}")
+    assert (row["resource"], row["process"], row["uses"], row["loads"], row["reloads"]) == (
+        "test.board_table@1", "main", "4", "1", "0",
+    )  # fmt: skip
+    assert "renderResources" in get(live, "/")
+    assert runs.resources("missing") is None
 
 
 def test_a_run_without_profile() -> None:
