@@ -42,6 +42,9 @@ examples = [
     "pydot (>=4.0.1,<5.0.0)",
     "graphviz (>=0.21,<0.22)",
 ]
+remote = [
+    "boto3>=1.35",
+]
 vision = [
     "torch>=2.9.1",
     "torchvision>=0.24.1",
@@ -70,6 +73,7 @@ torch = {version = "^2.9.1", optional = true}
 torchvision = {version = "^0.24.1", optional = true}
 matplotlib = {version = "^3.10.7", optional = true}
 ipywidgets = {version = "^8.1.8", optional = true}
+boto3 = {version = "^1.35", optional = true}
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.18.2"
@@ -78,9 +82,12 @@ pytest = "^8.3.3"
 pytest-xdist = "^3.6.1"
 ipykernel = "^7.2.0"
 pyright = "^1.1.404"
+boto3 = "^1.35"
+moto = {version = "^5.1", extras = ["s3", "server"]}
 
 [tool.poetry.extras]
 notebook = ["ipywidgets"]
+remote = ["boto3"]
 vision = [
     "torch",
     "torchvision",

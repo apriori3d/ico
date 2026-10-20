@@ -3,12 +3,14 @@ through the job's JSON.
 
 The runner downloads the storage URIs of a job's input and params into the
 job's work directory (stage in) and uploads its outputs (stage out). Only
-``file://`` is built in (tests, a shared disk); ``s3://`` comes with the
-``ico[remote]`` extra.
+``file://`` is built in (tests, a shared disk); ``s3://`` (any
+S3-compatible service: R2, B2, MinIO) comes with the ``ico[remote]``
+extra.
 """
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 from pathlib import Path
 from typing import Protocol
@@ -57,9 +59,18 @@ def register_storage(scheme: str, storage: Storage) -> None:
 
 
 def storage_for(uri: str) -> Storage | None:
-    """The storage of a URI, or ``None`` if it is not a storage URI."""
+    """The storage of a URI, or ``None`` if it is not a storage URI.
+    ``s3://`` is registered on first use when ``boto3`` is installed."""
     scheme = urlsplit(uri).scheme
-    return _STORAGES.get(scheme) if scheme and "://" in uri else None
+    if not scheme or "://" not in uri:
+        return None
+    if scheme == "s3" and scheme not in _STORAGES:
+        if importlib.util.find_spec("boto3") is None:
+            raise ImportError(f"{uri}: s3:// storage needs boto3: install ico[remote]")
+        from ico.remote.s3 import S3Storage
+
+        _STORAGES[scheme] = S3Storage()
+    return _STORAGES.get(scheme)
 
 
 def join(prefix: str, relative: str) -> str:
