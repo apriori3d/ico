@@ -1,6 +1,7 @@
 """Jobs end to end: a runner subprocess, operators by value or on disk,
 file:// staging, errors, cancellation, recent samples and profiles."""
 
+import fcntl
 import textwrap
 from pathlib import Path
 from typing import Any, cast
@@ -41,6 +42,24 @@ OPS = textwrap.dedent(
     def fail(word: str) -> str:
         """Fail."""
         raise ValueError("boom")
+
+
+    @register("jobs.once", 1)
+    class Once(IcoOperator[str, str]):
+        """Process a word once per work directory (a mark file per word)."""
+
+        def __init__(self, work_dir: str) -> None:
+            self.work_dir = work_dir
+            super().__init__(fn=self._apply)
+
+        def _apply(self, word: str) -> str:
+            mark = Path(self.work_dir) / word
+            if mark.exists():
+                return "cached:" + word
+            time.sleep(0.05)
+            mark.parent.mkdir(parents=True, exist_ok=True)
+            mark.touch()
+            return word
 
 
     @register("jobs.upper_file", 1)
@@ -169,6 +188,60 @@ def test_a_cancelled_job_returns_what_it_produced(tmp_path: Path) -> None:
     assert final["event"] == "result"
     assert final["result"]["cancelled"] == "cancelled"
     assert 3 <= len(final["result"]["outputs"]) < 200
+
+
+def test_a_job_sent_again_resumes(tmp_path: Path) -> None:
+    executor = LocalExecutor(tmp_path)
+    spec = words_then(op("jobs.once@1", work_dir={"$param": "marks"}))
+    words = " ".join(f"w{i}" for i in range(40))
+    first = submit(
+        spec, words, executor=executor, packages=[PACKAGE], sources=SOURCES,
+        params={"marks": "$JOB/marks"}, id="video-1",
+    )  # fmt: skip
+    for raw in first.events():
+        event = cast(dict[str, Any], raw)
+        if event["event"] == "progress" and event["snapshot"]["done"] >= 3:
+            first.cancel()
+    again = submit(
+        spec, words, executor=executor, packages=[PACKAGE], sources=SOURCES,
+        params={"marks": "$JOB/marks"}, id="video-1",
+    )  # fmt: skip
+    outputs = cast(list[str], result(again)["outputs"])
+
+    cached = [o for o in outputs if o.startswith("cached:")]
+    assert 3 <= len(cached) < 40 and len(outputs) == 40
+    assert outputs[: len(cached)] == [f"cached:w{i}" for i in range(len(cached))]
+
+
+def test_a_resumed_job_keeps_its_inputs(tmp_path: Path) -> None:
+    source = tmp_path / "a.txt"
+    source.write_text("hello")
+    executor = LocalExecutor(tmp_path / "jobs")
+
+    def send() -> list[Any]:
+        handle = submit(
+            op("jobs.upper_file@1", out_dir={"$param": "out_dir"}),
+            f"file://{source}", params={"out_dir": "$JOB/out"},
+            executor=executor, packages=[PACKAGE], sources=SOURCES, id="j",
+        )  # fmt: skip
+        return cast(list[Any], result(handle)["outputs"])
+
+    first = send()
+    source.write_text("changed")
+    assert send() == first
+    staged = tmp_path / "jobs" / "j" / "in"
+    assert (staged / "a.txt").read_text() == "hello"
+    assert not (staged / "a-1.txt").exists()
+
+
+def test_one_runner_per_work_directory(tmp_path: Path) -> None:
+    (tmp_path / "j").mkdir()
+    with (tmp_path / "j" / ".lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        events = run_events(
+            LocalExecutor(tmp_path), spec=op("jobs.shout@1"), input="x", id="j"
+        )
+    assert events[-1]["code"] == "busy"
 
 
 def test_recent_samples_and_profile(tmp_path: Path) -> None:

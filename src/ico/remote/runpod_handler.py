@@ -6,9 +6,11 @@ and yields its events, which ``/stream`` delivers to the executor. When
 RunPod cancels the job, the runner gets SIGTERM (it stops between items)
 and is killed after ``CANCEL_GRACE`` seconds.
 
-Environment: ``ICO_WORKDIRS`` (where work directories go; a network
-volume makes jobs resumable), ``ICO_CODE`` (the runner's working
-directory: the domain's packages in the image).
+Environment: ``ICO_WORKDIRS`` (where work directories go; by default on
+the endpoint's network volume when one is mounted, which makes jobs
+resumable: cancel one to stop billing, send it again with the same id to
+continue), ``ICO_CODE`` (the runner's working directory: the domain's
+packages in the image).
 """
 
 from __future__ import annotations
@@ -26,13 +28,15 @@ from typing import Any, cast
 from ico.remote.job import JsonObject
 
 CANCEL_GRACE = 10.0
+VOLUME = Path("/runpod-volume")
+"""Where RunPod mounts an endpoint's network volume."""
 LINE_LIMIT = 64 * 1024 * 1024
 
 
 async def handler(request: JsonObject) -> AsyncIterator[JsonObject]:
     """Run the ICO job of a RunPod job; yield its events."""
     job = cast(JsonObject, cast(JsonObject, request["input"])["job"])
-    root = Path(os.environ.get("ICO_WORKDIRS", "/tmp/ico-jobs"))
+    root = workdirs()
     workdir = root / str(job.get("id") or request.get("id"))
     workdir.mkdir(parents=True, exist_ok=True)
     process = await asyncio.create_subprocess_exec(
@@ -58,6 +62,14 @@ async def handler(request: JsonObject) -> AsyncIterator[JsonObject]:
     except asyncio.CancelledError:
         await _stop(process)
         raise
+
+
+def workdirs() -> Path:
+    """``ICO_WORKDIRS``, else the network volume, else ``/tmp``."""
+    configured = os.environ.get("ICO_WORKDIRS")
+    if configured:
+        return Path(configured)
+    return VOLUME / "ico-jobs" if VOLUME.is_dir() else Path("/tmp/ico-jobs")
 
 
 async def _stop(process: asyncio.subprocess.Process) -> None:

@@ -15,6 +15,7 @@ from typing import Any, cast
 import pytest
 
 import ico.remote.runpod as runpod_module
+import ico.remote.runpod_handler as runpod_handler
 from ico.remote import Job, RemoteError, RunPod, result, submit
 from ico.remote.job import JsonObject
 from ico.remote.runpod_handler import handler
@@ -213,3 +214,15 @@ def _job(spec: dict[str, Any], input: str) -> Job:
 @dataclass
 class _Clock:
     sleep: Any
+
+
+def test_work_directories_go_to_the_network_volume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("ICO_WORKDIRS", raising=False)
+    monkeypatch.setattr(runpod_handler, "VOLUME", tmp_path / "missing")
+    assert runpod_handler.workdirs() == Path("/tmp/ico-jobs")
+    monkeypatch.setattr(runpod_handler, "VOLUME", tmp_path)
+    assert runpod_handler.workdirs() == tmp_path / "ico-jobs"
+    monkeypatch.setenv("ICO_WORKDIRS", "/data/jobs")
+    assert runpod_handler.workdirs() == Path("/data/jobs")

@@ -67,7 +67,15 @@ Runs one job in a work directory (`$JOB`):
 5. **Resume.** The work directory may be a persistent volume
    (`storage.work`): a job sent again with the same id continues from the
    files its operators left (VACE windows, cleaned scenes) — this is how a
-   run is "paused": cancel it (billing stops), send it again later.
+   run is "paused": cancel it (billing stops), send it again later
+   (`submit(..., id=...)`). URIs come back to the local paths they were
+   downloaded to (`$JOB/in/.staged.json`), without downloading them again,
+   so operators that key their files by input path find them. One runner
+   at a time holds a work directory (`flock` on `$JOB/.lock`, released when
+   the process dies); a second one ends with the error `busy`. On RunPod
+   the work directories go to the endpoint's network volume
+   (`/runpod-volume/ico-jobs`) when one is mounted. A RunPod cancel loses
+   the outputs so far (RunPod stops the handler), not the files.
 
 The runner knows nothing of a provider: it reads a request and calls
 `emit`.
