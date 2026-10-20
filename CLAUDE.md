@@ -205,6 +205,9 @@ PR each:
     rows.
 30. [x] `spec_assets(spec, params)` through resources.
 31. [ ] A pool across jobs: the RunPod worker runs jobs in process.
+32. [x] Prefetch jobs (`docs/design/remote.md`, "Assets on the remote
+    side"): `FetchJob` downloads assets into the worker's asset root (the
+    network volume); runs that carry the manifest resolve `asset(id)`.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in

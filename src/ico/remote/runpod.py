@@ -23,7 +23,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import cast
 
-from ico.remote.job import FINAL, Job, JsonObject
+from ico.remote.job import FINAL, AnyJob, JsonObject
 from ico.spec.model import JsonValue
 
 API = "https://api.runpod.ai/v2"
@@ -54,7 +54,7 @@ class RunPod:
     poll: float = 1.0
     base_url: str = API
 
-    def submit(self, job: Job) -> RunPodJob:
+    def submit(self, job: AnyJob) -> RunPodJob:
         ttl = self.ttl if self.ttl is not None else self.execution_timeout + 86400
         body: JsonObject = {
             "input": {"job": job.to_dict()},

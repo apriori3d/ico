@@ -19,7 +19,15 @@ from dataclasses import replace
 from pathlib import Path
 from typing import IO, Protocol, cast
 
-from ico.remote.job import FINAL, Job, JsonObject, Package, RemoteError, spec_json
+from ico.remote.job import (
+    FINAL,
+    AnyJob,
+    Job,
+    JsonObject,
+    Package,
+    RemoteError,
+    spec_json,
+)
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec
 
 
@@ -41,7 +49,7 @@ class JobHandle(Protocol):
 class Executor(Protocol):
     """Where jobs run."""
 
-    def submit(self, job: Job) -> JobHandle: ...
+    def submit(self, job: AnyJob) -> JobHandle: ...
 
 
 def result(handle: JobHandle) -> JsonObject:
@@ -114,7 +122,7 @@ class LocalExecutor:
         self.python = python
         self.cwd = cwd
 
-    def submit(self, job: Job) -> LocalJob:
+    def submit(self, job: AnyJob) -> LocalJob:
         workdir = self.workdirs / job.id
         workdir.mkdir(parents=True, exist_ok=True)
         process = subprocess.Popen(
