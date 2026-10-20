@@ -8,6 +8,7 @@ and a generated ``assets.lock`` (the size and sha256 of every file).
 ``docs/proposals/2026-10-20-assets-and-resources.md``.
 """
 
+from ico.assets.ids import AssetId
 from ico.assets.manifest import (
     AssetFile,
     AssetLock,
@@ -22,6 +23,7 @@ from ico.assets.store import AssetMissing, Assets, asset
 
 __all__ = [
     "AssetFile",
+    "AssetId",
     "AssetLock",
     "AssetMissing",
     "AssetSpec",
