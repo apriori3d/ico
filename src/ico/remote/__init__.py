@@ -17,6 +17,7 @@ from ico.remote.executor import (
 )
 from ico.remote.job import Job, Package, RemoteError
 from ico.remote.runner import run_job
+from ico.remote.runpod import RunPod, RunPodJob
 from ico.remote.storage import FileStorage, Storage, register_storage
 
 __all__ = [
@@ -28,6 +29,8 @@ __all__ = [
     "LocalJob",
     "Package",
     "RemoteError",
+    "RunPod",
+    "RunPodJob",
     "Storage",
     "register_storage",
     "result",
