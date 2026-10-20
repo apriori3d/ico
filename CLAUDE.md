@@ -190,6 +190,22 @@ Remote runs (design: `docs/design/remote.md`). One PR each:
 24. [x] `RunPodExecutor` and `runpod_handler`, against a fake RunPod API.
 25. [x] Resume and cancel: work directory on a volume, job ids.
 
+Assets and resources (proposal:
+`docs/proposals/2026-10-20-assets-and-resources.md`, its section 9). One
+PR each:
+
+26. [x] Assets: `assets.toml` / `assets.lock` formats, `asset(id)`,
+    `AssetMissing` (presence and sizes, never downloads).
+27. [ ] `ico assets lock / status / verify / fetch`: stdlib HTTPS, locks,
+    atomic, resumable, offline.
+28. [ ] `ico assets adopt` (files already on disk, after a full hash) and
+    `gc` (listing first).
+29. [ ] Resources: `@resource`, `Resource[T]`, the pool (`use` / release,
+    keys, RAM budget, LRU), resource params in cards and specs, profile
+    rows.
+30. [ ] `spec_assets(spec, params)` through resources.
+31. [ ] A pool across jobs: the RunPod worker runs jobs in process.
+
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.

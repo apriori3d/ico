@@ -4325,7 +4325,7 @@ version = "2.3.0"
 description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
-groups = ["dev"]
+groups = ["main", "dev"]
 markers = "python_version == \"3.10\""
 files = [
     {file = "tomli-2.3.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:88bd15eb972f3664f5ed4b57c1634a97153b4bac4479dcb6a495f41921eb7f45"},
@@ -4797,4 +4797,4 @@ vision = ["matplotlib", "torch", "torchvision"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "ac453597f0d20c713cb5f4c207da6d531b93d1701db17393b351871e458b293f"
+content-hash = "a5bdfeefddf91e02bed580d20c060d6de8967b9112ed8bb29805052a5b9354d1"
