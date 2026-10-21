@@ -24,6 +24,9 @@ from ico.remote.job import JsonObject
 from ico.spec.model import JsonValue
 
 REST_API = "https://rest.runpod.io/v1"
+USER_AGENT = "ico-remote"
+"""RunPod's REST API (behind Cloudflare) refuses the default
+``Python-urllib`` user agent: HTTP 403, error code 1010."""
 RETRIES = 5
 
 
@@ -129,6 +132,7 @@ class RunPodApi:
             request = urllib.request.Request(url, data=data, method=method)
             request.add_header("authorization", f"Bearer {key}")
             request.add_header("content-type", "application/json")
+            request.add_header("user-agent", USER_AGENT)
             try:
                 with urllib.request.urlopen(request, timeout=60) as response:
                     text = response.read()
