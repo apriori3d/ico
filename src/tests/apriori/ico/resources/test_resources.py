@@ -1,11 +1,13 @@
 """Resources: declaration, the pool (use / release, budgets, sharing),
 resource params of operators in cards and specs, and profile rows."""
 
+import os
 import threading
 import time
 from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -20,6 +22,7 @@ from ico.resources import (
     resource,
     set_pool,
 )
+from ico.resources.pool import memory, ram_budget
 from ico.spec import NodeSpec, SpecError, build, to_spec
 from ico.spec.run import run
 from ico.tools.profiler import ProfilerTool
@@ -126,6 +129,34 @@ def test_a_gpu_budget_keeps_idle_models_on_the_device() -> None:
     with FakeModel(name="b").use("cuda") as other:  # over the budget: a goes back
         pass
     assert model.moves == ["cuda", "cpu"] and other.device == "cuda"
+
+
+def test_a_ram_budget_is_a_size_or_a_share_of_the_memory(tmp_path: Path) -> None:
+    physical = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    assert memory(tmp_path) == physical  # no cgroup files: the host
+    (tmp_path / "memory.max").write_text("max\n")
+    assert memory(tmp_path) == physical  # v2 without a limit
+    (tmp_path / "memory.max").write_text(f"{4 * GB}\n")
+    assert memory(tmp_path) == 4 * GB  # a container: its limit, not the host
+    (tmp_path / "memory.max").unlink()
+    (tmp_path / "memory").mkdir()
+    (tmp_path / "memory" / "memory.limit_in_bytes").write_text(f"{2 * GB}\n")
+    assert memory(tmp_path) == 2 * GB  # v1
+    assert ram_budget("80%", tmp_path) == int(1.6 * GB)
+    assert ram_budget(None, tmp_path) == ram_budget("", tmp_path) == 1 * GB
+    assert ram_budget("3GB", tmp_path) == 3 * GB
+    for bad in ("0%", "120%", "x%"):
+        with pytest.raises(ValueError, match="not a share"):
+            ram_budget(bad, tmp_path)
+
+
+def test_the_pool_reads_its_ram_budget_from_the_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ICO_RESOURCES_RAM", "25%")
+    assert ResourcePool().ram == ram_budget("25%")
+    monkeypatch.setenv("ICO_RESOURCES_RAM", "7GB")
+    assert ResourcePool().ram == 7 * GB
 
 
 def test_two_users_must_agree_on_the_device() -> None:

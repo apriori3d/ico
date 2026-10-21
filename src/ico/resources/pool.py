@@ -14,8 +14,10 @@ the pool decides where a released resource stays:
   for the same device.
 
 Budgets: ``ICO_RESOURCES_RAM`` and ``ICO_RESOURCES_GPU`` (bytes, or
-``"48GB"``, ``"512MB"``); RAM defaults to half the physical memory. Sizes
-come from :meth:`Resource.size` (unknown counts as 0).
+``"48GB"``, ``"512MB"``). RAM may also be a share of the memory the process
+may use (``"80%"``: the physical memory, or the cgroup limit of a container
+when lower) and defaults to ``"50%"``. Sizes come from
+:meth:`Resource.size` (unknown counts as 0).
 
 Every load, move, hit, release (with the time in use) and drop is an
 event for listeners (the profiler).
@@ -30,6 +32,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal, TypedDict, TypeVar
 
 from ico.resources.base import Resource
@@ -38,6 +41,7 @@ T = TypeVar("T")
 
 RAM_ENV = "ICO_RESOURCES_RAM"
 GPU_ENV = "ICO_RESOURCES_GPU"
+CGROUP = Path("/sys/fs/cgroup")
 CPU = "cpu"
 
 Action = Literal["load", "move", "hit", "release", "drop"]
@@ -88,7 +92,7 @@ class ResourcePool:
         gpu: int | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
-        self.ram = ram if ram is not None else _budget(RAM_ENV, _half_memory())
+        self.ram = ram if ram is not None else ram_budget(os.environ.get(RAM_ENV))
         self.gpu = gpu if gpu is not None else _budget(GPU_ENV, 0)
         self.clock = clock
         self._entries: dict[str, _Entry] = {}
@@ -321,8 +325,38 @@ def _budget(env: str, default: int) -> int:
     return parse_size(value) if value else default
 
 
-def _half_memory() -> int:
+def ram_budget(text: str | None, cgroup: Path = CGROUP) -> int:
+    """Bytes of a RAM budget: a size, or a share of :func:`memory`
+    (``"80%"``); ``None`` or empty is ``"50%"``.
+
+    Raises:
+        ValueError: Neither a size nor a share in (0, 100].
+    """
+    text = (text or "50%").strip()
+    if not text.endswith("%"):
+        return parse_size(text)
     try:
-        return os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") // 2
+        share = float(text[:-1])
+    except ValueError:
+        raise ValueError(f"not a share: {text!r} (e.g. 80%)") from None
+    if not 0 < share <= 100:
+        raise ValueError(f"not a share: {text!r} (e.g. 80%)")
+    return int(memory(cgroup) * share / 100)
+
+
+def memory(cgroup: Path = CGROUP) -> int:
+    """Bytes this process may use: the physical memory, or the memory limit
+    of its cgroup (v2 ``memory.max``, v1 ``memory.limit_in_bytes``) when
+    lower. A container sees the memory of its host, not its limit."""
+    try:
+        total = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
     except (AttributeError, ValueError, OSError):  # pragma: no cover
-        return 8 * 10**9
+        total = 16 * 10**9
+    for path in (cgroup / "memory.max", cgroup / "memory" / "memory.limit_in_bytes"):
+        try:
+            limit = path.read_text().strip()
+        except OSError:
+            continue
+        if limit.isdigit():  # v2 "max": no limit
+            total = min(total, int(limit))
+    return total
