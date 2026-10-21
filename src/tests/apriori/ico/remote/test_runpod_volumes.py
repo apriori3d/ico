@@ -47,6 +47,8 @@ class FakeRest:
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
 
     def serve(self, request: BaseHTTPRequestHandler, method: str) -> None:
+        if request.headers["user-agent"].startswith("Python-urllib"):
+            return self.reply(request, 403, "error code: 1010")  # as Cloudflare does
         if request.headers["authorization"] != f"Bearer {KEY}":
             return self.reply(request, 401, {"error": "unauthorized"})
         length = int(request.headers.get("content-length") or 0)

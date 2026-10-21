@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from ico.remote.job import FINAL, AnyJob, JsonObject
+from ico.remote.runpod_api import USER_AGENT
 from ico.spec.model import JsonValue
 
 API = "https://api.runpod.ai/v2"
@@ -76,6 +77,7 @@ class RunPod:
             request = urllib.request.Request(url, data=data, method=method)
             request.add_header("authorization", f"Bearer {key}")
             request.add_header("content-type", "application/json")
+            request.add_header("user-agent", USER_AGENT)
             try:
                 with urllib.request.urlopen(request, timeout=60) as response:
                     return cast(JsonObject, json.loads(response.read() or b"{}"))
