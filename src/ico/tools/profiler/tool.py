@@ -177,11 +177,17 @@ class ProfilerTool(IcoRuntimeTool):
             remote = sorted(self._remote.items())
         resources = self._resources.rows()
         peaks = self._resources.peaks()
+        names = [event.process for _, event in remote]
         for source, event in remote:
             layout.update(event.layout)
             merge_into(merged, event.nodes)
             processes.append({"source": source, "peak_rss": event.peak_rss})
-            resources.extend({**row, "process": source} for row in event.resources)
+            # The worker's name; with the runtime path when two share it
+            # (a pool of workers from one factory).
+            process = event.process or source
+            if not event.process or names.count(event.process) > 1:
+                process = f"{event.process} {source}".strip()
+            resources.extend({**row, "process": process} for row in event.resources)
             for device, size in event.resource_peaks:
                 peaks[device] = peaks.get(device, 0) + size
         frames = sum(node.frames for node in merged.values())

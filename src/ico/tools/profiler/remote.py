@@ -44,6 +44,8 @@ class IcoProfileEvent(IcoRuntimeEvent):
     profiler tool that merges them)."""
     resource_peaks: tuple[tuple[str, int], ...] = ()
     """Most bytes the process's pool held at once, per device."""
+    process: str = ""
+    """The name of the worker whose runner sent it (its plan label)."""
 
     @staticmethod
     def create(
@@ -52,6 +54,7 @@ class IcoProfileEvent(IcoRuntimeEvent):
         peak_rss: int | None,
         resources: tuple[ResourceProfile, ...] = (),
         resource_peaks: tuple[tuple[str, int], ...] = (),
+        process: str = "",
     ) -> IcoProfileEvent:
         return IcoProfileEvent(
             trace=TreePathIndex(),
@@ -60,6 +63,7 @@ class IcoProfileEvent(IcoRuntimeEvent):
             peak_rss=peak_rss,
             resources=resources,
             resource_peaks=resource_peaks,
+            process=process,
         )
 
 
@@ -75,6 +79,8 @@ class RunnerProfiler:
     root_key: str
     metrics: tuple[IcoMetric, ...]
     interval: float | None
+    name: str = ""
+    """The worker's plan label: the process its rows are shown under."""
 
     def wrap(
         self, flow: IcoOperatorProtocol[Any, Any]
@@ -83,7 +89,7 @@ class RunnerProfiler:
 
         table = ProfileTable(self.metrics)
         instrument_table(flow, table, self.root_key, self.interval)
-        return ProfileHost(flow, table, self.interval)
+        return ProfileHost(flow, table, self.interval, name=self.name)
 
 
 @final
@@ -97,6 +103,7 @@ class ProfileHost(IcoOperator[Any, Any], IcoRuntimeNode):
         table: ProfileTable,
         interval: float | None,
         *,
+        name: str = "",
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         IcoOperator.__init__(  # pyright: ignore[reportUnknownMemberType]
@@ -107,6 +114,7 @@ class ProfileHost(IcoOperator[Any, Any], IcoRuntimeNode):
         self.table = table
         self.interval = interval
         self.clock = clock
+        self.process = name
         self._last = clock()
         self._resources = ResourceStats()
 
@@ -137,6 +145,7 @@ class ProfileHost(IcoOperator[Any, Any], IcoRuntimeNode):
                 peak_rss(),
                 tuple(self._resources.rows()),
                 tuple(sorted(self._resources.peaks().items())),
+                self.process,
             )
         )
 

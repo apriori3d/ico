@@ -27,8 +27,11 @@ from ico.resources.pool import PoolEvent
 
 class ResourceProfile(TypedDict):
     process: str
-    """``main``, or the runtime path of the worker runner whose pool it is."""
+    """``main``, or the worker whose runner's pool it is (its name)."""
     ref: str
+    label: str
+    """The reference and the fields that tell the resource apart (two
+    experts of one class differ by their ``weights``)."""
     key: str
     uses: int
     in_use: float
@@ -60,7 +63,8 @@ class ResourceStats:
             if row is None:
                 row = self._rows[key] = {
                     "process": "main",
-                    "ref": event["ref"], "key": key, "uses": 0, "in_use": 0.0,
+                    "ref": event["ref"],
+                    "label": event["label"], "key": key, "uses": 0, "in_use": 0.0,
                     "loads": 0, "load_seconds": 0.0, "reloads": 0, "moves": 0,
                     "move_seconds": 0.0, "drops": 0, "bytes": None, "devices": [],
                 }  # fmt: skip

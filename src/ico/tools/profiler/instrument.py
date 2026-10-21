@@ -103,7 +103,7 @@ def _instrument_worker(
 ) -> None:
     remote = remote_flow_key(key, worker)
     table.layout.workers[key] = remote
-    probe = RunnerProfiler(remote, table.metrics, interval)
+    probe = RunnerProfiler(remote, table.metrics, interval, label(worker))
     current = worker.runner_probe
     if current is None or (isinstance(current, RunnerProfiler) and current != probe):
         worker.runner_probe = probe
