@@ -88,6 +88,9 @@ class Job:
         max_items: At most this many output items in the result.
         id: The job id; a job sent again with the same id and a persistent
             work directory resumes from the files it left.
+        volume: The bucket that is the worker's own network volume: its
+            ``s3://<volume>/...`` URIs are read and written at the volume's
+            mount (``/runpod-volume``) instead of through S3.
     """
 
     spec: JsonObject
@@ -100,6 +103,7 @@ class Job:
     recent: bool = False
     max_items: int | None = None
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    volume: str | None = None
 
     def to_dict(self) -> JsonObject:
         out: JsonObject = {
@@ -114,6 +118,8 @@ class Job:
             out["sources"] = dict[str, JsonValue](self.sources)
         if self.out is not None:
             out["out"] = self.out
+        if self.volume is not None:
+            out["volume"] = self.volume
         options: JsonObject = {"profile": self.profile, "recent": self.recent}
         if self.max_items is not None:
             options["max_items"] = self.max_items
@@ -141,6 +147,7 @@ class Job:
             recent=bool(options.get("recent", False)),
             max_items=max_items if isinstance(max_items, int) else None,
             id=str(data.get("id") or uuid.uuid4().hex),
+            volume=str(data["volume"]) if data.get("volume") else None,
         )
 
 

@@ -50,7 +50,33 @@ class FileStorage:
             shutil.copy2(path, target)
 
 
+class MountedStorage:
+    """``s3://<bucket>/<key>`` of a bucket mounted at a local directory: a
+    RunPod network volume is ``/runpod-volume`` on its workers and a bucket
+    of its S3 API outside, so a worker reads and writes its files directly,
+    without the network or S3 keys."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+    def get(self, uri: str, path: Path) -> None:
+        FileStorage().get(self._file(uri), path)
+
+    def put(self, path: Path, uri: str) -> None:
+        FileStorage().put(path, self._file(uri))
+
+    def _file(self, uri: str) -> str:
+        key = unquote(urlsplit(uri).path).lstrip("/")
+        return f"file://{self.root / key}"
+
+
 _STORAGES: dict[str, Storage] = {"file": FileStorage()}
+_MOUNTS: dict[str, MountedStorage] = {}
+
+
+def mount_bucket(bucket: str, root: Path) -> None:
+    """Serve ``s3://<bucket>/...`` from the local directory ``root``."""
+    _MOUNTS[bucket] = MountedStorage(root)
 
 
 def register_storage(scheme: str, storage: Storage) -> None:
@@ -61,9 +87,12 @@ def register_storage(scheme: str, storage: Storage) -> None:
 def storage_for(uri: str) -> Storage | None:
     """The storage of a URI, or ``None`` if it is not a storage URI.
     ``s3://`` is registered on first use when ``boto3`` is installed."""
-    scheme = urlsplit(uri).scheme
+    parts = urlsplit(uri)
+    scheme = parts.scheme
     if not scheme or "://" not in uri:
         return None
+    if scheme == "s3" and parts.netloc in _MOUNTS:
+        return _MOUNTS[parts.netloc]
     if scheme == "s3" and scheme not in _STORAGES:
         if importlib.util.find_spec("boto3") is None:
             raise ImportError(f"{uri}: s3:// storage needs boto3: install ico[remote]")
