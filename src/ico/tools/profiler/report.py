@@ -253,7 +253,7 @@ def resource_cells(snapshot: ProfileSnapshot) -> list[ResourceCells]:
         size = row["bytes"]
         out.append(
             {
-                "resource": row["ref"],
+                "resource": row["label"],
                 "process": row["process"],
                 "uses": str(row["uses"]),
                 "in_use": duration(row["in_use"]),

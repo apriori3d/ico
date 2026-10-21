@@ -141,6 +141,22 @@ class Resource(Generic[T]):
         """The identity in the pool: reference plus fields."""
         return f"{self.ref} {json.dumps(self.params(), sort_keys=True)}"
 
+    @property
+    def label(self) -> str:
+        """The reference and the fields that tell this instance apart: those
+        without a default and those set to another value, e.g.
+        ``wan22.expert@1 (weights=wan22-i2v-high, storage=bf16)``."""
+        shown: list[str] = []
+        for f in dataclasses.fields(cast(Any, self)):
+            value = cast(object, getattr(self, f.name))
+            no_default = (
+                f.default is dataclasses.MISSING
+                and f.default_factory is dataclasses.MISSING
+            )
+            if no_default or value != f.default:
+                shown.append(f"{f.name}={value}")
+        return f"{self.ref} ({', '.join(shown)})" if shown else self.ref
+
     def spec(self) -> dict[str, JsonValue]:
         """``{"ref": "name@version", "params": {...}}`` for specs and cards."""
         return {"ref": self.ref, "params": self.params()}

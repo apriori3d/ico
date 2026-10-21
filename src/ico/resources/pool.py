@@ -45,6 +45,8 @@ Action = Literal["load", "move", "hit", "release", "drop"]
 
 class PoolEvent(TypedDict):
     ref: str
+    label: str
+    """The reference and the fields that tell the resource apart."""
     key: str
     action: Action
     device: str
@@ -253,6 +255,7 @@ class ResourcePool:
     ) -> None:
         event: PoolEvent = {
             "ref": entry.resource.ref,
+            "label": entry.resource.label,
             "key": entry.resource.key,
             "action": action,
             "device": device or entry.device or CPU,

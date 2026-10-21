@@ -163,6 +163,12 @@ def test_a_failed_load_leaves_nothing(fresh_pool: ResourcePool) -> None:
     assert LOADS["a"] == 2
 
 
+def test_a_label_tells_instances_apart() -> None:
+    assert FakeModel().label == "test.model@1"
+    assert FakeModel(name="high", gb=2.5).label == "test.model@1 (name=high, gb=2.5)"
+    assert OtherModel().label == "test.other@1"
+
+
 def test_declaration_rules() -> None:
     res = FakeModel(name="x", gb=2)
     assert res.ref == "test.model@1"
@@ -260,6 +266,7 @@ def test_profile_rows_tell_uses_waits_and_reloads() -> None:
     assert result.outputs == ("a:b:a:x:cuda:cuda:cuda",)
     rows = {r["key"]: r for r in profiler.snapshot()["resources"]}
     a = rows[FakeModel().key]
+    assert rows[FakeModel(name="b").key]["label"] == "test.model@1 (name=b)"
     assert (a["uses"], a["loads"], a["reloads"], a["drops"]) == (2, 2, 1, 1)
     assert a["moves"] == 4 and a["devices"] == ["cuda"] and a["bytes"] == GB
     assert a["in_use"] >= 0 and a["load_seconds"] >= 0

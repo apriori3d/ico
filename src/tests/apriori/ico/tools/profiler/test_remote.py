@@ -97,7 +97,8 @@ def test_a_worker_reports_its_resource_pool() -> None:
     snapshot = profile(numbers(4) | IcoStream(worker), ProfilerTool(interval=None))
 
     [row] = snapshot["resources"]
-    assert row["process"] != "main" and row["ref"] == "test.profiled_table@1"
+    assert row["process"] == "tables" and row["ref"] == "test.profiled_table@1"
+    assert row["label"] == "test.profiled_table@1"  # all fields at their defaults
     assert (row["uses"], row["loads"], row["reloads"]) == (4, 1, 0)
     assert row["devices"] == ["cpu"]
 
