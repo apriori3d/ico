@@ -182,6 +182,16 @@ def resource(name: str, version: int) -> Callable[[R], R]:
                 f"@resource: {cls.__name__} must be a frozen dataclass "
                 "(@dataclass(frozen=True) below @resource)"
             )
+        reserved = sorted(
+            f.name
+            for f in dataclasses.fields(cast(Any, cls))
+            if hasattr(Resource, f.name)
+        )
+        if reserved:
+            raise TypeError(
+                f"@resource: {cls.__name__} has field(s) {', '.join(reserved)} that hide "
+                "methods of Resource; rename them"
+            )
         existing = _registry.get(meta.ref)
         if existing is not None and (existing.__module__, existing.__qualname__) != (
             cls.__module__,

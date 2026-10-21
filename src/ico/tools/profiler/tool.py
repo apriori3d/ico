@@ -52,10 +52,12 @@ class ProfileSnapshot(TypedDict):
     processes: list[ProcessInfo]
     """The main process and every runner process that reported."""
     resources: list[ResourceProfile]
-    """Resources of the main process's pool used during the run (see
-    :mod:`ico.tools.profiler.resources`)."""
+    """Resources used during the run, by the main process's pool and by
+    the pools of worker processes (``process``); see
+    :mod:`ico.tools.profiler.resources`."""
     resource_peaks: dict[str, int]
-    """Most bytes the pool held at once, per device."""
+    """Most bytes the pools held at once, per device (summed over
+    processes: an upper bound)."""
     final: bool
 
 
@@ -173,10 +175,15 @@ class ProfilerTool(IcoRuntimeTool):
         processes: list[ProcessInfo] = [{"source": "main", "peak_rss": peak_rss()}]
         with self._remote_lock:
             remote = sorted(self._remote.items())
+        resources = self._resources.rows()
+        peaks = self._resources.peaks()
         for source, event in remote:
             layout.update(event.layout)
             merge_into(merged, event.nodes)
             processes.append({"source": source, "peak_rss": event.peak_rss})
+            resources.extend({**row, "process": source} for row in event.resources)
+            for device, size in event.resource_peaks:
+                peaks[device] = peaks.get(device, 0) + size
         frames = sum(node.frames for node in merged.values())
         now = self._stopped if self._stopped is not None else self.clock()
         return {
@@ -185,8 +192,8 @@ class ProfilerTool(IcoRuntimeTool):
             "elapsed": now - self._started if self._started is not None else 0.0,
             "overhead": frames * self._frame_cost(),
             "processes": processes,
-            "resources": self._resources.rows(),
-            "resource_peaks": self._resources.peaks(),
+            "resources": resources,
+            "resource_peaks": peaks,
             "final": self._stopped is not None,
         }
 

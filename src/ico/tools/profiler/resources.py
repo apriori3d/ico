@@ -11,9 +11,10 @@ profiler is active. A row answers three questions:
   the same run; ``drops`` counts the drops.
 
 ``bytes`` is the size on its device; the snapshot's ``resource_peaks``
-gives the most the pool held at once per device during the run.
-Resources of worker processes are not included yet (their pools are their
-own).
+gives the most the pools held at once per device during the run (the sum
+of each process's peak: an upper bound). Worker processes have pools of
+their own; their rows come with their profile events and carry the
+process they belong to.
 """
 
 from __future__ import annotations
@@ -25,6 +26,8 @@ from ico.resources.pool import PoolEvent
 
 
 class ResourceProfile(TypedDict):
+    process: str
+    """``main``, or the runtime path of the worker runner whose pool it is."""
     ref: str
     key: str
     uses: int
@@ -56,6 +59,7 @@ class ResourceStats:
             row = self._rows.get(key)
             if row is None:
                 row = self._rows[key] = {
+                    "process": "main",
                     "ref": event["ref"], "key": key, "uses": 0, "in_use": 0.0,
                     "loads": 0, "load_seconds": 0.0, "reloads": 0, "moves": 0,
                     "move_seconds": 0.0, "drops": 0, "bytes": None, "devices": [],

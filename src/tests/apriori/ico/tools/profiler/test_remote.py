@@ -1,5 +1,6 @@
 import pickle
 import time
+from dataclasses import dataclass
 from typing import Any
 
 from ico.core.async_stream import IcoAsyncStream
@@ -12,6 +13,7 @@ from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
 from ico.describe.plan.json_renderer import plan_view
 from ico.describe.plan.options import PlanRendererOptions
+from ico.resources import Resource, resource
 from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.tools.profiler import (
     IcoProfileEvent,
@@ -43,6 +45,29 @@ def make_worker() -> MPWorker[int, int]:
     return MPWorker(make_flow, name="worker")
 
 
+@resource("test.profiled_table", 1)
+@dataclass(frozen=True)
+class Table(Resource[list[int]]):
+    """A small table loaded once per process."""
+
+    count: int = 3
+
+    def load(self) -> list[int]:
+        return list(range(self.count))
+
+
+TABLE = Table()
+
+
+def look_up(x: int) -> int:
+    with TABLE.use() as table:
+        return table[x % len(table)]
+
+
+def make_table_flow() -> IcoOperatorProtocol[int, int]:
+    return IcoOperator(look_up)
+
+
 def ignore(x: Any) -> None:
     pass
 
@@ -65,6 +90,16 @@ def by_label(snapshot: ProfileSnapshot) -> dict[str, NodeProfile]:
 
 
 # ─── Runner processes ───
+
+
+def test_a_worker_reports_its_resource_pool() -> None:
+    worker = MPWorker(make_table_flow, name="tables")
+    snapshot = profile(numbers(4) | IcoStream(worker), ProfilerTool(interval=None))
+
+    [row] = snapshot["resources"]
+    assert row["process"] != "main" and row["ref"] == "test.profiled_table@1"
+    assert (row["uses"], row["loads"], row["reloads"]) == (4, 1, 0)
+    assert row["devices"] == ["cpu"]
 
 
 def test_a_worker_flow_is_profiled_in_its_runner() -> None:
