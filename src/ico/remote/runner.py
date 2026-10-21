@@ -50,7 +50,7 @@ from ico.describe.plan.json_renderer import plan_view
 from ico.registry.loader import load_operators
 from ico.registry.registry import Status
 from ico.remote.job import AnyJob, FetchJob, Job, JsonObject, load_job
-from ico.remote.storage import basename, join, storage_for
+from ico.remote.storage import basename, join, mount_bucket, storage_for
 from ico.spec.builders import build
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
 from ico.spec.run import DEFAULT_MAX_ITEMS, run
@@ -60,6 +60,9 @@ from ico.tools.sample import JsonSampleTool, SampleSnapshot
 
 Emit = Callable[[JsonObject], None]
 JOB_VAR = "$JOB"
+VOLUME_ROOT = "/runpod-volume"
+VOLUME_ENV = "ICO_VOLUME_ROOT"
+"""Where the worker's network volume is mounted (tests set another)."""
 TRACEBACK_LIMIT = 8000
 
 
@@ -139,6 +142,9 @@ def _run_locked(
     job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None
 ) -> None:
     _load(job, workdir)
+    volume_root = Path(os.environ.get(VOLUME_ENV) or VOLUME_ROOT)
+    if job.volume is not None and volume_root.is_dir():
+        mount_bucket(job.volume, volume_root)
     manifest = workdir / "code" / "assets.toml"
     if manifest.is_file():
         os.environ["ICO_ASSETS_MANIFEST"] = str(manifest)

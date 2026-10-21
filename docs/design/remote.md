@@ -188,6 +188,21 @@ far faster, and the lock proves both copies equal.
   writes from several workers, and `flock` on a network volume is not
   documented. Cost: the worker's time while downloading, about $0.1–0.3
   for the full set, once per volume.
+- **A volume per order.** The volume exists only while there is work:
+  `RunPodApi.volume_up(endpoint, size, datacenter)` creates it and
+  attaches it to the endpoint (`PATCH /endpoints/<id>`: `networkVolumeId`
+  and `dataCenterIds`), then a prefetch fills it; `volume_down` detaches
+  and deletes it with everything on it (the outputs were brought back by
+  then). `ico runpod volume up|down|list` and `ico runpod prefetch` do the
+  same from a shell. Keeping 150 GB costs about $10.5 a month; filling it
+  again about $0.2–0.3 and 15–20 minutes: per order unless orders come
+  every few days.
+- **The volume is also the storage** of runs: its S3 API
+  (`https://s3api-<datacenter>.runpod.io`, bucket = the volume id, RunPod
+  S3 keys in `AWS_*`) takes the inputs from outside and gives the outputs
+  back; a job names its volume (`Job.volume`) and the worker reads and
+  writes `s3://<volume>/...` at its mount `/runpod-volume` directly,
+  without the network or keys. No second storage provider.
 - **Runs never fetch.** A run job carries the manifest in its `sources`,
   so `asset(id)` resolves on the volume; a missing asset fails at the
   operator that loads it. ico-mcp checks `spec_assets` against the

@@ -214,6 +214,10 @@ PR each:
     resource rows with their profile events (rows carry the process);
     the Live Board shows a resources table (`/api/resources`); a resource
     field that hides a method of `Resource` (`size`) is rejected.
+35. [x] Network volumes per order (`docs/design/remote.md`): `RunPodApi`
+    (REST: create, attach, detach, delete), the volume as the storage of
+    runs (S3 API outside, the mount on the worker: `Job.volume`), and
+    `ico runpod volume up|down|list` / `ico runpod prefetch`.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
