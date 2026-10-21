@@ -57,7 +57,12 @@ class Volume:
     def s3_env(self) -> dict[str, str]:
         """Environment for boto3 to reach the volume (the keys are RunPod
         S3 API keys in ``AWS_ACCESS_KEY_ID`` / ``AWS_SECRET_ACCESS_KEY``)."""
-        return {"AWS_ENDPOINT_URL_S3": self.s3_endpoint, "AWS_REGION": self.datacenter}
+        # boto3 reads AWS_DEFAULT_REGION, not AWS_REGION: with the latter the
+        # requests are signed for us-east-1 and the volume refuses them.
+        return {
+            "AWS_ENDPOINT_URL_S3": self.s3_endpoint,
+            "AWS_DEFAULT_REGION": self.datacenter.lower(),
+        }
 
     @classmethod
     def from_dict(cls, data: JsonObject) -> Volume:

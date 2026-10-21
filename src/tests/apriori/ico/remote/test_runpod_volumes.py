@@ -99,12 +99,21 @@ def test_an_order_brings_a_volume_up_and_down(rest: FakeRest) -> None:
     assert api.volumes() == [volume]
     assert volume.uri("runs/r1/in") == "s3://vol1/runs/r1/in"
     assert volume.s3_env() == {
-        "AWS_ENDPOINT_URL_S3": "https://s3api-eu-ro-1.runpod.io", "AWS_REGION": "EU-RO-1",
-    }  # fmt: skip
+        "AWS_ENDPOINT_URL_S3": "https://s3api-eu-ro-1.runpod.io",
+        "AWS_DEFAULT_REGION": "eu-ro-1",
+    }
 
     api.volume_down("ep1", volume.id)
     assert rest.patches[-1] == ("ep1", {"networkVolumeIds": []})
     assert api.volumes() == []
+
+
+def test_boto3_signs_for_the_volume_region(monkeypatch: pytest.MonkeyPatch) -> None:
+    boto3: Any = pytest.importorskip("boto3")
+    for name, value in Volume("v", "n", 1, "US-IL-1").s3_env().items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("AWS_REGION", raising=False)
+    assert boto3.client("s3").meta.region_name == "us-il-1"
 
 
 def test_a_failed_attach_leaves_no_volume(rest: FakeRest) -> None:
