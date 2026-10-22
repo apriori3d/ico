@@ -32,7 +32,7 @@ fib8((0, 1))  # 21
 fib8.describe()
 ```
 
-<img src="docs/images/fib_describe.jpg" width="700" alt="The plan of fib8 in the console">
+<img src="https://raw.githubusercontent.com/apriori3d/ico/main/docs/images/fib_describe.jpg" width="700" alt="The plan of fib8 in the console">
 
 ## How it is built
 
@@ -112,7 +112,7 @@ Below, the CIFAR-10 example during training: four `MPWorker`s load and
 augment batches, two folds train and validate, and `train_step` takes 95% of
 the work.
 
-<img src="docs/images/live_board.gif" width="900" alt="The Live Board updating during the CIFAR-10 example">
+<img src="https://raw.githubusercontent.com/apriori3d/ico/main/docs/images/live_board.gif" width="900" alt="The Live Board updating during the CIFAR-10 example">
 
 ## MCP server
 
@@ -124,16 +124,16 @@ a pull request that makes them stable.
 
 ## Examples
 
-- [ICO basics](src/examples/ico_basics.ipynb) and
-  [the runtime](src/examples/ico_runtime_basics.ipynb) (notebooks)
-- [Worker processes](src/examples/ico_mp_basic.py) and
-  [a pool of them](src/examples/ico_mp_basic_pool.py)
-- [A training process in miniature](src/examples/ico_training.py): a pool of
+- [ICO basics](https://github.com/apriori3d/ico/blob/main/src/examples/ico_basics.ipynb) and
+  [the runtime](https://github.com/apriori3d/ico/blob/main/src/examples/ico_runtime_basics.ipynb) (notebooks)
+- [Worker processes](https://github.com/apriori3d/ico/blob/main/src/examples/ico_mp_basic.py) and
+  [a pool of them](https://github.com/apriori3d/ico/blob/main/src/examples/ico_mp_basic_pool.py)
+- [A training process in miniature](https://github.com/apriori3d/ico/blob/main/src/examples/ico_training.py): a pool of
   worker processes loads items, a fold runs an epoch over them, a process
   repeats it (the diagram above)
-- [Linear regression](src/examples/ml/ico_linear_regression.ipynb)
-- CIFAR-10: [notebook](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb),
-  [with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py)
+- [Linear regression](https://github.com/apriori3d/ico/blob/main/src/examples/ml/ico_linear_regression.ipynb)
+- CIFAR-10: [notebook](https://github.com/apriori3d/ico/blob/main/src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb),
+  [with worker pools](https://github.com/apriori3d/ico/blob/main/src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py)
   (`--epochs 1 --limit 4000 --profile` for a quick run with the profiler)
 
 Worker processes do not run in Jupyter or Colab: run those examples from a
@@ -142,7 +142,7 @@ terminal.
 ## Installation
 
 ```bash
-pip install git+https://github.com/apriori3d/ico.git
+pip install ico
 ```
 
 or, for development, `uv sync` in a clone (`make ci` runs the checks).
@@ -154,8 +154,8 @@ or, for development, `uv sync` in a clone (`make ci` runs the checks).
 | `examples` | `skrub`, `pydot`, `graphviz` | the skrub examples |
 | `notebook` | `ipywidgets` | Rich widgets in Jupyter |
 
-Design notes are in [docs/design](docs/design).
+Design notes are in [docs/design](https://github.com/apriori3d/ico/tree/main/docs/design).
 
 ## License
 
-Apache License 2.0, see [LICENSE](LICENSE).
+Apache License 2.0, see [LICENSE](https://github.com/apriori3d/ico/blob/main/LICENSE).

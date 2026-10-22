@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "ico"
 version = "0.1.0"
-description = "ICO formalizes a common ML pattern: take Input, apply Context, produce Output, and provides an elegant, type-safe, and fully-transparent framework for ML engineers and researchers."
+description = "Computation flows from typed operators: described before they run, run in worker processes or on a cloud GPU, profiled and watched live."
 readme = "README.md"
 license = {text = "Apache 2.0"}
 authors = [
