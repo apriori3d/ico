@@ -1,290 +1,165 @@
-# ICO Framework
-<div align="center">
+# ICO
 
-[![CI](https://img.shields.io/github/actions/workflow/status/apriori3d/ico/ci.yml?style=for-the-badge&label=CI&logo=github)](https://github.com/apriori3d/ico/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
-[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json&style=for-the-badge)](https://github.com/astral-sh/ruff)
-![Type Safety](https://img.shields.io/badge/Type_Safety-mypy-green?style=for-the-badge&logo=python)
-![Rich Integration](https://img.shields.io/badge/Rich_Console-Integrated-purple?style=for-the-badge&logo=python)
+[![CI](https://img.shields.io/github/actions/workflow/status/apriori3d/ico/ci.yml?label=CI&logo=github)](https://github.com/apriori3d/ico/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.10%E2%80%933.12-blue?logo=python)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-*Composable, type-safe ML pipelines with full runtime transparency*
-
-</div>
-
-ICO is a type-safe framework for building composable ML pipelines with built-in multiprocessing, progress tracking, and full runtime introspection.
-
-It helps you replace complex, ad-hoc training and data processing code with clear, reusable, and debuggable flows.
-
-At its core, ICO formalizes a simple pattern:
-
-**Input → Context → Output**
-
-Each step is a typed operator that composes into pipelines, runs locally or in parallel, and remains fully inspectable at runtime.
-
-## 🚀 Quick Demo
-A Fibonacci toy example showing how ICO models iterative stateful computation as a composable flow.
+ICO (Input → Context → Output) builds computation flows from typed
+operators. A flow is a tree that you can describe before it runs, run in
+one process, in worker processes or on a cloud GPU, profile, watch in the
+browser, and save as JSON. State that changes item by item, such as a model
+during training, is data in the flow, not a hidden field.
 
 ```python
 from ico import IcoProcess, operator
 
-Context = tuple[int, int]
+State = tuple[int, int]
 
 
 @operator()
-def fib_step(state: Context) -> Context:
+def fib_step(state: State) -> State:
     a, b = state
     return (b, a + b)
 
 
 @operator()
-def first(state: Context) -> int:
+def first(state: State) -> int:
     return state[0]
 
 
 fib8 = IcoProcess(fib_step, num_iterations=8) | first
-
-print(f"{fib8((0, 1))=}")  # 21
-
-```
-
-## 🔥 Key Capabilities
-
-### 🔍 **Full Runtime Introspection**
-
-Every operator and pipeline can be inspected at runtime:
-```python
+fib8((0, 1))  # 21
 fib8.describe()
 ```
-<img src="docs/images/fib_describe.jpg" width="700" alt="Fibonacci process visualization">
 
-You always know:
-- what is running
-- how data flows
-- where failures occur
+<img src="docs/images/fib_describe.jpg" width="700" alt="The plan of fib8 in the console">
 
-No more black-box pipelines.
+## How it is built
 
+```mermaid
+flowchart TB
+  R["IcoRuntime"] --- T["tools: Live Board, profiler, progress"]
+  R -- "commands: activate, run, cancel" --> flow
+  flow -- "events: progress, profile, errors" --> R
+  subgraph flow["IcoProcess: 3 epochs"]
+    direction LR
+    subgraph epoch["IcoFold: one epoch"]
+      direction LR
+      S["IcoSource"] --> P["IcoProgress"] --> A["IcoAsyncStream"] --> F["train_step"]
+      A -.- W["MPWorker × 4: load"]
+    end
+  end
+```
 
-### 🧩 **Composable Declarative Pipelines**
-Build complex workflows from simple, reusable operators using a clean pipe syntax:
+**Operators.** An `IcoOperator[I, O]` wraps a callable from `I` to `O`.
+Signatures are inferred from annotations and generics and checked at every
+link: `validate_signatures(flow)` reports mismatches, and mypy or Pylance
+check the same types statically.
+
+**Composition.** `a | b` chains operators. A few structural nodes cover the
+rest:
+
+| Node | Type | |
+| --- | --- | --- |
+| `IcoSource`, `IcoSink` | `() → Iterator[O]`, `Iterator[I] → ()` | ends of a flow |
+| `op.stream()` | `Iterator[I] → Iterator[O]` | map over items |
+| `IcoAsyncStream(factory, pool_size)` | `Iterator[I] → Iterator[O]` | a pool, threads or worker processes |
+| `fork`, `route`, `keep`, `partition`, `tap` | | fan out, choose by key, filter, split, side effect |
+| `IcoBatcher(n)` | `Iterator[I] → Iterator[Iterator[I]]` | batches |
+| `IcoFold(source, step)` | `C → C` | `step((item, state))` for each item: a training epoch |
+| `IcoProcess(body, ...)` | `C → C` | repeat `n` times or until a predicate |
+| `IcoProgress(total)` | `I → I` | counts the items that pass it |
+
+**Two trees.** The flow tree computes. The runtime tree (`IcoRuntime`)
+activates it, sends commands down (activate, run, cancel) and events up
+(progress, prints, profiles, errors). Tools attach to the runtime: Rich
+progress, the Live Board, the profiler, samples of the results of a node.
+A cancelled run stops between items.
+
+**Workers.** `MPWorker(factory)` runs a sub-flow in its own process; inside
+an `IcoAsyncStream` it is a pool. Its progress and profile come back to the
+main runtime, and the plan shows its flow.
+
+**Specs and the registry.** Operators registered with `register("name", 1)`
+are parametric and versioned. `ico.spec.to_spec(flow)` turns a flow into
+JSON, and `build(spec)` builds a flow from a spec of registered operators.
+Specs take parameters (`{"$param": ...}`) and can refer to other saved
+pipelines.
+
+**Remote runs.** `ico.remote` runs a spec as a job in a subprocess or on a
+RunPod Serverless GPU. The job carries the operators' code by value, its
+inputs go through S3 or a network volume, and its events stream back to the
+same tools.
+
+**Assets and resources.** Model weights are pinned assets (`assets.toml`,
+`assets.lock`, `ico assets fetch`). Loaded models are resources in a pool
+per process, with a RAM budget, shared by the operators that use them.
+
+## Live Board and profiler
 
 ```python
-ml_pipeline = (
-    load_train_data
-    | augment
-    | train_epoch
-    | save_checkpoint
-)
-```
-No hidden control flow — the structure of your pipeline is explicit and readable.
+from ico import IcoRuntime, LiveBoardTool
+from ico.tools.profiler import instrument
 
-### 🛡️ **End-to-End Type Safety**
-All operators are fully typed (Input → Context → Output) and validated by static type checkers like mypy or Pylance.
-
-This catches integration errors early and makes large pipelines easier to reason about.
-<img src="docs/images/type_checking.jpg" width="800" alt="Type checking">
-
-
-### ⚡ **Built-in Multiprocessing**
-Parallel execution is part of the core design — no need to rewrite your pipeline:
-```python
-workers = IcoAsyncStream(
-    lambda: MPWorker(heavy_computation),
-    pool_size=cpu_count()
-)
-
-pipeline = source | workers | train
-```
-The same pipeline scales from local execution to multi-process workloads.
-
-### 📊 **Integrated Progress and Monitoring**
-Track execution in real time with built-in progress and metrics:
-```python
-# Rich progress bars and metrics
-progress = IcoProgress(name="Overall progress", total=epochs)
-pipeline = source | progress | processing | train
-
-```
-<img src="docs/images/progress.jpg" width="600" alt="Fibonacci process visualization">
-
-Includes ETA, throughput, and structured execution state.
-
-An operator that runs a long loop inside one call (a diffusion model's
-steps) can report it too: it owns a progress node as a child and counts its
-steps on it. The node is known before the run, also inside a worker, and the
-plan shows it under the operator:
-```python
-class Denoise(IcoOperator[Plan, Frames]):
-    def __init__(self, steps: int) -> None:
-        self.progress = IcoProgress[int](total=steps, name="denoise")
-        super().__init__(fn=self._apply, children=[self.progress])
-
-    def _apply(self, plan: Plan) -> Frames:
-        def on_step(pipe, step, timestep, kwargs):
-            self.progress(step)  # one step done
-            return kwargs
-        return run_model(plan, callback_on_step_end=on_step)
+board = LiveBoardTool(profile=True)
+flow = instrument(flow, board.profiler)
+IcoRuntime(flow, tools=[board]).activate().run().deactivate()  # prints the URL
 ```
 
+The board shows every progress node, worker processes included, the plan
+with each node's time, calls and p95, and the models each process holds.
+Below, the CIFAR-10 example during training: four `MPWorker`s load and
+augment batches, two folds train and validate, and `train_step` takes 95% of
+the work.
 
-## 📚 Use Cases
+<img src="docs/images/live_board.gif" width="900" alt="The Live Board updating during the CIFAR-10 example">
 
-### 🚀 PyTorch DataLoader Replacement
-Build fully customizable, inspectable, and parallel data pipelines without the limitations of traditional DataLoader abstractions.
+The whole plan with its profile:
 
----
+<img src="docs/images/live_board.png" width="900" alt="The Live Board during the CIFAR-10 example">
 
-### 🧠 ML Training Pipelines
-Structure end-to-end training workflows with clear, composable steps:
-data loading, augmentation, batching, training, and logging — all in one pipeline.
+## MCP server
 
----
+[ico-mcp](https://github.com/apriori3d/ico-mcp) is an MCP server on top of
+ICO. An agent finds operators in a domain's registry, composes and validates
+specs, runs them locally or on a GPU target and follows them on the Live
+Board. It writes new operators as drafts, and once a pipeline works it opens
+a pull request that makes them stable.
 
+## Examples
 
-### ⚡ Parallel Data Processing
-Scale CPU-heavy preprocessing and feature extraction with built-in multiprocessing — without rewriting your pipeline.
+- [ICO basics](src/examples/ico_basics.ipynb) and
+  [the runtime](src/examples/ico_runtime_basics.ipynb) (notebooks)
+- [Worker processes](src/examples/ico_mp_basic.py) and
+  [a pool of them](src/examples/ico_mp_basic_pool.py)
+- [A training process in miniature](src/examples/ico_training.py): a pool of
+  worker processes loads items, a fold runs an epoch over them, a process
+  repeats it (the diagram above)
+- [Linear regression](src/examples/ml/ico_linear_regression.ipynb)
+- CIFAR-10: [notebook](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb),
+  [with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py)
+  (`--epochs 1 --limit 4000 --profile` for a quick run with the profiler)
 
----
+Worker processes do not run in Jupyter or Colab: run those examples from a
+terminal.
 
-### 🔄 Streaming and Online Processing
-Build streaming pipelines with backpressure-aware execution and continuous data flow.
-
----
-
-### 🧪 Research and Experimentation
-Prototype and iterate quickly with fully transparent pipelines that are easy to inspect, modify, and debug.
-
----
-
-### 📊 Data Transformation Workflows
-Replace ad-hoc scripts with structured, traceable pipelines for complex data transformations.
-
-## 🚀 Getting Started
-
-### 📖 Examples
-
-📓 Examples are provided as **Jupyter notebooks** and can be run instantly in Google Colab — no setup required.
-
-#### 🎯 **ICO Basics**
-
-- 📓 [Basic introduction to ICO approach](src/examples/ico_basics.ipynb) — Main building blocks and core concepts
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ico_basics.ipynb)
-
-- 📓 [ICO Runtime introduction](src/examples/ico_runtime_basics.ipynb) — Progress monitoring, printing and runtime architecture
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ico_runtime_basics.ipynb)
-
----
-
-#### 🔄 **Multiprocessing**
-⚠️ Note: Multiprocessing examples cannot be executed in Jupyter or Google Colab. To run them, please install the framework locally and execute the scripts from a terminal.
-
-See the [Installation](#-installation) section below for setup instructions.
-
-- 🐍 [Multi-processing example](src/examples/ico_mp_basic.py) — Basic example of distributed computational flows
-
-- 🐍 [Parallel Multi-processing Pool example](src/examples/ico_mp_basic_pool.py) — Distributed compute flows with parallel worker pools
-
----
-
-#### 🧠 **Machine Learning**
-
-- 📓 [Linear Regression](src/examples/ml/ico_linear_regression.ipynb) — ICO-based ML pipeline development
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ml/ico_linear_regression.ipynb)
-
-- 📓 [CIFAR-10 Classification with validation](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb) — Complete CV pipeline replacing PyTorch DataLoader
-  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/apriori3d/ico/blob/main/src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb)
-
-- 🐍 [CIFAR-10 Classification with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py) — Complete CV pipeline with parallel data processing workers
-
-
-## ⚙️ Installation
-
-### Using Poetry (recommended)
-
-```bash
-# 1. Install Poetry (if not installed)
-curl -sSL https://install.python-poetry.org | python3 -
-
-# 2. Clone repository
-git clone https://github.com/apriori3d/ico.git
-cd ico
-
-# 3. Install dependencies
-poetry install
-
-# 4. Activate virtual environment
-poetry shell
-```
-
-### Using pip (quick install)
+## Installation
 
 ```bash
 pip install git+https://github.com/apriori3d/ico.git
 ```
 
-Optional extras:
+or, for development, `poetry install` in a clone.
 
-| Extra      | Installs                     | Needed for                         |
-| ---------- | ---------------------------- | ---------------------------------- |
-| `notebook` | `ipywidgets`                 | Rich widgets in Jupyter            |
-| `examples` | `skrub`, `pydot`, `graphviz` | Running the skrub examples         |
-| `vision`   | `torch`, `torchvision`, ...  | CIFAR-10 examples                  |
+| Extra | Installs | For |
+| --- | --- | --- |
+| `remote` | `boto3` | remote runs (S3, RunPod volumes) |
+| `vision` | `torch`, `torchvision`, `matplotlib` | the CIFAR-10 examples |
+| `examples` | `skrub`, `pydot`, `graphviz` | the skrub examples |
+| `notebook` | `ipywidgets` | Rich widgets in Jupyter |
 
-```
-pip install "ico[notebook] @ git+https://github.com/apriori3d/ico.git"
-```
+Design notes are in [docs/design](docs/design).
 
-## 📈 Future Development
+## License
 
-### 🔮 Planned Features
-
-#### 📊 ICO Profiler
-Performance analysis for complex pipelines:
-- Operator-level timing and bottleneck detection
-- Memory usage tracking across workers
-- End-to-end pipeline profiling
-- Exportable reports for optimization
-
----
-
-#### 🧠 Stateful Runtime
-Robust execution for long-running workflows:
-- Pause and resume pipeline execution
-- Checkpointing and recovery after failures
-- Reproducible runs across environments
-- Designed for large-scale training workloads
-
----
-
-#### 🌐 ICO Live Board
-Real-time monitoring and visualization:
-- Web-based pipeline visualization
-- Live progress tracking across runs
-- Resource monitoring (CPU, GPU, memory)
-- Integration with Jupyter and ML tooling
-
----
-
-### 🚀 **Community-Driven Roadmap**
-We're building based on real ML engineer needs. Have ideas? [Join the discussions](https://github.com/apriori3d/ico/discussions) and help shape ICO's future!
-
-Start experimenting and create your own innovative ML pipelines! 🎯
-
-## 🤝 Contributing
-
-We welcome contributions! Contribution guidelines are coming soon.
-
-## 📄 License
-
-Apache License 2.0 - see [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-
-**Happy Coding with ICO! ☺️**
-
-[Documentation](docs/) • [Examples](src/examples/) • [Discussions](https://github.com/apriori3d/ico/discussions)
-
-</div>
+Apache License 2.0, see [LICENSE](LICENSE).
