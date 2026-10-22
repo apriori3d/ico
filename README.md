@@ -149,7 +149,7 @@ terminal.
 pip install git+https://github.com/apriori3d/ico.git
 ```
 
-or, for development, `poetry install` in a clone.
+or, for development, `uv sync` in a clone (`make ci` runs the checks).
 
 | Extra | Installs | For |
 | --- | --- | --- |

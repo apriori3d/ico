@@ -19,10 +19,8 @@ dist/
 *.pyd
 
 # ───────────────────────────────────────────────
-#  Poetry
+#  uv
 # ───────────────────────────────────────────────
-.poetry/
-# (Poetry venv is usually outside project; ignore local one if inside)
 .venv/
 
 # ───────────────────────────────────────────────

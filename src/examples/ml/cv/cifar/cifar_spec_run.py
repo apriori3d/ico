@@ -10,7 +10,7 @@ comparing label counts with the labels of the indices from the spec's own
 index source.
 
 Usage:
-    poetry run python src/examples/ml/cv/cifar/cifar_spec_run.py [flow.spec.json]
+    uv run --extra vision python src/examples/ml/cv/cifar/cifar_spec_run.py [flow.spec.json]
 """
 
 from __future__ import annotations

@@ -17,42 +17,25 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
-
-    - name: Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        version: latest
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-
-    - name: Load cached venv
-      id: cached-poetry-dependencies
-      uses: actions/cache@v3
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ matrix.python-version }}-examples-${{ hashFiles('**/poetry.lock') }}
+        enable-cache: true
 
     - name: Install dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
       # mypy checks src/examples too, so install the "examples" extra
       # (skrub, sklearn, numpy, ...). torch/torchvision are not needed:
       # mypy ignores their missing imports and no test imports them.
-      run: |
-        poetry install --no-interaction --no-ansi --extras examples
+      run: uv sync --locked --extra examples
 
     - name: Run linting with Ruff
       run: |
-        poetry run ruff check src/
-        poetry run ruff format --check src/
+        uv run --extra examples ruff check src/
+        uv run --extra examples ruff format --check src/
 
     - name: Run type checking with mypy
-      run: |
-        poetry run mypy src/
+      run: uv run --extra examples mypy src/
 
     - name: Run tests with pytest
-      run: |
-        poetry run pytest --verbose
+      run: uv run --extra examples pytest --verbose
