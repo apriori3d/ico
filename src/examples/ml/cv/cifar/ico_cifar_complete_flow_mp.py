@@ -54,6 +54,7 @@ from ico import (
     operator,
 )
 from ico.core.operator import IcoOperatorProtocol
+from ico.tools.profiler import instrument
 
 # ─────────────────────────────────────────────────────────────────────────────────
 # DATA STRUCTURES & DATASET CLASSES
@@ -442,6 +443,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--limit", type=int, default=None, help="use only this many images (a check)"
     )
+    parser.add_argument(
+        "--profile", action="store_true", help="profile every node on the Live Board"
+    )
     args = parser.parse_args()
 
     num_epoch = args.epochs
@@ -641,5 +645,8 @@ if __name__ == "__main__":
     # LiveBoardTool shows the same progress and the pipeline graph in the
     # browser; its URL is printed to stderr.
 
-    runtime = IcoRuntime(cifar_flow, tools=[RichProgressTool(), LiveBoardTool()])
+    board = LiveBoardTool(profile=args.profile)
+    if board.profiler is not None:
+        cifar_flow = instrument(cifar_flow, board.profiler)
+    runtime = IcoRuntime(cifar_flow, tools=[RichProgressTool(), board])
     runtime.activate().run().deactivate()
