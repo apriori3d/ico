@@ -101,6 +101,8 @@ def _runpod(args: argparse.Namespace) -> int:
             if percent >= shown.get(id, -10) + 10:
                 shown[id] = percent
                 print(f"{id}: {_gb(done)} / {_gb(total)}", flush=True)
+        elif kind == "queue":
+            print(f"runpod: {event.get('status')}", flush=True)  # e.g. IN_QUEUE
         elif kind == "result":
             result = cast(dict[str, object], event["result"])
             for item in cast(list[dict[str, object]], result["assets"]):

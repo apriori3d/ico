@@ -96,7 +96,9 @@ class JobHandle(Protocol):
   For tests and for running the same job on cube; it replaces the run part
   of the ico-mcp kernel later.
 - `RunPodExecutor`: `POST /run` with the request, events from `/stream`
-  (the handler is a generator that yields events), `POST /cancel`;
+  (the handler is a generator that yields events) and a `queue` event
+  whenever RunPod's status of the job changes (`IN_QUEUE` while it waits
+  for a worker, `IN_PROGRESS`), `POST /cancel`;
   standard library HTTP, no SDK. The worker side is
   `ico.remote.runpod_handler`, the image's entry point.
 - Modal or a plain SSH pod later, by the same protocol.
