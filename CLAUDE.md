@@ -205,8 +205,20 @@ PR each:
     keys, RAM budget, LRU), resource params in cards and specs, profile
     rows.
 30. [x] `spec_assets(spec, params)` through resources.
-31. [ ] A pool across jobs: the RunPod worker runs jobs in process.
-    Next: today every job loads the Wan2.2 experts again, about 90 s each.
+31. [ ] A pool across jobs (low priority): today every RunPod job loads
+    its models again (Wan2.2: about 3 min). Models live in the pool of the
+    `MPWorker` runner (`gpu`), which lives one run, inside a job runner
+    that lives one job. Design (agreed, not started): warm workers, an
+    opt-in mode in which an `MPWorker` parks its runner process on
+    deactivation (key: worker type, name, code fingerprint) and the next
+    activation with that key takes it and sends it a new flow (operator
+    params change between runs; the pool is per process, so its models
+    stay); and `ico.remote.runner --serve`, one job runner per RunPod
+    worker that restarts on a new code fingerprint. Low priority because a
+    series fits in one job today (a `stream` over the inputs with a
+    `pipeline_ref` to the pipeline: models load once per job), RunPod takes
+    queued jobs without idling, and interactive use pays idle time about
+    equal to the load it saves.
 32. [x] Prefetch jobs (`docs/design/remote.md`, "Assets on the remote
     side"): `FetchJob` downloads assets into the worker's asset root (the
     network volume); runs that carry the manifest resolve `asset(id)`.
@@ -242,8 +254,10 @@ PR each:
     uses (from the assets manifest) with `memory()`.
 38. [ ] The runner's `RuntimeWarning: 'ico.remote.runner' found in
     sys.modules after import of package 'ico.remote'` on every RunPod job.
-39. [ ] `RunPodApi.detach` against REST v2: v1 `networkVolumeIds: []`
-    versus v2 `mounts.network: []`; a test with the current request shape.
+39. [ ] `RunPodApi.detach` against REST v2: confirmed broken. The v1
+    `networkVolumeIds: []` leaves the mount (`volume_down` then fails with
+    "remove this network volume from all pods"); REST v2 PATCH
+    `{"mounts": {"network": []}}` detaches. A test with that request.
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
