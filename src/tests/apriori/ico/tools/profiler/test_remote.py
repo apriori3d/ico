@@ -13,7 +13,7 @@ from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
 from ico.describe.plan.json_renderer import plan_view
 from ico.describe.plan.options import PlanRendererOptions
-from ico.resources import Resource, resource
+from ico.resources import Resource, ResourcePool, resource, set_pool
 from ico.runtime.worker.mp.mp_worker import MPWorker
 from ico.tools.profiler import (
     IcoProfileEvent,
@@ -244,3 +244,30 @@ def test_the_host_reports_after_items_at_most_every_interval() -> None:
     host.on_deactivate()
     assert len(parent.events) == 2  # the final one
     assert all(isinstance(e, IcoProfileEvent) for e in parent.events)
+
+
+def test_the_host_reports_a_resource_load_during_the_item() -> None:
+    old = set_pool(ResourcePool())
+    try:
+        table = ProfileTable(ProfilerTool().table.metrics)
+        parent = Collector()
+        reported: list[int] = []
+
+        def long_item(x: int) -> int:
+            with Table(count=5).use() as rows:
+                # Loaded: reported before the item (a long model call) ends.
+                reported.append(len(parent.events))
+            return x + len(rows)
+
+        host = ProfileHost(IcoOperator(long_item), table, None, name="gpu")
+        parent.add_runtime_children(host)
+        host.on_activate()
+        host(1)
+        host(2)  # a hit: nothing to report
+        [event] = parent.events
+        assert isinstance(event, IcoProfileEvent) and reported == [1, 1]
+        [row] = event.resources
+        assert (row["label"], row["loads"]) == ("test.profiled_table@1 (count=5)", 1)
+        host.on_deactivate()
+    finally:
+        set_pool(old)

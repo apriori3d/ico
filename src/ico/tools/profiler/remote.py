@@ -4,11 +4,13 @@ A profiled worker's ``runner_probe`` is a :class:`RunnerProfiler`: in the
 runner process, it instruments the flow the runner built into a table of the runner process, with keys
 below the worker's key, and wrapped in :class:`ProfileHost`. The host is a
 runtime node of the runner: after an item, at most every ``interval``
-seconds, and once more on deactivation, it bubbles an
-:class:`IcoProfileEvent` with the cumulative aggregates of the process to
-the worker, where the profiler tool merges them. Events are sent from the
-runner's main thread only, between items, so they never race with items on
-the worker channel.
+seconds, when a resource of the process's pool loads, moves or drops (an
+item may hold a worker for minutes), and once more on deactivation, it
+bubbles an :class:`IcoProfileEvent` with the cumulative aggregates of the
+process to the worker, where the profiler tool merges them. Profile events
+are telemetry, sent without an acknowledgment, so the ones sent during an
+item (from the thread that uses the resource) do not race with the items
+on the worker channel.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.runtime.event import IcoRuntimeEvent
 from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.tree_utils import TreePathIndex
-from ico.resources.pool import pool
+from ico.resources.pool import PoolEvent, pool
 from ico.tools.profiler.metrics import IcoMetric
 from ico.tools.profiler.resources import ResourceProfile, ResourceStats
 from ico.tools.profiler.table import Layout, NodeAggregate, ProfileTable
@@ -130,11 +132,19 @@ class ProfileHost(IcoOperator[Any, Any], IcoRuntimeNode):
         self._last = self.clock()
         self._resources = ResourceStats()
         pool().add_listener(self._resources)
+        pool().add_listener(self._on_pool)
 
     def on_deactivate(self) -> None:
         super().on_deactivate()
+        pool().remove_listener(self._on_pool)
         pool().remove_listener(self._resources)
         self._emit()
+
+    def _on_pool(self, event: PoolEvent) -> None:
+        """A model loaded, moved or dropped is reported at once: one item
+        may hold a worker for minutes (a video model's call)."""
+        if event["action"] in ("load", "move", "drop"):
+            self._emit()
 
     def _emit(self) -> None:
         self._last = self.clock()

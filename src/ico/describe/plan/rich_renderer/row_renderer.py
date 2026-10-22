@@ -9,6 +9,7 @@ from rich.text import Text
 from ico.core.context_operator import IcoContextOperator, IcoContextOperatorProtocol
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
+from ico.core.runtime.progress import IcoProgress
 from ico.core.signature_utils import format_ico_type
 from ico.describe.plan.options import (
     PlanRendererColumn,
@@ -170,6 +171,10 @@ class RowRenderer:
         return text
 
     def _render_node_args_info(self, node: IcoNodeProtocol) -> Text | None:
+        if isinstance(node, IcoProgress) and node.name:
+            # What it counts: the label its bar has.
+            return Text(node.name, style=DescribeStyle.fn.value)
+
         if isinstance(node, IcoOperatorProtocol):
             op_fn: object = cast(IcoOperator[Any, Any], node).fn
 

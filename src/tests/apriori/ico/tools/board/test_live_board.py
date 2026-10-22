@@ -228,7 +228,9 @@ def test_board_serves_the_resource_rows(board: tuple[BoardRuns, LiveBoard]) -> N
         "test.board_table@1",
         [["name", "squares, cubes"]],
     )
-    assert "renderResourceName" in get(live, "/")
+    page = get(live, "/")
+    assert "renderResourceName" in page
+    assert "barLabel" in page  # a progress an operator owns: "owner › label"
     assert runs.resources("missing") is None
 
 

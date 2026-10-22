@@ -71,7 +71,7 @@ def test_rows_are_the_console_plan() -> None:
     assert flow_column(view) == [
         "📚IcoSource(words)",
         "╭── for each in 🎞️ IcoStream()",
-        "│   ⏳IcoProgress()",
+        "│   ⏳IcoProgress(items)",
         "│   upper",
         "╰─▸ yield",
         "╭── parallel in 🚀IcoAsyncStream(pool_size=4, on_error=skip)",
@@ -129,3 +129,25 @@ def test_view_is_json_and_sources_are_not_called() -> None:
 
     assert calls == []
     assert json.loads(json.dumps(view)) == view
+
+
+class Steps(IcoOperator[float, float]):
+    """Counts the steps of each call on a progress node it owns."""
+
+    def __init__(self) -> None:
+        self.progress: IcoProgress[int] = IcoProgress(total=4, name="denoise")
+        super().__init__(fn=halve, name="steps", children=[self.progress])
+
+
+def test_an_operator_with_its_own_progress_is_a_row_not_a_subflow() -> None:
+    view = plan_view(IcoStream(Steps()))
+    rows = [[text(cell) for cell in row] for row in view["rows"]]
+    keys = view["keys"]
+
+    [operator] = [i for i, row in enumerate(rows) if row[0].endswith("Steps(halve)")]
+    progress = operator + 1
+    assert rows[operator][1] == "float → float"  # its own signature
+    assert rows[progress][0].endswith("╰ reports ⏳IcoProgress(denoise)")
+    assert (rows[progress][1], rows[progress][2]) == ("", "denoise")
+    assert keys[progress] == f"{keys[operator]}.0"
+    assert not any("Subflow" in row[0] for row in rows)
