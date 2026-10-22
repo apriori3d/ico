@@ -13,7 +13,7 @@ but is built from the registered operators of `cifar_ops`, so it can be
 exported in strict mode and rebuilt elsewhere with `cifar_spec_run.py`.
 
 Usage:
-    poetry run python src/examples/ml/cv/cifar/cifar_spec_export.py [out.spec.json]
+    uv run --extra vision python src/examples/ml/cv/cifar/cifar_spec_export.py [out.spec.json]
 """
 
 from __future__ import annotations

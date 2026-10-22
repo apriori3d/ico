@@ -22,7 +22,7 @@ spec export in `src/ico/spec`, tests in `src/tests`.
 
 ## Workflow
 1. Run tests and pyright before starting to confirm a clean baseline:
-   `make test` and `poetry run pyright src/ico src/tests`.
+   `make test` and `uv run pyright src/ico src/tests`.
 2. Implement the change with tests.
 3. Run tests and pyright again; fix all failures before committing.
 4. Describe in the PR what changed and why.

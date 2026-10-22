@@ -1,19 +1,23 @@
 .PHONY: ci lint format typecheck pylance test
 
+# The checks cover src/examples too: mypy needs the "examples" extra (skrub,
+# ...), pyright also the "vision" one (torch for the CIFAR examples).
+RUN = uv run --extra examples --extra vision
+
 ci: lint typecheck pylance test
 
 lint:
-	poetry run ruff check src/
-	poetry run ruff format --check src/
+	$(RUN) ruff check src/
+	$(RUN) ruff format --check src/
 
 format:
-	poetry run ruff format src/
+	$(RUN) ruff format src/
 
 typecheck:
-	poetry run mypy src/
+	$(RUN) mypy src/
 
 pylance:
-	poetry run pyright src/
+	$(RUN) pyright src/
 
 test:
-	poetry run pytest --verbose
+	$(RUN) pytest --verbose
