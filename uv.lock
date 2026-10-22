@@ -38,6 +38,72 @@ wheels = [
 ]
 
 [[package]]
+name = "apriori-ico"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "rich" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
+]
+
+[package.optional-dependencies]
+examples = [
+    { name = "graphviz" },
+    { name = "pydot" },
+    { name = "skrub" },
+]
+notebook = [
+    { name = "ipywidgets" },
+]
+remote = [
+    { name = "boto3" },
+]
+vision = [
+    { name = "matplotlib" },
+    { name = "torch" },
+    { name = "torchvision" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "boto3" },
+    { name = "ipykernel" },
+    { name = "moto", extra = ["s3", "server"] },
+    { name = "mypy" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", marker = "extra == 'remote'", specifier = ">=1.35" },
+    { name = "graphviz", marker = "extra == 'examples'", specifier = ">=0.21,<0.22" },
+    { name = "ipywidgets", marker = "extra == 'notebook'", specifier = ">=8.1.8" },
+    { name = "matplotlib", marker = "extra == 'vision'", specifier = ">=3.10.7" },
+    { name = "pydot", marker = "extra == 'examples'", specifier = ">=4.0.1,<5.0.0" },
+    { name = "rich", specifier = ">=14.2.0" },
+    { name = "skrub", marker = "extra == 'examples'", specifier = ">=0.7.2,<0.8.0" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
+    { name = "torch", marker = "extra == 'vision'", specifier = ">=2.9.1" },
+    { name = "torchvision", marker = "extra == 'vision'", specifier = ">=0.24.1" },
+]
+provides-extras = ["notebook", "examples", "remote", "vision"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "boto3", specifier = ">=1.35,<2" },
+    { name = "ipykernel", specifier = ">=7.2.0,<8" },
+    { name = "moto", extras = ["s3", "server"], specifier = ">=5.1,<6" },
+    { name = "mypy", specifier = ">=1.18.2,<1.19" },
+    { name = "pyright", specifier = ">=1.1.404,<1.1.409" },
+    { name = "pytest", specifier = ">=8.3.3,<9" },
+    { name = "pytest-xdist", specifier = ">=3.6.1,<4" },
+    { name = "ruff", specifier = ">=0.6.8,<0.7" },
+]
+
+[[package]]
 name = "asttokens"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -646,72 +712,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f8/b3/3ac91e9be6b761a4b30d66ff165e54439dcd48b83f4e20d644867215f6ca/graphviz-0.21.tar.gz", hash = "sha256:20743e7183be82aaaa8ad6c93f8893c923bd6658a04c32ee115edb3c8a835f78", size = 200434, upload-time = "2025-06-15T09:35:05.824Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/91/4c/e0ce1ef95d4000ebc1c11801f9b944fa5910ecc15b5e351865763d8657f8/graphviz-0.21-py3-none-any.whl", hash = "sha256:54f33de9f4f911d7e84e4191749cac8cc5653f815b06738c54db9a15ab8b1e42", size = 47300, upload-time = "2025-06-15T09:35:04.433Z" },
-]
-
-[[package]]
-name = "ico"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "rich" },
-    { name = "tomli", marker = "python_full_version < '3.11'" },
-]
-
-[package.optional-dependencies]
-examples = [
-    { name = "graphviz" },
-    { name = "pydot" },
-    { name = "skrub" },
-]
-notebook = [
-    { name = "ipywidgets" },
-]
-remote = [
-    { name = "boto3" },
-]
-vision = [
-    { name = "matplotlib" },
-    { name = "torch" },
-    { name = "torchvision" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "boto3" },
-    { name = "ipykernel" },
-    { name = "moto", extra = ["s3", "server"] },
-    { name = "mypy" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "boto3", marker = "extra == 'remote'", specifier = ">=1.35" },
-    { name = "graphviz", marker = "extra == 'examples'", specifier = ">=0.21,<0.22" },
-    { name = "ipywidgets", marker = "extra == 'notebook'", specifier = ">=8.1.8" },
-    { name = "matplotlib", marker = "extra == 'vision'", specifier = ">=3.10.7" },
-    { name = "pydot", marker = "extra == 'examples'", specifier = ">=4.0.1,<5.0.0" },
-    { name = "rich", specifier = ">=14.2.0" },
-    { name = "skrub", marker = "extra == 'examples'", specifier = ">=0.7.2,<0.8.0" },
-    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
-    { name = "torch", marker = "extra == 'vision'", specifier = ">=2.9.1" },
-    { name = "torchvision", marker = "extra == 'vision'", specifier = ">=0.24.1" },
-]
-provides-extras = ["notebook", "examples", "remote", "vision"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "boto3", specifier = ">=1.35,<2" },
-    { name = "ipykernel", specifier = ">=7.2.0,<8" },
-    { name = "moto", extras = ["s3", "server"], specifier = ">=5.1,<6" },
-    { name = "mypy", specifier = ">=1.18.2,<1.19" },
-    { name = "pyright", specifier = ">=1.1.404,<1.1.409" },
-    { name = "pytest", specifier = ">=8.3.3,<9" },
-    { name = "pytest-xdist", specifier = ">=3.6.1,<4" },
-    { name = "ruff", specifier = ">=0.6.8,<0.7" },
 ]
 
 [[package]]

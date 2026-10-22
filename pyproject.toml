@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ico"
+name = "apriori-ico"
 version = "0.1.0"
 description = "Computation flows from typed operators: described before they run, run in worker processes or on a cloud GPU, profiled and watched live."
 readme = "README.md"

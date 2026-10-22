@@ -142,7 +142,7 @@ terminal.
 ## Installation
 
 ```bash
-pip install ico
+pip install apriori-ico
 ```
 
 or, for development, `uv sync` in a clone (`make ci` runs the checks).
