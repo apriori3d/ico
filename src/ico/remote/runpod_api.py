@@ -1,5 +1,6 @@
-"""RunPod's REST API (``rest.runpod.io/v1``) for what jobs need around an
-endpoint: network volumes, created for an order and deleted after it.
+"""RunPod's REST API (``rest.runpod.io/v1``, and ``api.runpod.io/v2`` where
+v1 falls short) for what jobs need around an endpoint: network volumes,
+created for an order and deleted after it.
 
 A volume holds the assets (weights) the workers read and the inputs and
 outputs of runs; its S3 API (``https://s3api-<datacenter>.runpod.io``,
@@ -24,6 +25,10 @@ from ico.remote.job import JsonObject
 from ico.spec.model import JsonValue
 
 REST_API = "https://rest.runpod.io/v1"
+REST_API_V2 = "https://api.runpod.io/v2"
+REST_ENV = "ICO_RUNPOD_REST"
+REST_V2_ENV = "ICO_RUNPOD_REST_V2"
+"""The API roots (fake ones in tests)."""
 USER_AGENT = "ico-remote"
 """RunPod's REST API (behind Cloudflare) refuses the default
 ``Python-urllib`` user agent: HTTP 403, error code 1010."""
@@ -80,6 +85,16 @@ class RunPodApi:
 
     api_key: str | None = None
     base_url: str = REST_API
+    v2_url: str = REST_API_V2
+
+    @classmethod
+    def from_env(cls) -> RunPodApi:
+        """The API roots from ``ICO_RUNPOD_REST`` / ``ICO_RUNPOD_REST_V2``
+        (fake APIs in tests), else RunPod's."""
+        return cls(
+            base_url=os.environ.get(REST_ENV) or REST_API,
+            v2_url=os.environ.get(REST_V2_ENV) or REST_API_V2,
+        )
 
     def volumes(self) -> list[Volume]:
         found = cast(list[JsonValue], self.call("GET", "/networkvolumes"))
@@ -107,9 +122,11 @@ class RunPodApi:
         self.call("PATCH", f"/endpoints/{endpoint_id}", body)
 
     def detach(self, endpoint_id: str) -> None:
-        """Detach the endpoint's volumes (before deleting them)."""
-        body: JsonObject = {"networkVolumeIds": []}
-        self.call("PATCH", f"/endpoints/{endpoint_id}", body)
+        """Detach the endpoint's volumes (before deleting them). Through
+        REST v2: v1 accepts ``networkVolumeIds: []`` but keeps the mount,
+        and the volume then cannot be deleted."""
+        body: JsonObject = {"mounts": {"network": []}}
+        self.call("PATCH", f"/serverless/{endpoint_id}", body, root=self.v2_url)
 
     def volume_up(
         self, endpoint_id: str, size: int, datacenter: str, name: str
@@ -129,9 +146,16 @@ class RunPodApi:
         self.detach(endpoint_id)
         self.delete_volume(volume_id)
 
-    def call(self, method: str, path: str, body: JsonObject | None = None) -> JsonValue:
+    def call(
+        self,
+        method: str,
+        path: str,
+        body: JsonObject | None = None,
+        *,
+        root: str | None = None,
+    ) -> JsonValue:
         key = self.api_key or os.environ.get("RUNPOD_API_KEY", "")
-        url = f"{self.base_url.rstrip('/')}{path}"
+        url = f"{(root or self.base_url).rstrip('/')}{path}"
         data = json.dumps(body).encode() if body is not None else None
         for attempt in range(RETRIES):
             request = urllib.request.Request(url, data=data, method=method)

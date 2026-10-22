@@ -15,7 +15,7 @@ from ico.assets.hub import HubError
 from ico.assets.lockfile import lock
 from ico.remote.job import FetchJob, RemoteError
 from ico.remote.runpod import API, RunPod
-from ico.remote.runpod_api import REST_API, RunPodApi, RunPodApiError
+from ico.remote.runpod_api import RunPodApi, RunPodApiError
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -70,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _runpod(args: argparse.Namespace) -> int:
-    api = RunPodApi(base_url=os.environ.get("ICO_RUNPOD_REST") or REST_API)
+    api = RunPodApi.from_env()
     if args.command == "volume":
         if args.action == "list":
             for v in api.volumes():
