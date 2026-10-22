@@ -41,6 +41,8 @@ class FakeRunPod:
     def __init__(self) -> None:
         self.jobs: dict[str, FakeJob] = {}
         self.throttle = 0
+        self.drop = 0
+        """Stream reads to answer by closing the connection."""
         self.ids = itertools.count(1)
         fake = self
 
@@ -74,6 +76,10 @@ class FakeRunPod:
             threading.Thread(target=self.work, args=(id, job), daemon=True).start()
             return self.reply(request, 200, {"id": id, "status": job.status})
         job = self.jobs[rest[0]]
+        if action == "stream" and self.drop:
+            self.drop -= 1
+            request.close_connection = True
+            return
         if action == "stream":
             new = job.chunks[job.read :]
             job.read += len(new)
@@ -198,6 +204,19 @@ def test_throttled_submits_back_off(
 
     assert result(handle)["outputs"] == ["X"]
     assert 1 <= sleeps[0] < 2 and 2 <= sleeps[1] < 3
+
+
+def test_dropped_stream_reads_are_retried(
+    fake: FakeRunPod, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def sleep(seconds: float) -> None:
+        time.sleep(0.01)
+
+    monkeypatch.setattr(runpod_module, "time", _Clock(sleep))
+    fake.drop = 2
+    handle = executor(fake).submit(_job(op("jobs.shout@1"), "x"))
+
+    assert result(handle)["outputs"] == ["X"] and fake.drop == 0
 
 
 def test_a_wrong_key_is_an_http_error(fake: FakeRunPod) -> None:
