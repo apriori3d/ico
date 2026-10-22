@@ -18,11 +18,15 @@ KEY = "rest-key"
 
 
 class FakeRest:
-    """/networkvolumes and /endpoints/<id> of the REST API."""
+    """/networkvolumes and /endpoints/<id> of REST v1, /serverless/<id> of
+    v2. A v1 PATCH of ``networkVolumeIds: []`` keeps the mount, as RunPod's
+    does; deleting a mounted volume fails, as RunPod's does."""
 
     def __init__(self) -> None:
         self.volumes: dict[str, dict[str, Any]] = {}
         self.patches: list[tuple[str, dict[str, Any]]] = []
+        self.mounted: dict[str, str] = {}
+        """Endpoint → its volume."""
         self.fail_patch = False
         fake = self
 
@@ -44,7 +48,8 @@ class FakeRest:
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
-        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/v1"
+        root = f"http://127.0.0.1:{self.server.server_address[1]}"
+        self.url, self.url_v2 = f"{root}/v1", f"{root}/v2"
 
     def serve(self, request: BaseHTTPRequestHandler, method: str) -> None:
         if request.headers["user-agent"].startswith("Python-urllib"):
@@ -53,6 +58,13 @@ class FakeRest:
             return self.reply(request, 401, {"error": "unauthorized"})
         length = int(request.headers.get("content-length") or 0)
         body: dict[str, Any] = json.loads(request.rfile.read(length)) if length else {}
+        if request.path.startswith("/v2/serverless/") and method == "PATCH":
+            endpoint = request.path.rsplit("/", 1)[1]
+            self.patches.append((endpoint, body))
+            mounts = cast(dict[str, Any], body.get("mounts") or {})
+            if mounts.get("network") == []:
+                self.mounted.pop(endpoint, None)
+            return self.reply(request, 200, {"id": endpoint})
         path = request.path.removeprefix("/v1")
         if path == "/networkvolumes" and method == "GET":
             return self.reply(request, 200, list(self.volumes.values()))
@@ -61,14 +73,26 @@ class FakeRest:
             self.volumes[volume["id"]] = volume
             return self.reply(request, 200, volume)
         if path.startswith("/networkvolumes/") and method == "DELETE":
+            if path.rsplit("/", 1)[1] in self.mounted.values():
+                return self.reply(
+                    request,
+                    500,
+                    {
+                        "error": "delete network volume: "
+                        "You must remove this network volume from all pods before deleting it."
+                    },
+                )
             if self.volumes.pop(path.rsplit("/", 1)[1], None) is None:
                 return self.reply(request, 404, {"error": "not found"})
             return self.reply(request, 204, None)
         if path.startswith("/endpoints/") and method == "PATCH":
             if self.fail_patch:
                 return self.reply(request, 400, {"error": "bad datacenter"})
-            self.patches.append((path.rsplit("/", 1)[1], body))
-            return self.reply(request, 200, {"id": path.rsplit("/", 1)[1]})
+            endpoint = path.rsplit("/", 1)[1]
+            self.patches.append((endpoint, body))
+            if "networkVolumeId" in body:
+                self.mounted[endpoint] = body["networkVolumeId"]
+            return self.reply(request, 200, {"id": endpoint})
         self.reply(request, 404, {"error": "no route"})
 
     def reply(self, request: BaseHTTPRequestHandler, code: int, body: object) -> None:
@@ -84,12 +108,13 @@ def rest(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRest]:
     fake = FakeRest()
     monkeypatch.setenv("RUNPOD_API_KEY", KEY)
     monkeypatch.setenv("ICO_RUNPOD_REST", fake.url)
+    monkeypatch.setenv("ICO_RUNPOD_REST_V2", fake.url_v2)
     yield fake
     fake.server.shutdown()
 
 
 def test_an_order_brings_a_volume_up_and_down(rest: FakeRest) -> None:
-    api = RunPodApi(base_url=rest.url)
+    api = RunPodApi.from_env()
     volume = api.volume_up("ep1", 150, "EU-RO-1", "order-7")
 
     assert volume == Volume("vol1", "order-7", 150, "EU-RO-1")
@@ -103,9 +128,13 @@ def test_an_order_brings_a_volume_up_and_down(rest: FakeRest) -> None:
         "AWS_DEFAULT_REGION": "eu-ro-1",
     }
 
+    assert rest.mounted == {"ep1": "vol1"}
+    with pytest.raises(RunPodApiError, match="remove this network volume"):
+        api.delete_volume(volume.id)  # still mounted
+
     api.volume_down("ep1", volume.id)
-    assert rest.patches[-1] == ("ep1", {"networkVolumeIds": []})
-    assert api.volumes() == []
+    assert rest.patches[-1] == ("ep1", {"mounts": {"network": []}})  # REST v2
+    assert rest.mounted == {} and api.volumes() == []
 
 
 def test_boto3_signs_for_the_volume_region(monkeypatch: pytest.MonkeyPatch) -> None:
