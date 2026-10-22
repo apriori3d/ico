@@ -5,9 +5,7 @@ import pytest
 
 from ico import IcoOperator, plan_view
 from ico.core.async_stream import IcoAsyncStream
-from ico.core.context_operator import IcoContextOperator
-from ico.core.context_pipeline import IcoContextPipeline
-from ico.core.epoch import IcoEpoch
+from ico.core.fold import IcoFold
 from ico.core.operator import IcoOperatorProtocol
 from ico.core.plan_keys import plan_nodes, remote_flow_key
 from ico.core.route import route
@@ -89,23 +87,23 @@ def test_route_rows_have_the_keys_of_their_nodes() -> None:
     ]
 
 
-def test_epoch_parts_and_remote_flows_are_keyed() -> None:
+def test_fold_parts_and_remote_flows_are_keyed() -> None:
     class Ctx:
         pass
 
-    def train(x: float, c: Ctx) -> Ctx:
-        return c
+    def train(pair: tuple[float, Ctx]) -> Ctx:
+        return pair[1]
 
     def log(c: Ctx) -> Ctx:
         return c
 
-    epoch = IcoEpoch(
-        source=IcoSource(floats) | IcoAsyncStream(make_worker, pool_size=2),
-        context_operator=IcoContextPipeline(IcoContextOperator(train), log),
+    fold = IcoFold(
+        IcoSource(floats) | IcoAsyncStream(make_worker, pool_size=2),
+        IcoOperator(train) | IcoOperator(log),
     )
-    keys = [key for key, _ in keyed_rows(plan_view(epoch))]
-    assert keys == [
-        "0",  # the epoch
+    rows = keyed_rows(plan_view(fold))
+    assert [key for key, _ in rows] == [
+        "0",  # the fold
         "0.0",  # for each in: the source chain
         "0.0.0",
         "0.0.1",  # parallel in
@@ -114,11 +112,12 @@ def test_epoch_parts_and_remote_flows_are_keyed() -> None:
         "0.0.1.0.0.1",  # shift
         None,  # receive
         None,  # yield
-        "0.1",  # apply: the context pipeline
+        "0.1",  # fold: the step chain
         "0.1.0",
         "0.1.1",
         None,  # emit
     ]
+    assert [text for _, text in rows][9] == "├─▸ fold"
 
 
 def test_keys_are_unique_and_match_plan_nodes() -> None:

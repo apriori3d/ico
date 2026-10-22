@@ -111,14 +111,12 @@ class IcoSink(
 
             return IcoSignature(
                 i=Iterator[ci_type],
-                c=None,
                 o=type(None),
             )
 
         # Fallback to Any types
         return IcoSignature(
             i=Iterator[Any],
-            c=None,
             o=type(None),
             infered=False,
         )

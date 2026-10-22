@@ -165,7 +165,6 @@ class IcoStream(
         if signature.infered:
             return IcoSignature(
                 i=Iterator[signature.i],  # type: ignore[name-defined]
-                c=None,
                 o=Iterator[signature.o],  # type: ignore[name-defined]
                 infered=True,
             )

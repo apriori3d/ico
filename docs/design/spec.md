@@ -82,7 +82,7 @@ Not implemented. This section is the agreed direction.
 | **Params**    | Plain JSON that configures behavior     | `NodeSpec.params`                    | lr, batch size, augmentations | report dates, fields |
 | **Data**      | Values flowing through ports            | between nodes; large values as handles | batches, metrics        | report rows             |
 | **Resources** | Heavy, process-local objects with a lifecycle | `resources` section, opened by the runtime | dataset, device   | HTTP client             |
-| **Contexts**  | Resources with mutable, snapshottable state owned by one run | `context` of a context pipeline | model + optimizer + epoch | campaign optimization state |
+| **Contexts**  | Resources with mutable, snapshottable state owned by one run | the state of a fold (`IcoFold`) | model + optimizer + epoch | campaign optimization state |
 
 The registry gets three entry kinds: `operator`, `resource`, `context`.
 All are registered parametric classes; their params are JSON.
@@ -125,20 +125,22 @@ class IcoStateful(Protocol):
 
 In ICO a context is not a field of a node: it is a value that flows through
 the main chain. In the CIFAR example `create_train_context` produces a
-`CifarTrainContext`, `IcoProcess` passes it through every epoch,
-`IcoContextPipeline` / `IcoContextOperator` update it per batch inside an
-`IcoEpoch`, and `start_eval` / `end_eval` wrap it into a nested
-`CifarEvalContext` and back. So "a context in a spec" means:
+`CifarTrainContext`, `IcoProcess` passes it through every epoch, an
+`IcoFold` whose step (`train_step | logging_step | save_checkpoint_step`,
+over `tuple[CifarBatch, CifarTrainContext]`) updates it per batch, and
+`start_eval` / `end_eval` wrap it into a nested `CifarEvalContext` and
+back. So "a context in a spec" means:
 
 - the context class is registered (kind `context`) and implements
   `IcoStateful`;
 - the operator that creates it becomes a registered parametric operator,
   e.g. `cifar.train_context` with params `arch`, `lr` and an optional
   `init` snapshot handle; it is the only place where the context is built;
-- the nodes that move it (`IcoProcess`, `IcoEpoch`, `IcoContextPipeline`,
-  `IcoContextOperator`) are serialized as structure (roadmap item 10);
+- the nodes that move it (`IcoProcess`, `IcoFold`, chains) are serialized
+  as structure (`fold` builds from its source and step);
 - per-batch functions (`train_step`, `calculate_accuracy`, logging) become
-  registered operators whose signatures name the context type.
+  registered operators whose signatures name the context type (a step over
+  `tuple[Item, Context]`).
 
 ```json
 {"type": "seq", "children": [

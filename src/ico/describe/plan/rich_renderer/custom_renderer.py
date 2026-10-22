@@ -10,7 +10,7 @@ class CustomRenderer(ABC):
     Base class for specialized node rendering with full control.
 
     Use for complex nodes requiring custom layout beyond standard
-    row/group rendering (e.g., IcoEpoch with iteration details).
+    row/group rendering (e.g., IcoFold with its source and step).
     """
 
     options: PlanRendererOptions

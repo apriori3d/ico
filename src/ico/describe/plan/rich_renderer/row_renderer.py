@@ -6,7 +6,6 @@ from typing import Any, cast
 
 from rich.text import Text
 
-from ico.core.context_operator import IcoContextOperator, IcoContextOperatorProtocol
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.runtime.progress import IcoProgress
@@ -83,10 +82,9 @@ class RowRenderer:
 
         args_info = self._render_node_args_info(node)
 
-        if isinstance(node, IcoOperatorProtocol | IcoContextOperatorProtocol) and (
+        if isinstance(node, IcoOperatorProtocol) and (
             not self.options.show_ico_operator
             or type(cast(object, node)) is IcoOperator
-            or type(cast(object, node)) is IcoContextOperator
         ):
             return text + args_info
 
@@ -121,23 +119,18 @@ class RowRenderer:
         """Render Signature column with type information and arrows."""
         if not self.show_signature_column:
             return Text("")
-        if not isinstance(node, IcoOperatorProtocol | IcoContextOperatorProtocol):
+        if not isinstance(node, IcoOperatorProtocol):
             return Text("")
 
         signature = node.signature
         i = format_ico_type(signature.i) if signature.has_input else None
-        c = format_ico_type(signature.c) if signature.c is not None else None
         o = format_ico_type(signature.o) if signature.has_output else None
         prefix_length = 0
 
-        if o is not None and not (i is None and c is None):
-            if i is not None:
-                prefix_length = same_prefix_length(i, o)
-            if c is not None:
-                prefix_length = min(prefix_length, same_prefix_length(c, o))
+        if o is not None and i is not None:
+            prefix_length = same_prefix_length(i, o)
 
         i_text = Text(i, style=DescribeStyle.signature.value) if i is not None else None
-        c_text = Text(c, style=DescribeStyle.signature.value) if c is not None else None
         o_text = Text(o, style=DescribeStyle.signature.value) if o is not None else None
 
         arrow = Text(" → ", style=DescribeStyle.dimmed.value)
@@ -151,11 +144,6 @@ class RowRenderer:
                 text = Text("()", style=DescribeStyle.signature.value)
         else:
             text = Text("")
-
-        if c_text is not None and self.options.signature_format in ("Full", "Input"):
-            if prefix_length > 0 and self.options.signature_format == "Full":
-                c_text.stylize("dim", 0, prefix_length)
-            text += Text(", ") + c_text
 
         if self.options.signature_format in ("Full"):
             text += arrow
@@ -186,10 +174,6 @@ class RowRenderer:
                     return None
 
             return render_callable(op_fn, options=self.options)
-
-        if isinstance(node, IcoContextOperatorProtocol):
-            ctx_fn = cast(IcoContextOperator[Any, Any, Any], node).fn
-            return render_callable(ctx_fn, options=self.options)
 
         return None
 

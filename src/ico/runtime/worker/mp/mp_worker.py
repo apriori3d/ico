@@ -540,7 +540,7 @@ class MPWorker(Generic[I, O], IcoWorker[I, O]):
         factory_signature = infer_from_flow_factory(self.flow_factory)
 
         return factory_signature or IcoSignature(
-            i=type(Any), c=None, o=type(Any), infered=False
+            i=type(Any), o=type(Any), infered=False
         )
 
 

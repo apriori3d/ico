@@ -1,10 +1,12 @@
-from typing import Any
+from collections.abc import Iterator
+from typing import Any, cast
 
 import pytest
 
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
 from ico.core.filter import keep
+from ico.core.fold import IcoFold
 from ico.core.fork import fork
 from ico.core.identity import IcoIdentity
 from ico.core.node import IcoNodeProtocol
@@ -64,6 +66,17 @@ def is_large(x: int) -> bool:
 @_reg("parity")
 def parity(x: int) -> str:
     return "even" if x % 2 == 0 else "odd"
+
+
+@_reg("count_to_four")
+def count_to_four(_: None) -> Iterator[int]:
+    return iter(range(1, 5))
+
+
+@_reg("add_to_total")
+def add_to_total(pair: tuple[int, int]) -> int:
+    x, total = pair
+    return total + x
 
 
 # Structural generic nodes are built unparametrized, as `build` does.
@@ -132,6 +145,8 @@ def test_build_returns_registered_instances() -> None:
             id="route",
         ),
         pytest.param(route(parity, {"even": double}), id="route-no-default"),
+        pytest.param(IcoFold(count_to_four, add_to_total), id="fold"),
+        pytest.param(IcoFold(count_to_four, add_to_total | double), id="fold-chain"),
         pytest.param(keep(is_even), id="filter"),
         pytest.param(partition(is_even, name="split"), id="partition"),
         pytest.param(BATCHER, id="batcher"),
@@ -168,6 +183,13 @@ def test_rebuilt_flow_behaves_like_original() -> None:
     )
     _, rebuilt = roundtrip(flow)
     assert flow(3) == cast_call(rebuilt, 3) == ("64", 65)
+
+
+def test_a_rebuilt_fold_folds() -> None:
+    _, rebuilt = roundtrip(IcoFold(count_to_four, add_to_total, name="sum"))
+    fold = cast(IcoFold[int, int], rebuilt)
+    assert isinstance(rebuilt, IcoFold) and fold.name == "sum"
+    assert fold(100) == 110
 
 
 def cast_call(node: IcoNodeProtocol, value: Any) -> Any:
@@ -209,7 +231,7 @@ def test_unregistered_leaf_is_not_imported() -> None:
         build(spec_of(importable), REGISTRY)
 
 
-@pytest.mark.parametrize("kind", ["epoch", "context_pipeline", "monitor", "node"])
+@pytest.mark.parametrize("kind", ["monitor", "node"])
 def test_unsupported_kinds(kind: str) -> None:
     with pytest.raises(SpecError, match=f"kind '{kind}' yet"):
         build(spec_of(NodeSpec(kind=kind)), REGISTRY)

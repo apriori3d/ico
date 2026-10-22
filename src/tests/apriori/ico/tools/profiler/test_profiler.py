@@ -8,7 +8,7 @@ import pytest
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.async_stream import IcoAsyncStream
-from ico.core.context_operator import IcoContextOperator
+from ico.core.fold import IcoFold
 from ico.core.operator import IcoOperator
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.sink import IcoSink
@@ -248,13 +248,24 @@ def test_a_factory_pool_merges_into_one_key() -> None:
     assert nodes["pool"]["items"] == 12
 
 
-def test_context_and_async_operators() -> None:
-    def scale(x: int, factor: int) -> int:
-        return x * factor
+def test_the_step_of_a_fold_is_profiled_per_item() -> None:
+    def add(pair: tuple[int, int]) -> int:
+        return pair[0] + pair[1]
 
-    ctx = instrument(IcoContextOperator(scale), ProfilerTool(interval=None))
-    assert ctx(2, 3) == 6
+    def numbers() -> list[int]:
+        return [1, 2, 3]
 
+    def start() -> list[int]:
+        return [0]
+
+    profiler = ProfilerTool(interval=None)
+    fold = IcoFold(IcoSource(numbers), add)
+    flow = instrument(IcoSource(start) | IcoStream(fold) | IcoSink(ignore), profiler)
+    node = by_label(activate_run(flow, profiler))["add"]
+    assert node["calls"] == 3
+
+
+def test_async_operators() -> None:
     async def fetch(x: int) -> int:
         await asyncio.sleep(0.001)
         return x

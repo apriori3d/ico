@@ -157,7 +157,6 @@ chain, not its child.
   `probe.call(self._fn, item)` when a probe is set, else `self._fn(item)`.
   Every node calls its children through `child(item)`, so composites are
   measured without special cases.
-- `IcoContextOperator`: `probe.call_with_context(fn, item, context)`.
 - `IcoAsyncOperator`: `await probe.call_async(fn, item)` (wall only).
 
 The hook is used instead of replacing `_fn`, because `describe`, the plan

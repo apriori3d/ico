@@ -11,13 +11,6 @@ from typing import (
 )
 
 from ico.core.chain import O3, IcoChain
-from ico.core.context_operator import (
-    C,
-    # CContra,
-    IcoContextOperator,
-    IcoContextOperatorProtocol,
-    OCovariant,
-)
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import O2, I, IcoOperator, IcoOperatorProtocol, IInv, O
 from ico.core.pipeline import IcoPipeline
@@ -43,7 +36,7 @@ class SKMixin(SKProtocol):
 
         if isinstance(self, IcoNodeProtocol):
             for child in self.children:
-                if isinstance(child, SKOperatorProtocol | SKContextOperatorProtocol):
+                if isinstance(child, SKOperatorProtocol):
                     child.fit_mode()
 
     def predict_mode(self) -> None:
@@ -51,7 +44,7 @@ class SKMixin(SKProtocol):
 
         if isinstance(self, IcoNodeProtocol):
             for child in self.children:
-                if isinstance(child, SKOperatorProtocol | SKContextOperatorProtocol):
+                if isinstance(child, SKOperatorProtocol):
                     child.predict_mode()
 
 
@@ -86,15 +79,6 @@ class SKOperatorProtocol(
     def __ior__(
         self, other: IcoOperatorProtocol[O, O2]
     ) -> SKOperatorProtocol[I, O2]: ...
-
-
-@runtime_checkable
-class SKContextOperatorProtocol(
-    SKProtocol,
-    IcoContextOperatorProtocol[I, C, OCovariant],
-    Protocol[I, C, OCovariant],
-):
-    pass
 
 
 class SKOperator(
@@ -214,12 +198,3 @@ class SKPipeline(
         self, other: IcoOperatorProtocol[IInv, O]
     ) -> SKOperatorProtocol[IInv, O]:
         return SKChain(self, other)
-
-
-class SKContextOperator(
-    Generic[I, C, O],
-    IcoContextOperator[I, C, O],
-    SKContextOperatorProtocol[I, C, O],
-    SKMixin,
-):
-    pass

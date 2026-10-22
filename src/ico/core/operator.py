@@ -218,7 +218,6 @@ class IcoOperator(Generic[I, O], IcoNode):
         if i_type is not None and o_type is not None:
             return IcoSignature(
                 i=wrap_type_if_any(i_type),
-                c=None,
                 o=wrap_type_if_any(o_type),
                 infered=True,
             )
@@ -229,9 +228,7 @@ class IcoOperator(Generic[I, O], IcoNode):
             return signature
 
         # 3. Fallback to Any types
-        signature = signature or IcoSignature(
-            i=type(Any), c=None, o=type(Any), infered=False
-        )
+        signature = signature or IcoSignature(i=type(Any), o=type(Any), infered=False)
 
         return signature
 

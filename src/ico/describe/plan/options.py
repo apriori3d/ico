@@ -4,9 +4,8 @@ from typing import Literal, TypeAlias
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
-from ico.core.context_pipeline import IcoContextPipeline
-from ico.core.epoch import IcoEpoch
 from ico.core.filter import IcoFilter
+from ico.core.fold import IcoFold
 from ico.core.fork import IcoFork
 from ico.core.node import IcoNode, IcoNodeProtocol
 from ico.core.partition import IcoPartition
@@ -71,7 +70,6 @@ class PlanRendererOptions(RendererOptions):
         default_factory=lambda: {
             IcoChain,
             IcoPipeline,
-            IcoContextPipeline,
             IcoRuntimeWrapper,
         }
     )
@@ -87,7 +85,7 @@ class PlanRendererOptions(RendererOptions):
             IcoSource: "📚",
             IcoSink: "🏁",
             IcoProgress: "⏳",
-            IcoEpoch: "🧠",
+            IcoFold: "🧠",
             IcoFork: "🔀",
             IcoRoute: "🚦",
             IcoFilter: "🔍",

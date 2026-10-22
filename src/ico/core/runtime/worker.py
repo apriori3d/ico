@@ -581,7 +581,7 @@ class IcoWorker(
         if not signature.infered:
             signature_from_factory = infer_from_flow_factory(self.flow_factory)
             signature = signature_from_factory or IcoSignature(
-                i=type(Any), c=None, o=type(Any), infered=False
+                i=type(Any), o=type(Any), infered=False
             )
 
         return signature

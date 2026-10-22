@@ -79,7 +79,6 @@ class IcoFilter(Generic[IInv], IcoOperator[Iterator[IInv], Iterator[IInv]]):
 
         return IcoSignature(
             i=Iterator[predicate.i],  # type: ignore[name-defined]
-            c=None,
             o=Iterator[predicate.i],  # type: ignore[name-defined]
         )
 

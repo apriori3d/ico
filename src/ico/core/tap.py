@@ -47,7 +47,7 @@ class IcoTap(Generic[IInv], IcoOperator[IInv, IInv]):
         child = self.child.signature
         if not child.infered:
             return child
-        return IcoSignature(i=child.i, c=None, o=child.i)
+        return IcoSignature(i=child.i, o=child.i)
 
 
 def tap(

@@ -138,9 +138,9 @@ class IcoRoute(Generic[I, K, O], IcoOperator[I, O]):
             or common_input is None
             or not is_supported_type(output)
         ):
-            return IcoSignature(i=type[Any], c=None, o=type[Any], infered=False)
+            return IcoSignature(i=type[Any], o=type[Any], infered=False)
 
-        return IcoSignature(i=common_input, c=None, o=output)
+        return IcoSignature(i=common_input, o=output)
 
 
 def route(

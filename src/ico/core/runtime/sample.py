@@ -226,16 +226,6 @@ class SampleProbe:
         self._take(result)
         return result
 
-    def call_with_context(
-        self, fn: Callable[[Any, Any], Any], item: Any, context: Any
-    ) -> Any:
-        if self.inner is None:
-            result = fn(item, context)
-        else:
-            result = self.inner.call_with_context(fn, item, context)
-        self._take(result)
-        return result
-
     async def call_async(self, fn: Callable[[Any], Awaitable[Any]], item: Any) -> Any:
         if self.inner is None:
             result = await fn(item)
@@ -248,10 +238,9 @@ class SampleProbe:
 def is_sampled_kind(node: IcoNodeProtocol) -> bool:
     """Whether ``node`` has a probe slot (every node of the core does)."""
     from ico.core.async_operator import IcoAsyncOperator
-    from ico.core.context_operator import IcoContextOperator
     from ico.core.operator import IcoOperator
 
-    return isinstance(node, IcoOperator | IcoContextOperator | IcoAsyncOperator)
+    return isinstance(node, IcoOperator | IcoAsyncOperator)
 
 
 @final
@@ -301,16 +290,6 @@ class RecentProbe:
         self._keep(result)
         return result
 
-    def call_with_context(
-        self, fn: Callable[[Any, Any], Any], item: Any, context: Any
-    ) -> Any:
-        if self.inner is None:
-            result = fn(item, context)
-        else:
-            result = self.inner.call_with_context(fn, item, context)
-        self._keep(result)
-        return result
-
     async def call_async(self, fn: Callable[[Any], Awaitable[Any]], item: Any) -> Any:
         if self.inner is None:
             result = await fn(item)
@@ -322,15 +301,13 @@ class RecentProbe:
 
 def is_leaf_operator(node: IcoNodeProtocol) -> bool:
     """Whether ``node`` is an operator of the domain: a wrapped function
-    (exactly ``IcoOperator``, ``IcoAsyncOperator`` or
-    ``IcoContextOperator``) or a class defined outside ICO; not a
-    structural node of the core."""
+    (exactly ``IcoOperator`` or ``IcoAsyncOperator``) or a class defined
+    outside ICO; not a structural node of the core."""
     from ico.core.async_operator import IcoAsyncOperator
-    from ico.core.context_operator import IcoContextOperator
     from ico.core.operator import IcoOperator
 
     kind = type(node)
-    if kind in (IcoOperator, IcoAsyncOperator, IcoContextOperator):
+    if kind in (IcoOperator, IcoAsyncOperator):
         return True
     return is_sampled_kind(node) and not kind.__module__.startswith("ico.")
 

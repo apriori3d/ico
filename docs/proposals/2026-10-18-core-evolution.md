@@ -15,7 +15,7 @@ separate change: it gets its own short design and PR before any code, as
 | D. A smaller state model | done: #56 |
 | E. Hygiene | in part: shared event listeners #50; docstrings cut where code changed, no pass over the rest |
 | F. Data channel | not started (no measured need) |
-| G. Algebra | in part: `tap` #67, and `pipeline_ref` #66 at the spec level; `flat_map`, `zip`/`merge`, `scan`, one n-ary chain, context as data not started |
+| G. Algebra | in part: `tap` #67, `pipeline_ref` #66 at the spec level, context as data (`IcoFold` over `tuple[I, C]` steps; the context operator, context pipeline and epoch removed); `flat_map`, `zip`/`merge`, `scan`, one n-ary chain not started |
 | H. Description apart from the running instance | not started |
 
 Found in real use on the way and fixed: a worker survives an item error

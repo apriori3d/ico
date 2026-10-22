@@ -624,7 +624,7 @@ def class_signature(cls: type[IcoOperator[Any, Any]]) -> IcoSignature | None:
     i_type, o_type = resolve_types_from_generic(probe, IcoOperator, I, O)
     if i_type is None or o_type is None:
         return None
-    return IcoSignature(i=wrap_type_if_any(i_type), c=None, o=wrap_type_if_any(o_type))
+    return IcoSignature(i=wrap_type_if_any(i_type), o=wrap_type_if_any(o_type))
 
 
 def node_signature(node: IcoNodeProtocol) -> IcoSignature | None:

@@ -166,13 +166,11 @@ class IcoChain(Generic[I, O, O2], IcoOperator[I, O2]):
         if left.infered and right.infered:
             return IcoSignature(
                 i=left.i,
-                c=None,
                 o=right.o,
             )
         # Fallback to Any types
         return IcoSignature(
             i=type[Any],
-            c=None,
             o=type[Any],
             infered=False,
         )

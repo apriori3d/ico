@@ -134,14 +134,12 @@ class IcoSource(
 
             return IcoSignature(
                 i=type(None),
-                c=None,
                 o=Iterator[o_arg],
             )
 
         # Fallback to Any types
         return IcoSignature(
             i=type(None),
-            c=None,
             o=Iterator[Any],
             infered=False,
         )

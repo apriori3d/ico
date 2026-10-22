@@ -21,7 +21,6 @@ from typing import (
     get_type_hints,
 )
 
-from ico.core.context_operator import IcoContextOperator
 from ico.core.operator import IcoOperator
 from ico.core.signature import IcoSignature, SignatureParamType, is_supported_type
 
@@ -226,7 +225,7 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
         >>> def create_converter() -> IcoOperator[int, str]:
         ...     return IcoOperator(str)
         >>> sig = infer_from_flow_factory(create_converter)
-        >>> # Returns IcoSignature(i=int, c=None, o=str)
+        >>> # Returns IcoSignature(i=int, o=str)
     """
     if not callable(fn):
         return None
@@ -245,11 +244,7 @@ def infer_from_flow_factory(fn: object) -> IcoSignature | None:
         return None
     i, o = args
 
-    return IcoSignature(
-        wrap_type_if_any(i),
-        None,
-        wrap_type_if_any(o),
-    )
+    return IcoSignature(i=wrap_type_if_any(i), o=wrap_type_if_any(o))
 
 
 # ──────── Callable Signature Inference ────────
@@ -270,7 +265,7 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
 
     Note:
         Handles special cases:
-        - IcoOperator and IcoContextOperator instances
+        - IcoOperator instances
         - Flow factory methods returning typed operators
         - Functions with TypeVar parameters
         - Methods vs standalone functions
@@ -279,15 +274,13 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
         >>> def process(data: int) -> str:
         ...     return str(data)
         >>> sig = infer_from_callable(process)
-        >>> # Returns IcoSignature(i=int, c=None, o=str)
+        >>> # Returns IcoSignature(i=int, o=str)
     """
     if not callable(obj):
         return None
 
     if isinstance(obj, IcoOperator):
         fn = cast(Callable[[Any], Any], obj._fn)  # type: ignore
-    elif isinstance(obj, IcoContextOperator):
-        fn = cast(Callable[[Any, Any], Any], obj.fn)  # type: ignore
     elif not (
         inspect.isfunction(obj) or inspect.ismethod(obj) or inspect.isbuiltin(obj)
     ):
@@ -306,14 +299,9 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
 
     params = list(sig.parameters.values())
 
-    # If 'i', 'c' or 'o' is present in params, they will be set to type from hints
-    # or to type(None) if hints is not present.
-    # 'c' is optional and can be None if not present.
-
+    # The input is the first parameter (none: ``type(None)``), the output the
+    # return annotation; missing hints are ``Any``.
     i = hints.get(params[0].name, type(Any)) if params else type(None)
-    c = (
-        hints.get(params[1].name, type(Any)) if len(params) > 1 else None
-    )  # Context parameter is optional
     o = hints.get("return", type(Any))
 
     # ──────── Unresolved cases ────────
@@ -325,7 +313,6 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
 
     # 2. Generic Alias with TypeVars, like Iterator[O].
     origins_args = get_args(i)
-    origins_args += get_args(c)
     origins_args += get_args(o)
     if any((type(a) is TypeVar) for a in origins_args):
         return None
@@ -345,26 +332,14 @@ def infer_from_callable(obj: object) -> IcoSignature | None:
                 case 2:
                     i = o_args[0]
                     o = o_args[1]
-                case 3:
-                    i = o_args[0]
-                    c = o_args[1] or type(None)  # Context is optional
-                    o = o_args[2]
                 case _:
                     pass
 
             i = i or type(None)
             o = o or type(None)
 
-    if (
-        is_supported_type(i)
-        and is_supported_type(o)
-        and (c is None or is_supported_type(c))
-    ):
-        return IcoSignature(
-            i=wrap_type_if_any(i),
-            c=wrap_type_if_any(c) if c is not None else None,
-            o=wrap_type_if_any(o),
-        )
+    if is_supported_type(i) and is_supported_type(o):
+        return IcoSignature(i=wrap_type_if_any(i), o=wrap_type_if_any(o))
 
     return None
 

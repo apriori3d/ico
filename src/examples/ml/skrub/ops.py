@@ -7,7 +7,6 @@ import pandas as pd  # type: ignore[import-untyped]
 from sklearn.decomposition import TruncatedSVD  # type: ignore[import-untyped]
 
 from examples.ml.skrub.base import (
-    SKContextOperator,
     SKOperator,
     SKOperatorProtocol,
 )
@@ -216,14 +215,9 @@ class ApplyToColumn(
                 prefix=output_prefix
             )
 
-        replace_column_op = SKContextOperator[AnyDataFrame, TDataFrame, TDataFrame](
-            lambda i, c: cast(TDataFrame, replace_dataframe_column(c, i, column_name))
-        )
-
         super().__init__(name=name, children=[full_column_flow])
 
         self.full_column_flow = full_column_flow
-        self.replace_column_op = replace_column_op
         self.column_name = column_name
 
     def _fit_transform(self, input: TDataFrame) -> TDataFrame:
@@ -231,7 +225,10 @@ class ApplyToColumn(
 
     def _transform(self, input: TDataFrame) -> TDataFrame:
         single_column_data = self.full_column_flow(input)
-        return self.replace_column_op(single_column_data, input)
+        return cast(
+            TDataFrame,
+            replace_dataframe_column(input, single_column_data, self.column_name),
+        )
 
 
 # class ApplyToColumns(
