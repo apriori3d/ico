@@ -114,10 +114,6 @@ the work.
 
 <img src="docs/images/live_board.gif" width="900" alt="The Live Board updating during the CIFAR-10 example">
 
-The whole plan with its profile:
-
-<img src="docs/images/live_board.png" width="900" alt="The Live Board during the CIFAR-10 example">
-
 ## MCP server
 
 [ico-mcp](https://github.com/apriori3d/ico-mcp) is an MCP server on top of
