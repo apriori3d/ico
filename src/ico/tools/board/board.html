@@ -87,6 +87,7 @@
   table.plan td.num { color: var(--muted); font-variant-numeric: tabular-nums; }
   table.plan td.self { color: var(--text); }
   table.plan tr.hot td.self { color: var(--fail); font-weight: 600; }
+  table.plan td.reloaded { color: var(--fail); font-weight: 600; }
   table.plan td.info { text-align: left; }
   .s-fn { color: var(--fn); }
   .s-type { color: var(--type); }
@@ -137,7 +138,24 @@ const RESOURCE_COLUMNS = [
   ["reloads", "Reloads"], ["size", "Size"], ["on", "On"],
 ];
 
-// Loaded models of a profiled run: reloads in red (the RAM budget is too small).
+// Loaded models of a profiled run, styled as operators in the plan,
+// ref(name=value, ...): the reference and the brackets as a name, its fields
+// as arguments; reloads in red (the RAM budget is too small).
+const RESOURCE_STYLES = { process: "s-text", on: "s-signature" };
+
+function renderResourceName(row) {
+  const td = el("td");
+  const args = row.args || [];
+  if (!args.length) {
+    td.append(el("span", "s-text", row.ref || row.resource));
+    return td;
+  }
+  td.append(el("span", "s-text", row.ref + "("));
+  td.append(el("span", "s-fn", args.map(([name, value]) => name + "=" + value).join(", ")));
+  td.append(el("span", "s-text", ")"));
+  return td;
+}
+
 function renderResources(rows) {
   const table = el("table", "plan");
   const head = el("tr");
@@ -147,8 +165,9 @@ function renderResources(rows) {
   for (const row of rows) {
     const tr = el("tr");
     RESOURCE_COLUMNS.forEach(([key]) => {
-      const cell = el("td", ["resource", "process", "on"].includes(key) ? "" : "num", row[key]);
-      if (key === "reloads" && row[key] !== "0") cell.style.color = "var(--hot, #c33)";
+      if (key === "resource") return tr.append(renderResourceName(row));
+      const cell = el("td", RESOURCE_STYLES[key] || "num", row[key]);
+      if (key === "reloads" && row[key] !== "0") cell.className = "num reloaded";
       tr.append(cell);
     });
     table.append(tr);

@@ -7,6 +7,7 @@ Live Board). Rows of the plan join them by ``plan_view(...)["keys"]``.
 
 from __future__ import annotations
 
+import re
 from typing import TypedDict, cast
 
 from rich.console import Console
@@ -16,6 +17,7 @@ from rich.text import Text
 from ico.core.node import IcoNodeProtocol
 from ico.describe.plan.options import PlanRendererOptions
 from ico.describe.plan.rich_renderer.plan_renderer import PlanRenderer
+from ico.describe.rich_style import DescribeStyle
 from ico.tools.profiler.table import NodeProfile
 from ico.tools.profiler.tool import ProfileSnapshot
 
@@ -225,6 +227,10 @@ class ResourceCells(TypedDict):
     """A resource row of a profile, formatted (the board and the console)."""
 
     resource: str
+    """The label: the reference and the fields that tell it apart."""
+    ref: str
+    args: list[tuple[str, str]]
+    """The fields of the label, as (name, value)."""
     process: str
     uses: str
     in_use: str
@@ -254,6 +260,8 @@ def resource_cells(snapshot: ProfileSnapshot) -> list[ResourceCells]:
         out.append(
             {
                 "resource": row["label"],
+                "ref": row["ref"],
+                "args": label_args(row["ref"], row["label"]),
                 "process": row["process"],
                 "uses": str(row["uses"]),
                 "in_use": duration(row["in_use"]),
@@ -269,6 +277,29 @@ def resource_cells(snapshot: ProfileSnapshot) -> list[ResourceCells]:
     return out
 
 
+def label_args(ref: str, label: str) -> list[tuple[str, str]]:
+    """The fields of a resource label (``ref (name=value, ...)``)."""
+    if not label.startswith(ref + " (") or not label.endswith(")"):
+        return []
+    inner = label[len(ref) + 2 : -1]
+    pairs = (part.partition("=") for part in re.split(r", (?=\w+=)", inner))
+    return [(name, value) for name, _, value in pairs]
+
+
+def resource_text(cells: ResourceCells) -> Text:
+    """A resource as an operator in the plan, ``ref(name=value, ...)``: the
+    reference and the brackets as a name, its fields as arguments."""
+    name = DescribeStyle.text.value
+    if not cells["args"]:
+        return Text(cells["ref"], style=name)
+    args = ", ".join(f"{key}={value}" for key, value in cells["args"])
+    return (
+        Text(cells["ref"] + "(", style=name)
+        + Text(args, style=DescribeStyle.fn.value)
+        + Text(")", style=name)
+    )
+
+
 def _resource_table(snapshot: ProfileSnapshot) -> Table:
     """Resources: uses, time in use, loads and moves with their time,
     reloads, size."""
@@ -276,12 +307,20 @@ def _resource_table(snapshot: ProfileSnapshot) -> Table:
     for key, name in RESOURCE_COLUMNS:
         left = key in ("resource", "process", "on")
         table.add_column(name, no_wrap=True, justify="left" if left else "right")
+    styles = {
+        "process": DescribeStyle.text.value,
+        "on": DescribeStyle.signature.value,
+    }
     for cells in resource_cells(snapshot):
         row = cast(dict[str, str], cells)
         values = [
-            Text(
+            resource_text(cells)
+            if key == "resource"
+            else Text(
                 row[key],
-                style="bold red" if key == "reloads" and row[key] != "0" else "",
+                style="bold red"
+                if key == "reloads" and row[key] != "0"
+                else styles.get(key, ""),
             )
             for key, _ in RESOURCE_COLUMNS
         ]
