@@ -41,10 +41,13 @@ flowchart TB
   R["IcoRuntime"] --- T["tools: Live Board, profiler, progress"]
   R -- "commands: activate, run, cancel" --> flow
   flow -- "events: progress, profile, errors" --> R
-  subgraph flow["flow: typed operators"]
+  subgraph flow["IcoProcess: 3 epochs"]
     direction LR
-    S["IcoSource"] --> A["IcoAsyncStream"] --> F["IcoFold: train_step"] --> K["IcoSink"]
-    A -.- W["MPWorker × 4"]
+    subgraph epoch["IcoFold: one epoch"]
+      direction LR
+      S["IcoSource"] --> P["IcoProgress"] --> A["IcoAsyncStream"] --> F["train_step"]
+      A -.- W["MPWorker × 4: load"]
+    end
   end
 ```
 
@@ -129,6 +132,9 @@ a pull request that makes them stable.
   [the runtime](src/examples/ico_runtime_basics.ipynb) (notebooks)
 - [Worker processes](src/examples/ico_mp_basic.py) and
   [a pool of them](src/examples/ico_mp_basic_pool.py)
+- [A training process in miniature](src/examples/ico_training.py): a pool of
+  worker processes loads items, a fold runs an epoch over them, a process
+  repeats it (the diagram above)
 - [Linear regression](src/examples/ml/ico_linear_regression.ipynb)
 - CIFAR-10: [notebook](src/examples/ml/cv/cifar/ico_cifar_complete_flow.ipynb),
   [with worker pools](src/examples/ml/cv/cifar/ico_cifar_complete_flow_mp.py)
