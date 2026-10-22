@@ -26,14 +26,13 @@ percent of each asset and a result with the state of every asset. A run
 job that carries ``assets.toml`` in its sources resolves ``asset(id)``
 against it.
 
-``python -m ico.remote.runner --workdir DIR`` reads a job (JSON) from stdin
+``python -m ico.remote --workdir DIR`` (:mod:`ico.remote.__main__`) reads a job (JSON) from stdin
 and writes its events as JSON lines to stdout (operators' prints go to
 stderr); SIGTERM cancels the run between items.
 """
 
 from __future__ import annotations
 
-import argparse
 import contextlib
 import json
 import os
@@ -49,7 +48,7 @@ from ico.core.runtime.cancel import IcoCancelToken
 from ico.describe.plan.json_renderer import plan_view
 from ico.registry.loader import load_operators
 from ico.registry.registry import Status
-from ico.remote.job import AnyJob, FetchJob, Job, JsonObject, load_job
+from ico.remote.job import AnyJob, FetchJob, Job, JsonObject
 from ico.remote.storage import basename, join, mount_bucket, storage_for
 from ico.spec.builders import build
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
@@ -414,18 +413,3 @@ def serve(job: AnyJob, workdir: Path, out: IO[str]) -> None:
         fetch_job(job, emit, workdir, token)
     else:
         run_job(job, emit, workdir, token)
-
-
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(prog="python -m ico.remote.runner")
-    parser.add_argument("--workdir", type=Path, required=True)
-    args = parser.parse_args(argv)
-    # The events own the original stdout; operators' output goes to stderr.
-    events = os.fdopen(os.dup(1), "w", encoding="utf-8")
-    os.dup2(2, 1)
-    job = load_job(cast(JsonObject, json.loads(sys.stdin.read())))
-    serve(job, cast(Path, args.workdir), events)
-
-
-if __name__ == "__main__":
-    main()

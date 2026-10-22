@@ -1,7 +1,7 @@
 """The RunPod worker: ``python -m ico.remote.runpod_handler`` in the image.
 
 Each RunPod job carries an ICO job (``{"input": {"job": ...}}``); the
-handler runs it in a runner subprocess (``python -m ico.remote.runner``)
+handler runs it in a runner subprocess (``python -m ico.remote``)
 and yields its events, which ``/stream`` delivers to the executor. When
 RunPod cancels the job, the runner gets SIGTERM (it stops between items)
 and is killed after ``CANCEL_GRACE`` seconds.
@@ -43,7 +43,7 @@ async def handler(request: JsonObject) -> AsyncIterator[JsonObject]:
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "ico.remote.runner",
+        "ico.remote",
         "--workdir",
         str(workdir),
         stdin=asyncio.subprocess.PIPE,
