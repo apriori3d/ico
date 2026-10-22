@@ -208,9 +208,25 @@ function duration(seconds) {
 
 // ─── Progress bars ───
 
-function renderBar(node) {
+// A progress an operator owns (its plan row "reports ...") is labelled
+// with its owner, the plan row above it: "Wan22Loop() › denoise".
+function barLabel(node, plan) {
+  if (!plan || !plan.keys || !node.node) return node.label;
+  const at = plan.keys.indexOf(node.node);
+  const owner = plan.keys.indexOf(node.node.slice(0, node.node.lastIndexOf(".")));
+  if (at < 0 || owner < 0) return node.label;
+  const reports = plan.rows[at][0].some((s) => s.style === "keyword" && s.text.startsWith("reports "));
+  if (!reports) return node.label;
+  const row = plan.rows[owner];
+  const own = (cell) => cell.filter((s) => !["group", "keyword", "dimmed"].includes(s.style))
+    .map((s) => s.text).join("").trim();
+  const name = own(row[row.length - 1]) || own(row[0]);
+  return name ? name + " › " + node.label : node.label;
+}
+
+function renderBar(node, plan) {
   const row = el("div", "bar");
-  row.append(el("div", "label", node.label));
+  row.append(el("div", "label", barLabel(node, plan)));
   const track = el("div", "track");
   const fill = el("div", "fill");
   if (node.total > 0) {
@@ -354,7 +370,7 @@ function renderLive(run) {
   live.append(head);
   if (run.progress.length) {
     const bars = el("div", "bars");
-    run.progress.forEach((node) => bars.append(renderBar(node)));
+    run.progress.forEach((node) => bars.append(renderBar(node, plans.get(run.id))));
     live.append(bars);
   }
   if (run.summary) live.append(el("div", "summary", run.summary));
@@ -371,6 +387,10 @@ function updateCard(run) {
   const live = renderLive(run);
   if (view.live) view.live.replaceWith(live); else view.card.prepend(live);
   view.live = live;
+  if (run.has_plan && run.progress.length && !plans.has(run.id)) {
+    // Bar labels name their owners from the plan, also while it is closed.
+    getPlan(run.id).then((plan) => plans.set(run.id, plan), () => {});
+  }
   if (run.has_plan) {
     if (!view.plan) {
       view.plan = createPlan(run);
