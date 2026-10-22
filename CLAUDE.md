@@ -177,10 +177,11 @@ Findings of the first domain (video cleaning on cube; numbers are those of
     pool). Not reproducible on 97fc74d: a factory pool of workers importing
     every module of the video domain (diffusers, scipy) runs the same with
     and without the profiler. Reopen with a traceback if it comes back.
-21. [ ] Design, then implement (algebra, proposal G): `pipeline_ref`, a
+21. [x] Design, then implement (algebra, proposal G): `pipeline_ref`, a
     saved pipeline as a node of another (finding 16; with ico-mcp), and
     `tap`, a child run for its side effect that passes its input on
     (finding 17).
+    Done: `pipeline_ref` (#66), `tap` (#67).
 
 Remote runs (design: `docs/design/remote.md`). One PR each:
 
@@ -205,6 +206,7 @@ PR each:
     rows.
 30. [x] `spec_assets(spec, params)` through resources.
 31. [ ] A pool across jobs: the RunPod worker runs jobs in process.
+    Next: today every job loads the Wan2.2 experts again, about 90 s each.
 32. [x] Prefetch jobs (`docs/design/remote.md`, "Assets on the remote
     side"): `FetchJob` downloads assets into the worker's asset root (the
     network volume); runs that carry the manifest resolve `asset(id)`.
@@ -219,12 +221,35 @@ PR each:
     runs (S3 API outside, the mount on the worker: `Job.volume`), and
     `ico runpod volume up|down|list` / `ico runpod prefetch`.
 
+Findings of the first runs on RunPod (`animate_loop` on a 48 GB GPU). One
+PR each:
+
+36. [ ] Context as data (algebra, proposal G): a fold over the items of a
+    source, `fold(source, step)`, `C → C`, where `step` is an ordinary
+    operator over `tuple[I, C] → C` (a function of two arguments is
+    wrapped into one). `IcoEpoch`, `IcoContextOperator` and
+    `IcoContextPipeline` stay as thin aliases (a context pipeline is a
+    chain), and the separate hierarchy goes: its protocol, wrapper and
+    `call_with_context` in the probes. A spec kind `fold` builds from
+    registered operators, so the step's card and types are visible to an
+    agent. The CIFAR example and its tests run unchanged. Checked:
+    signatures infer and link checks compare `tuple[I, C]` element by
+    element today.
+37. [ ] A working set larger than the memory fails at once with a clear
+    error: the pool's budget bounds only idle resources, so an operator
+    that holds models of ~42 GB at once on a worker with a 23 GiB limit
+    is killed (OOM) instead. Compare the sizes of the resources a call
+    uses (from the assets manifest) with `memory()`.
+38. [ ] The runner's `RuntimeWarning: 'ico.remote.runner' found in
+    sys.modules after import of package 'ico.remote'` on every RunPod job.
+39. [ ] `RunPodApi.detach` against REST v2: v1 `networkVolumeIds: []`
+    versus v2 `mounts.network: []`; a test with the current request shape.
+
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.
 - `build(spec)` for context nodes (`IcoEpoch`, `IcoContextPipeline`,
-  `IcoContextOperator`). Revisit when an agent needs to rebuild a training
-  flow.
+  `IcoContextOperator`): replaced by `fold` (item 36).
 - Resources in specs (`resources` section, `ResourceRef[T]`, `{"$res": name}`,
   lazy open, scopes). Revisit when parametric operators with lazy loading
   are not enough, likely the first GPU-model pipeline.
