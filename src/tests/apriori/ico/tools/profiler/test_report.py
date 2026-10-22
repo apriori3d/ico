@@ -1,4 +1,5 @@
 import io
+import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -189,6 +190,8 @@ def test_label_args_split_the_fields_of_a_resource_label() -> None:
     ref = "wan22.expert@1"
     label = f"{ref} (weights=wan22-i2v-high, lora=a, b, subfolder=transformer_2)"
     assert label_args(ref, label) == [
-        ("weights", "wan22-i2v-high"), ("lora", "a, b"), ("subfolder", "transformer_2"),
+        ["weights", "wan22-i2v-high"], ["lora", "a, b"], ["subfolder", "transformer_2"],
     ]  # fmt: skip
     assert label_args(ref, ref) == []
+    # Plain JSON: MCP results (ico-mcp) are validated as JSON values.
+    assert json.loads(json.dumps(label_args(ref, label))) == label_args(ref, label)

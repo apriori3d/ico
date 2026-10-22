@@ -229,8 +229,9 @@ class ResourceCells(TypedDict):
     resource: str
     """The label: the reference and the fields that tell it apart."""
     ref: str
-    args: list[tuple[str, str]]
-    """The fields of the label, as (name, value)."""
+    args: list[list[str]]
+    """The fields of the label, as ``[name, value]`` (JSON, as clients get
+    them)."""
     process: str
     uses: str
     in_use: str
@@ -277,13 +278,13 @@ def resource_cells(snapshot: ProfileSnapshot) -> list[ResourceCells]:
     return out
 
 
-def label_args(ref: str, label: str) -> list[tuple[str, str]]:
+def label_args(ref: str, label: str) -> list[list[str]]:
     """The fields of a resource label (``ref (name=value, ...)``)."""
     if not label.startswith(ref + " (") or not label.endswith(")"):
         return []
     inner = label[len(ref) + 2 : -1]
     pairs = (part.partition("=") for part in re.split(r", (?=\w+=)", inner))
-    return [(name, value) for name, _, value in pairs]
+    return [[name, value] for name, _, value in pairs]
 
 
 def resource_text(cells: ResourceCells) -> Text:
