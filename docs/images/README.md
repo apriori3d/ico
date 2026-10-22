@@ -22,3 +22,6 @@
   For the GIF, capture a frame every second or two for ~30 s at
   `--window-size=1500,1050`, crop to the run's progress and training fold and
   join the frames (e.g. Pillow, 500 ms each, 64 colors).
+
+  In both, the Signature column of the table is painted over with the card's
+  background (it is noise in a picture of the profile).
