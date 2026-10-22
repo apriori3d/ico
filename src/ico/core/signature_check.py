@@ -346,6 +346,7 @@ def _validate_node(
     node: IcoNodeProtocol, path: TreePathIndex, issues: list[SignatureIssue]
 ) -> None:
     from ico.core.chain import IcoChain
+    from ico.core.fold import IcoFold, fold_input
     from ico.core.fork import IcoFork
     from ico.core.process import IcoProcess
     from ico.core.route import IcoRoute
@@ -364,6 +365,27 @@ def _validate_node(
         found.extend(_progress_on_iterators(children, path))
     elif isinstance(node, IcoFork | IcoRoute):
         found.append(check_branch_inputs(node.children, node.name or "", path=path))
+    elif isinstance(node, IcoFold):
+        # The step takes an item of the source with the state it emits.
+        fold = cast(IcoFold[Any, Any], node)
+        expected = fold_input(fold)
+        step = fold.step
+        step_sig = _inferred_signature(_boundary_node(step, side="input"))
+        if (
+            expected is not None
+            and step_sig is not None
+            and is_assignable(expected, step_sig.i) is False
+        ):
+            found.append(
+                SignatureIssue(
+                    "mismatch",
+                    _label(_boundary_node(fold.source, side="output")),
+                    _label(_boundary_node(step, side="input")),
+                    expected,
+                    step_sig.i,
+                    path=path.add_child(1),
+                )
+            )
     elif isinstance(node, IcoProcess) and len(node.children) == 2:
         # Process with a stop condition: the body output feeds `until`.
         body, until = node.children

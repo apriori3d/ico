@@ -94,19 +94,6 @@ class NodeProbe:
         self.exit(frame, self._value_kind())
         return out
 
-    def call_with_context(
-        self, fn: Callable[[Any, Any], Any], item: Any, context: Any
-    ) -> Any:
-        frame = self.enter()
-        try:
-            out = fn(item, context)
-        except BaseException:
-            self._called = True
-            self.exit(frame, CALL_ERROR)
-            raise
-        self.exit(frame, self._value_kind())
-        return out
-
     async def call_async(self, fn: Callable[[Any], Awaitable[Any]], item: Any) -> Any:
         """Measured without a frame and without thread-bound metrics:
         coroutines of one thread interleave across ``await``."""

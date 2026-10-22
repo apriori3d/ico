@@ -150,7 +150,7 @@ def test_every_build_error_is_located(registry: IcoRegistry) -> None:
 
 def test_root_error_is_located_at_root(registry: IcoRegistry) -> None:
     with pytest.raises(SpecError) as exc_info:
-        build(PipelineSpec(root=NodeSpec(kind="epoch")), registry)
+        build(PipelineSpec(root=NodeSpec(kind="monitor")), registry)
     assert exc_info.value.path == TreePathIndex()
     assert str(exc_info.value).startswith("at root: ")
 

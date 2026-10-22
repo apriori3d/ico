@@ -14,10 +14,8 @@ from ico.core.async_operator import IcoAsyncOperator
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
-from ico.core.context_operator import IcoContextOperator
-from ico.core.context_pipeline import IcoContextPipeline
-from ico.core.epoch import IcoEpoch
 from ico.core.filter import IcoFilter
+from ico.core.fold import IcoFold
 from ico.core.fork import IcoFork
 from ico.core.identity import IcoIdentity
 from ico.core.node import IcoNode, IcoNodeProtocol
@@ -158,18 +156,6 @@ def serialize_async_operator(
     )
 
 
-@spec_serializer(IcoContextOperator)
-def serialize_context_operator(
-    node: IcoContextOperator[object, object, object], ctx: SpecContext
-) -> NodeSpec:
-    return NodeSpec(
-        kind="context_op",
-        name=node.name,
-        sig=node_signature(node),
-        ref=callable_ref(node.fn, ctx, owner="context operator"),
-    )
-
-
 @spec_serializer(IcoSource)
 def serialize_source(node: IcoSource[object], ctx: SpecContext) -> NodeSpec:
     return NodeSpec(
@@ -271,14 +257,14 @@ def serialize_process(node: IcoProcess[object], ctx: SpecContext) -> NodeSpec:
     )
 
 
-@spec_serializer(IcoEpoch)
-def serialize_epoch(node: IcoEpoch[object, object], ctx: SpecContext) -> NodeSpec:
-    # children: [source, context_operator]
+@spec_serializer(IcoFold)
+def serialize_fold(node: IcoFold[object, object], ctx: SpecContext) -> NodeSpec:
+    # children: [source, step]
     return NodeSpec(
-        kind="epoch",
+        kind="fold",
         name=node.name,
         sig=node_signature(node),
-        children=(ctx.walk(node.source), ctx.walk(node.context_operator)),
+        children=(ctx.walk(node.source), ctx.walk(node.step)),
     )
 
 
@@ -358,19 +344,6 @@ def _route_key(
             "(str, int, float, bool or None) and cannot be exported."
         )
     return repr(key)
-
-
-@spec_serializer(IcoContextPipeline)
-def serialize_context_pipeline(
-    node: IcoContextPipeline[object, object, object], ctx: SpecContext
-) -> NodeSpec:
-    # children: [apply, *body]
-    return NodeSpec(
-        kind="context_pipeline",
-        name=node.name,
-        sig=node_signature(node),
-        children=(ctx.walk(node.apply), *(ctx.walk(step) for step in node.body)),
-    )
 
 
 @spec_serializer(IcoRuntimeWrapper)

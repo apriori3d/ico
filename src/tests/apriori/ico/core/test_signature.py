@@ -1,9 +1,7 @@
 from collections.abc import Iterator
 
 from ico.core.batcher import IcoBatcher
-from ico.core.context_operator import IcoContextOperator
-from ico.core.context_pipeline import IcoContextPipeline
-from ico.core.epoch import IcoEpoch
+from ico.core.fold import IcoFold
 from ico.core.operator import IcoOperator
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
@@ -175,93 +173,42 @@ def test_infer_form_batcher() -> None:
     assert batcher.signature.format() == "Iterator[int] → Iterator[Iterator[int]]"
 
 
-# ─── Context operator ───
+# ─── Fold ───
 
 
-def test_infer_form_context_operator_from_generics() -> None:
-    ctx_op = IcoContextOperator[int, str, str](lambda i, c: c + str(i))
-    assert ctx_op.signature.format() == "int, str → str"
-
-
-def test_infer_form_context_operator_from_hints() -> None:
-    def ctx_fn(i: int, c: str) -> str:
-        return c + str(i)
-
-    ctx_op = IcoContextOperator(ctx_fn)
-    assert ctx_op.signature.format() == "int, str → str"
-
-
-# ─── Context Pipeline ───
-
-
-def test_infer_form_context_pipeline_from_generics() -> None:
-    ctx_pipe = IcoContextPipeline[int, str, str](
-        IcoContextOperator[int, str, str](lambda i, c: c + str(i)),
-        IcoOperator[str, str](lambda c: c.upper()),
-    )
-    assert ctx_pipe.signature.format() == "int, str → str"
-
-
-def test_infer_form_context_pipeline_from_type_hints() -> None:
-    def apply_fn(i: int, c: str) -> str:
-        return c + str(i)
-
-    def step_fn(c: str) -> str:
-        return c.upper()
-
-    ctx_pipe = IcoContextPipeline(
-        apply_fn,
-        step_fn,
-    )
-    assert ctx_pipe.signature.format() == "int, str → str"
-
-
-# ─── Epoch ───
-
-
-def test_infer_form_epoch_from_generics() -> None:
+def test_infer_form_fold_from_generics() -> None:
     source = IcoSource[int](lambda: iter([1, 2, 3]))
-    context_op = IcoContextOperator[int, str, str](lambda i, c: c + str(i))
+    step = IcoOperator[tuple[int, str], str](lambda pair: pair[1] + str(pair[0]))
 
-    epoch = IcoEpoch(source, context_op)
-    assert epoch.signature.format() == "Iterator[int], str → str"
+    fold = IcoFold(source, step)
+    assert fold.signature.format() == "str → str"
 
 
-def test_infer_form_epoch_from_type_hints() -> None:
+def test_infer_form_fold_from_type_hints() -> None:
     def source_fn() -> Iterator[int]:
         yield from [1, 2, 3]
 
-    def context_fn(i: int, c: str) -> str:
-        return c + str(i)
+    def step_fn(pair: tuple[int, str]) -> str:
+        return pair[1] + str(pair[0])
 
-    source = IcoSource(source_fn)
-    context_op = IcoContextOperator(context_fn)
-
-    epoch = IcoEpoch(source, context_op)
-    assert epoch.signature.format() == "Iterator[int], str → str"
+    fold = IcoFold(IcoSource(source_fn), step_fn)
+    assert fold.signature.format() == "str → str"
+    assert fold("") == "123"
 
 
-def test_infer_form_epoch_from_type_hints_fn_only() -> None:
-    def source_fn(_: None) -> Iterator[int]:
-        yield from [1, 2, 3]
-
-    def context_fn(i: int, c: str) -> str:
-        return c + str(i)
-
-    epoch = IcoEpoch(source_fn, context_fn)
-    assert epoch.signature.format() == "Iterator[int], str → str"
-
-
-def test_infer_form_epoch_from_type_hints_with_source() -> None:
+def test_infer_form_fold_with_a_chain_as_its_step() -> None:
     def source_fn() -> Iterator[int]:
         yield from [1, 2, 3]
 
-    def context_fn(i: int, c: str) -> str:
-        return c + str(i)
+    def add(pair: tuple[int, str]) -> str:
+        return pair[1] + str(pair[0])
 
-    source = IcoSource(source_fn)
-    epoch = IcoEpoch(source, context_fn)
-    assert epoch.signature.format() == "Iterator[int], str → str"
+    def shout(state: str) -> str:
+        return state + "!"
+
+    fold = IcoFold(IcoSource(source_fn), IcoOperator(add) | IcoOperator(shout))
+    assert fold.signature.format() == "str → str"
+    assert fold("") == "1!2!3!"
 
 
 # ─── MPWorker ───

@@ -8,10 +8,8 @@ from ico.core.async_stream import (
 )
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
-from ico.core.context_operator import IcoContextOperator, context_operator
-from ico.core.context_pipeline import IcoContextPipeline
-from ico.core.epoch import IcoEpoch
 from ico.core.filter import IcoFilter, keep
+from ico.core.fold import IcoFold
 from ico.core.fork import IcoFork, fork
 from ico.core.identity import IcoIdentity
 from ico.core.length import with_length
@@ -74,11 +72,8 @@ __all__ = [
     "RetryPolicy",
     "IcoBatcher",
     "IcoChain",
-    "IcoContextOperator",
-    "context_operator",
-    "IcoContextPipeline",
-    "IcoEpoch",
     "IcoFilter",
+    "IcoFold",
     "keep",
     "tap",
     "IcoTap",

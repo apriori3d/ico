@@ -81,7 +81,6 @@ class IcoPartition(
         item = predicate.i
         return IcoSignature(
             i=Iterator[item],  # type: ignore[valid-type]
-            c=None,
             o=tuple[list[item], list[item]],  # type: ignore[valid-type]
         )
 

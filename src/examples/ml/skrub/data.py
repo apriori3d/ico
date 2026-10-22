@@ -460,7 +460,7 @@ class XSource(
         if provider_signature:
             return provider_signature
 
-        return IcoSignature(i=type(None), c=None, o=type[Any])
+        return IcoSignature(i=type(None), o=type[Any])
 
     @overload
     def __or__(
@@ -512,7 +512,7 @@ class XySource(
         if provider_signature:
             return provider_signature
 
-        return IcoSignature(i=type(None), c=None, o=type[Any])
+        return IcoSignature(i=type(None), o=type[Any])
 
     @overload
     def __or__(
@@ -563,7 +563,7 @@ class SKSink(
             signature = infer_from_callable(self.consumer) or signature
 
         signature = (
-            IcoSignature(i=type[Any], c=None, o=type(None))
+            IcoSignature(i=type[Any], o=type(None))
             if not signature or not signature.infered
             else signature
         )

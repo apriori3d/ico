@@ -103,10 +103,10 @@ class IcoFork(Generic[I, O], IcoOperator[I, O]):
         common_input = narrowest_type([s.i for s in signatures])
 
         if not all(s.infered for s in signatures) or common_input is None:
-            return IcoSignature(i=type[Any], c=None, o=type[Any], infered=False)
+            return IcoSignature(i=type[Any], o=type[Any], infered=False)
 
         outputs = tuple(s.o for s in signatures)
-        return IcoSignature(i=common_input, c=None, o=tuple[outputs])  # type: ignore[valid-type]
+        return IcoSignature(i=common_input, o=tuple[outputs])  # type: ignore[valid-type]
 
 
 # ────────────────────────────────────────────────

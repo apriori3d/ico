@@ -20,6 +20,7 @@ CIFAR-10 image classification, showcasing ICO as a superior PyTorch DataLoader r
 
 """
 
+import argparse
 import random
 import time
 from abc import ABC, abstractmethod
@@ -40,9 +41,7 @@ from torchvision.transforms import (  # type: ignore
 from ico import (
     IcoAsyncStream,
     IcoBatcher,
-    IcoContextOperator,
-    IcoContextPipeline,
-    IcoEpoch,
+    IcoFold,
     IcoOperator,
     IcoPipeline,
     IcoProcess,
@@ -336,8 +335,10 @@ def start_train(context: CifarTrainContext) -> CifarTrainContext:
     return context
 
 
-def train_step(batch: CifarBatch, context: CifarTrainContext) -> CifarTrainContext:
-    """Execute single training step with forward/backward pass."""
+def train_step(pair: tuple[CifarBatch, CifarTrainContext]) -> CifarTrainContext:
+    """Execute single training step with forward/backward pass (the step of
+    the training fold: a batch with the training context)."""
+    batch, context = pair
     context.optimizer.zero_grad()
 
     outputs = context.model(batch.images)
@@ -378,8 +379,10 @@ class CifarEvalContext:
     total_samples: int = 0
 
 
-def calculate_accuracy(item: CifarItem, context: CifarEvalContext) -> CifarEvalContext:
-    """Calculate accuracy for single validation item."""
+def calculate_accuracy(pair: tuple[CifarItem, CifarEvalContext]) -> CifarEvalContext:
+    """Calculate accuracy for single validation item (the step of the
+    validation fold: an item with the evaluation context)."""
+    item, context = pair
     with torch.no_grad():
         outputs = context.train_context.model(item.image.unsqueeze(0))  # (1, 10)
 
@@ -434,8 +437,14 @@ if __name__ == "__main__":
     # 🔧 TRAINING CONFIGURATION & HYPERPARAMETERS
     # ─────────────────────────────────────────────────────────────────────────────────
 
-    # make it 2% of a real dataset size for speed up in demo.
-    num_epoch = 100
+    parser = argparse.ArgumentParser(description="CIFAR-10 training with ICO")
+    parser.add_argument("--epochs", type=int, default=100)
+    parser.add_argument(
+        "--limit", type=int, default=None, help="use only this many images (a check)"
+    )
+    args = parser.parse_args()
+
+    num_epoch = args.epochs
     train_split_ratio = 0.8
     batch_size = 8
     num_workers = 4
@@ -469,6 +478,9 @@ if __name__ == "__main__":
     dataset_size = len(dataset)
     all_indices = list(range(dataset_size))
     random.shuffle(all_indices)
+    if args.limit is not None:
+        all_indices = all_indices[: args.limit]
+        dataset_size = len(all_indices)
 
     # Split indices into train and validation sets
     train_split_size = int(dataset_size * train_split_ratio)
@@ -551,14 +563,15 @@ if __name__ == "__main__":
     train_data_flow.describe()
 
     # ──────── Create model train flow ────────
-    train_pipeline = IcoContextPipeline(train_step, logging_step, save_checkpoint_step)
+    # The step of the training fold: an ordinary chain over (batch, context).
+    train_pipeline = (
+        IcoOperator(train_step)
+        | IcoOperator(logging_step)
+        | IcoOperator(save_checkpoint_step)
+    )
     train_pipeline.name = "Training Pipeline"
 
-    train_epoch = IcoEpoch(
-        source=train_data_flow,
-        context_operator=train_pipeline,
-    )
-    train_epoch.name = "Training Epoch"
+    train_epoch = IcoFold(train_data_flow, train_pipeline, name="Training Epoch")
 
     train_flow = start_train | train_epoch
     train_flow.name = "Complete Train Flow"
@@ -588,11 +601,7 @@ if __name__ == "__main__":
     val_data_flow = val_source | (track_val_progress | fetch_item).stream()
     val_data_flow.name = "Validation Flow"
 
-    val_epoch = IcoEpoch(
-        source=val_data_flow,
-        context_operator=IcoContextOperator(calculate_accuracy),
-        name="Validation Epoch",
-    )
+    val_epoch = IcoFold(val_data_flow, calculate_accuracy, name="Validation Epoch")
 
     val_flow = start_eval | val_epoch | log_accuracy | end_eval
     val_flow.name = "Validation Flow"

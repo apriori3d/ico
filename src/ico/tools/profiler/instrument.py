@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from ico.core.async_operator import IcoAsyncOperator
 from ico.core.async_stream import IcoAsyncStream
-from ico.core.context_operator import IcoContextOperator
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator
 from ico.core.plan_keys import ROOT_KEY, child_key, plan_nodes, remote_flow_key
@@ -74,13 +73,8 @@ def instrument_table(
         member = planned.parent is not None and isinstance(
             planned.parent.node, IcoAsyncStream
         )
-        if isinstance(node, IcoOperator | IcoContextOperator | IcoAsyncOperator):
-            operator = cast(
-                IcoOperator[Any, Any]
-                | IcoContextOperator[Any, Any, Any]
-                | IcoAsyncOperator[Any, Any],
-                node,
-            )
+        if isinstance(node, IcoOperator | IcoAsyncOperator):
+            operator = cast(IcoOperator[Any, Any] | IcoAsyncOperator[Any, Any], node)
             probe = operator.probe
             # Replace a probe of an earlier profiler, keep other tools' probes.
             if probe is None or (

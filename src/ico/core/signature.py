@@ -20,32 +20,25 @@ class IcoSignature:
     """
     A representation of the ICO type signature for operators in the DSL.
 
-    Captures the input, context, and output types of an ICO operator to enable
-    type inference, validation, and visualization. Supports both concrete types
-    and typing generics.
+    Captures the input and output types of an ICO operator to enable type
+    inference, validation, and visualization. Supports both concrete types
+    and typing generics. State that an operator carries along goes in its
+    input and output, e.g. ``tuple[Batch, Model] → Model`` (see ``IcoFold``).
 
     ICO signature format:
-        I → O (simple transformation)
-        I, C → O (transformation with context)
+        I → O
 
     Example:
-        >>> # Simple int to string conversion
-        >>> sig = IcoSignature(i=int, c=None, o=str)
+        >>> sig = IcoSignature(i=int, o=str)
         >>> print(sig.format())  # "int → str"
-
-        >>> # Transformation with context
-        >>> sig = IcoSignature(i=str, c=dict, o=int)
-        >>> print(sig.format())  # "str, dict → int"
 
     Attributes:
         i: Input type of the operator (can be Any or typing generic).
-        c: Optional context type for stateful operations.
         o: Output type of the operator (can be Any or typing generic).
         infered: Whether this signature was successfully inferred from code.
     """
 
     i: Any
-    c: Any | None
     o: Any
     infered: bool = True
 
@@ -53,8 +46,6 @@ class IcoSignature:
         """Validate that the types are supported for ICO signatures."""
         if not is_supported_type(self.i):
             raise TypeError(f"Unsupported input type for ICO signature: {self.i}")
-        if self.c is not None and not is_supported_type(self.c):
-            raise TypeError(f"Unsupported context type for ICO signature: {self.c}")
         if not is_supported_type(self.o):
             raise TypeError(f"Unsupported output type for ICO signature: {self.o}")
 
@@ -62,20 +53,15 @@ class IcoSignature:
         """Format the signature as a human-readable type flow string.
 
         Returns:
-            A string representation showing the type flow:
-            - "I → O" for simple transformations
-            - "I, C → O" for transformations with context
+            A string representation showing the type flow, "I → O".
 
         Example:
-            >>> sig = IcoSignature(i=int, c=str, o=float)
-            >>> print(sig.format())  # "int, str → float"
+            >>> sig = IcoSignature(i=int, o=float)
+            >>> print(sig.format())  # "int → float"
         """
         from ico.core.signature_utils import format_ico_type
 
-        if self.c is None:
-            return f"{format_ico_type(self.i)} → {format_ico_type(self.o)}"
-
-        return f"{format_ico_type(self.i)}, {format_ico_type(self.c)} → {format_ico_type(self.o)}"
+        return f"{format_ico_type(self.i)} → {format_ico_type(self.o)}"
 
     @property
     def name(self) -> str:
@@ -100,18 +86,6 @@ class IcoSignature:
             Used for validation and signature analysis.
         """
         return self.i is not type(None)
-
-    @property
-    def has_context(self) -> bool:
-        """Check if this signature has a defined context type.
-
-        Returns:
-            True if context type is specified and not None, False otherwise.
-
-        Note:
-            Context is optional - operators can work with or without it.
-        """
-        return self.c is not None and self.c is not type(None)
 
     @property
     def has_output(self) -> bool:

@@ -236,17 +236,15 @@ PR each:
 Findings of the first runs on RunPod (`animate_loop` on a 48 GB GPU). One
 PR each:
 
-36. [ ] Context as data (algebra, proposal G): a fold over the items of a
-    source, `fold(source, step)`, `C → C`, where `step` is an ordinary
-    operator over `tuple[I, C] → C` (a function of two arguments is
-    wrapped into one). `IcoEpoch`, `IcoContextOperator` and
-    `IcoContextPipeline` stay as thin aliases (a context pipeline is a
-    chain), and the separate hierarchy goes: its protocol, wrapper and
-    `call_with_context` in the probes. A spec kind `fold` builds from
-    registered operators, so the step's card and types are visible to an
-    agent. The CIFAR example and its tests run unchanged. Checked:
-    signatures infer and link checks compare `tuple[I, C]` element by
-    element today.
+36. [x] Context as data (algebra, proposal G): `IcoFold(source, step)`,
+    `C → C`, a fold over the items of a source, where `step` is an
+    ordinary operator or chain over `tuple[I, C] → C`. The context
+    operator, the context pipeline and the epoch are removed, without
+    aliases (only examples used them), and so are the context type of
+    `IcoSignature` and `call_with_context` in the probes. A spec kind
+    `fold` builds from its source and step; `validate_signatures` checks
+    that the step takes the source's items with the state. The CIFAR
+    example and the notebooks use folds; CIFAR checked by a run.
 37. [ ] A working set larger than the memory fails at once with a clear
     error: the pool's budget bounds only idle resources, so an operator
     that holds models of ~42 GB at once on a worker with a 23 GiB limit
@@ -263,12 +261,12 @@ PR each:
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.
 - `build(spec)` for context nodes (`IcoEpoch`, `IcoContextPipeline`,
-  `IcoContextOperator`): replaced by `fold` (item 36).
+  `IcoContextOperator`): replaced by `IcoFold` (item 36), which builds.
 - Resources in specs (`resources` section, `ResourceRef[T]`, `{"$res": name}`,
   lazy open, scopes). Revisit when parametric operators with lazy loading
   are not enough, likely the first GPU-model pipeline.
-- Registered contexts, `IcoStateful`, `checkpoint` node. Revisit together
-  with context nodes.
+- Registered contexts, `IcoStateful`, `checkpoint` node. Revisit when a
+  fold's state has to be snapshotted (resume a training run).
 - Artifact handles (URI + content hash). Revisit together with caching.
 - `live` / `pinned` modes for non-deterministic sources.
 - Shared resources across workers (`IcoShareable`, scope `shared`, memmap

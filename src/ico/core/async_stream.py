@@ -317,7 +317,6 @@ class IcoAsyncStream(
         o_type: Any = worker.o
         return IcoSignature(
             i=Iterator[i_type],
-            c=None,
             o=Iterator[o_type],
         )
 

@@ -129,7 +129,7 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
         i_type, o_type = resolve_types_from_generic(self, IcoAsyncOperator, I, O)
 
         if i_type is not None and o_type is not None:
-            return IcoSignature(i=i_type, c=None, o=o_type, infered=True)
+            return IcoSignature(i=i_type, o=o_type, infered=True)
 
         # 2. Infer from callable signature
         signature = infer_from_callable(self.fn)
@@ -137,4 +137,4 @@ class IcoAsyncOperator(Generic[I, O], IcoNode):
             return signature
 
         # 3. Fallback to Any types
-        return IcoSignature(i=type[Any], c=None, o=type[Any], infered=False)
+        return IcoSignature(i=type[Any], o=type[Any], infered=False)

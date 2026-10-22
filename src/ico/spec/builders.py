@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias, cast
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import chain
 from ico.core.filter import IcoFilter
+from ico.core.fold import IcoFold
 from ico.core.fork import IcoFork
 from ico.core.identity import IcoIdentity
 from ico.core.node import IcoNodeProtocol
@@ -378,7 +379,7 @@ def build(
         SpecError: On unknown operators, signature drift between the spec
             and the registry, unregistered leaves, invalid params, registered
             instances inside factory-made workers, or kinds that cannot be
-            built yet (epoch, context operators, runtime wrappers, monitors).
+            built yet (runtime wrappers, monitors).
 
     Example:
         >>> flow = build(from_json(text))
@@ -483,6 +484,12 @@ def build_stream(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
 def build_pipeline(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
     _children(spec, at_least=1)
     return IcoPipeline(*(ctx.op(c) for c in spec.children), name=spec.name)
+
+
+@spec_builder("fold")
+def build_fold(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    _children(spec, 2)
+    return IcoFold(ctx.op(spec.children[0]), ctx.op(spec.children[1]), name=spec.name)
 
 
 @spec_builder("process")

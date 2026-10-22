@@ -2,8 +2,7 @@
 
 Two hooks, both ``None`` normally:
 
-- ``probe`` of an operator (``IcoOperator``, ``IcoContextOperator``,
-  ``IcoAsyncOperator``): when set, the operator calls the probe with its
+- ``probe`` of an operator (``IcoOperator``, ``IcoAsyncOperator``): when set, the operator calls the probe with its
   callable and its arguments instead of calling the callable.
 - ``runner_probe`` of a worker (``IcoWorker``): when set, the worker's
   runner calls ``runner_probe.wrap(flow)`` on the flow it built from
@@ -28,12 +27,6 @@ class IcoProbe(Protocol):
 
     def call(self, fn: Callable[[Any], Any], item: Any) -> Any:
         """Call ``fn(item)`` of an ``IcoOperator`` and return its result."""
-        ...
-
-    def call_with_context(
-        self, fn: Callable[[Any, Any], Any], item: Any, context: Any
-    ) -> Any:
-        """Call ``fn(item, context)`` of an ``IcoContextOperator``."""
         ...
 
     async def call_async(self, fn: Callable[[Any], Awaitable[Any]], item: Any) -> Any:

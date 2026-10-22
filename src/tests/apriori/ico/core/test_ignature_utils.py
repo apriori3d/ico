@@ -2,15 +2,16 @@
 # mypy: ignore-errors
 
 from types import NoneType
-from typing import Any, Generic
+from typing import Any, Generic, TypeVar
 
-from ico.core.context_operator import C
 from ico.core.operator import I, IInv, O
 from ico.core.signature_utils import (
     replace_typevar,
     resolve_types_from_generic,
     type_contain_any_typevar,
 )
+
+C = TypeVar("C")
 
 
 def test_replace_typevar() -> None:

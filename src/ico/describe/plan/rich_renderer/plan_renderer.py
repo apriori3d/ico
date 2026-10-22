@@ -176,7 +176,7 @@ class PlanRenderer:
 
             renderer = self._select_renderer(node)
 
-            # Custom rendering logic (for IcoEpoch, etc)
+            # Custom rendering logic (for IcoFold, etc)
             if isinstance(renderer, CustomRenderer):
                 renderer.render(self, node)
                 node_info.visit_children = False

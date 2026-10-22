@@ -8,9 +8,8 @@ import pytest
 from ico.core.async_stream import IcoAsyncStream
 from ico.core.batcher import IcoBatcher
 from ico.core.chain import IcoChain
-from ico.core.context_operator import IcoContextOperator
-from ico.core.epoch import IcoEpoch
 from ico.core.filter import keep
+from ico.core.fold import IcoFold
 from ico.core.fork import fork
 from ico.core.node import IcoNode
 from ico.core.operator import IcoOperator, IcoOperatorProtocol, operator
@@ -62,7 +61,8 @@ def consume(x: int) -> None:
     pass
 
 
-def accumulate(x: int, total: int) -> int:
+def accumulate(pair: tuple[int, int]) -> int:
+    x, total = pair
     return total + x
 
 
@@ -242,12 +242,12 @@ def test_process_until_params() -> None:
     assert [c.ref for c in root.children] == [f"{MOD}:double", f"{MOD}:is_large"]
 
 
-def test_epoch_children_order() -> None:
-    epoch = IcoEpoch(IcoSource(numbers), IcoContextOperator(accumulate))
-    root = to_spec(epoch).root
+def test_fold_children_order() -> None:
+    fold = IcoFold(IcoSource(numbers), accumulate)
+    root = to_spec(fold).root
 
-    assert root.kind == "epoch"
-    assert [c.kind for c in root.children] == ["source", "context_op"]
+    assert root.kind == "fold" and root.sig == "int → int"
+    assert [c.kind for c in root.children] == ["source", "op"]
     assert root.children[1].ref == f"{MOD}:accumulate"
 
 
