@@ -17,6 +17,10 @@ from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from ico.describe.plan.rich_renderer.group_renderer import (
     GroupRenderer,
 )
+from ico.describe.plan.rich_renderer.monitors_renderer import (
+    OwnedMonitorsRenderer,
+    owns_monitors,
+)
 from ico.describe.plan.rich_renderer.render_target import (
     PlanTraversalInfo,
     PlanTreeWalkerContext,
@@ -53,6 +57,7 @@ class PlanRenderer:
     _used_keys: set[str]
     _default_renderer: RowRenderer
     _default_group_renderer: GroupRenderer
+    _monitors_renderer: OwnedMonitorsRenderer
     _selected_renderers: dict[type[IcoNodeProtocol], RendererTypes]
 
     def __init__(
@@ -66,6 +71,7 @@ class PlanRenderer:
 
         self._default_renderer = RowRenderer(options=self.options)
         self._default_group_renderer = GroupRenderer(options=self.options)
+        self._monitors_renderer = OwnedMonitorsRenderer(self.options)
         self._table = None
         self._group_indents = []
         self._walk_keys = []
@@ -124,7 +130,11 @@ class PlanRenderer:
         return child_key(key, index) if index is not None else None
 
     def _select_renderer(self, node: IcoNodeProtocol) -> RendererTypes:
-        """Select appropriate renderer for node type via registry lookup."""
+        """Select appropriate renderer for node type via registry lookup;
+        an operator that owns monitors (its children, all ``IcoMonitor``)
+        without a renderer of its own is a row with its monitors below."""
+        if select_renderer(type(node)) is None and owns_monitors(node):
+            return self._monitors_renderer
         renderer = self._selected_renderers.get(type(node))
         if renderer is not None:
             return renderer

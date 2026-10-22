@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from ico.core.async_stream import IcoAsyncStream
-from ico.core.operator import IcoOperator
+from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.process import IcoProcess
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
@@ -278,3 +278,47 @@ def test_worker_progress_gets_its_total() -> None:
     totals = [s["total"] for s in snapshots if s["total"] is not None]
     assert totals and set(totals) <= {3, 2}
     assert (snapshots[-1]["done"], snapshots[-1]["total"]) == (2.0, 2)
+
+
+# ─── Progress an operator owns ───
+
+
+class Denoise(IcoOperator[int, int]):
+    """Reports the steps of each call on a progress node it owns (a child),
+    as an operator that wraps a model's loop does."""
+
+    def __init__(self, steps: int = 3) -> None:
+        self.progress: IcoProgress[int] = IcoProgress(
+            total=steps, name="denoise", interval=0
+        )
+        super().__init__(fn=self._apply, name="denoise_op", children=[self.progress])
+        self.steps = steps
+
+    def _apply(self, x: int) -> int:
+        for step in range(self.steps):
+            self.progress(step)
+        return x
+
+
+def make_denoise() -> IcoOperatorProtocol[int, int]:
+    return Denoise()
+
+
+def test_an_operator_reports_its_steps_on_a_progress_it_owns() -> None:
+    snapshots, tool = collect(max_rate=1000, clock=FakeClock(0.1))
+    run(numbers(2) | Denoise().stream(), tool)
+
+    initial = snapshots[0]
+    assert (initial["label"], initial["done"], initial["total"]) == ("denoise", 0.0, 3)
+    assert initial["node"] is not None  # a row of the plan
+    assert [s["done"] for s in snapshots[1:]] == [1.0, 2.0, 3.0, 1.0, 2.0, 3.0]
+
+
+def test_the_progress_of_a_worker_operator_is_known_before_it_runs() -> None:
+    snapshots, tool = collect(max_rate=1000)
+    run(numbers(2) | IcoStream(MPWorker(make_denoise)), tool)
+
+    initial = snapshots[0]
+    assert (initial["label"], initial["done"], initial["total"]) == ("denoise", 0.0, 3)
+    assert {s["key"] for s in snapshots} == {initial["key"]}
+    assert snapshots[-1]["done"] == 3.0

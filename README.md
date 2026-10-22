@@ -110,6 +110,23 @@ pipeline = source | progress | processing | train
 
 Includes ETA, throughput, and structured execution state.
 
+An operator that runs a long loop inside one call (a diffusion model's
+steps) can report it too: it owns a progress node as a child and counts its
+steps on it. The node is known before the run, also inside a worker, and the
+plan shows it under the operator:
+```python
+class Denoise(IcoOperator[Plan, Frames]):
+    def __init__(self, steps: int) -> None:
+        self.progress = IcoProgress[int](total=steps, name="denoise")
+        super().__init__(fn=self._apply, children=[self.progress])
+
+    def _apply(self, plan: Plan) -> Frames:
+        def on_step(pipe, step, timestep, kwargs):
+            self.progress(step)  # one step done
+            return kwargs
+        return run_model(plan, callback_on_step_end=on_step)
+```
+
 
 ## 📚 Use Cases
 

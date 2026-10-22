@@ -158,6 +158,24 @@ class IcoProgress(Generic[IInv], IcoMonitor[IInv]):
         • Tool Integration: Compatible with rich progress displays
         • Zero Overhead: No impact when progress monitoring not needed
 
+    Progress inside one call:
+        An operator that runs a long loop inside one call (the steps of a
+        model) owns a progress node as a child and calls it once per step;
+        the next call starts from zero once ``total`` is reached. Being in
+        the flow tree, the node is registered before the run (also inside a
+        worker, from the copy of its flow) and gets a plan key; the plan
+        shows it under the operator, not as a subflow::
+
+            class Denoise(IcoOperator[Plan, Frames]):
+                def __init__(self, steps: int) -> None:
+                    self.progress = IcoProgress[int](total=steps, name="denoise")
+                    super().__init__(fn=self._apply, children=[self.progress])
+
+                def _apply(self, plan: Plan) -> Frames:
+                    for step in range(self.progress.total or 0):
+                        ...  # one step of the model
+                        self.progress(step)
+
     Generic Parameters:
         I: Type of data items flowing through the progress node (input = output)
 
