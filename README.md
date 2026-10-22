@@ -37,17 +37,15 @@ fib8.describe()
 ## How it is built
 
 ```mermaid
-flowchart LR
-  subgraph flow["flow tree: computes"]
-    direction LR
-    S[IcoSource] --> A[IcoAsyncStream] --> F["IcoFold(train_step)"] --> K[IcoSink]
-    A -.-> W1[MPWorker] & W2[MPWorker]
-  end
-  subgraph runtime["runtime tree: runs it"]
-    R[IcoRuntime] --> T["tools: Live Board, profiler, progress"]
-  end
+flowchart TB
+  R["IcoRuntime"] --- T["tools: Live Board, profiler, progress"]
   R -- "commands: activate, run, cancel" --> flow
   flow -- "events: progress, profile, errors" --> R
+  subgraph flow["flow: typed operators"]
+    direction LR
+    S["IcoSource"] --> A["IcoAsyncStream"] --> F["IcoFold: train_step"] --> K["IcoSink"]
+    A -.- W["MPWorker × 4"]
+  end
 ```
 
 **Operators.** An `IcoOperator[I, O]` wraps a callable from `I` to `O`.
