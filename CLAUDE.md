@@ -245,12 +245,11 @@ PR each:
     `fold` builds from its source and step; `validate_signatures` checks
     that the step takes the source's items with the state. The CIFAR
     example and the notebooks use folds; CIFAR checked by a run.
-37. [ ] A working set larger than the memory fails at once with a clear
-    error: the pool's budget bounds only idle resources, so an operator
-    that holds models of ~42 GB at once on a worker with a 23 GiB limit
-    is killed (OOM) instead. Compare the sizes of the resources a call
-    uses (from the assets manifest) with `memory()`.
-38. [ ] The runner's `RuntimeWarning: 'ico.remote.runner' found in
+37. [-] A working set larger than the memory fails at once: not done. The
+    memory a pipeline needs (e.g. ~42 GB of models in one operator) is
+    written in the pipeline's docs; a check from asset sizes could fail on
+    assets whose files are not all loaded.
+38. [x] The runner's `RuntimeWarning: 'ico.remote.runner' found in
     sys.modules after import of package 'ico.remote'` on every RunPod job.
 39. [x] `RunPodApi.detach` against REST v2: confirmed broken. The v1
     `networkVolumeIds: []` leaves the mount (`volume_down` then fails with

@@ -92,7 +92,7 @@ class JobHandle(Protocol):
 ```
 
 - `LocalExecutor`: the runner in a subprocess (`python -m
-  ico.remote.runner`, request on stdin, events as JSON lines on stdout).
+  ico.remote`, request on stdin, events as JSON lines on stdout).
   For tests and for running the same job on cube; it replaces the run part
   of the ico-mcp kernel later.
 - `RunPodExecutor`: `POST /run` with the request, events from `/stream`

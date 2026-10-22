@@ -2,6 +2,9 @@
 file:// staging, errors, cancellation, recent samples and profiles."""
 
 import fcntl
+import json
+import subprocess
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any, cast
@@ -262,3 +265,17 @@ def test_a_job_round_trips_through_json() -> None:
         sources={"a/b.py": ""}, out="s3://b/o", profile=True, recent=True, max_items=5,
     )  # fmt: skip
     assert Job.from_dict(job.to_dict()) == job
+
+
+def test_the_runner_starts_without_warnings(tmp_path: Path) -> None:
+    job = Job(spec=op("jobs.shout@1"), input="x", packages=(PACKAGE,), sources=SOURCES)
+    done = subprocess.run(
+        [sys.executable, "-W", "error", "-m", "ico.remote", "--workdir", str(tmp_path)],
+        input=json.dumps(job.to_dict()),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert "Warning" not in done.stderr
+    assert json.loads(done.stdout.splitlines()[-1])["result"]["outputs"] == ["X"]

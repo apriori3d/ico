@@ -1,7 +1,7 @@
 """Executors send jobs somewhere and follow their events.
 
 ``LocalExecutor`` runs each job in a subprocess of this machine (``python
--m ico.remote.runner``): for tests, and for running on a GPU machine at
+-m ico.remote``): for tests, and for running on a GPU machine at
 hand. Cloud executors (RunPod) follow the same protocol.
 """
 
@@ -129,7 +129,7 @@ class LocalExecutor:
         workdir = self.workdirs / job.id
         workdir.mkdir(parents=True, exist_ok=True)
         process = subprocess.Popen(
-            [self.python, "-m", "ico.remote.runner", "--workdir", str(workdir)],
+            [self.python, "-m", "ico.remote", "--workdir", str(workdir)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,
