@@ -16,7 +16,7 @@ from ico.tools.profiler import (
     print_profile,
     profile_cells,
 )
-from ico.tools.profiler.report import duration
+from ico.tools.profiler.report import duration, label_args
 
 
 class Clock:
@@ -183,3 +183,12 @@ def test_first_calls_of_several_instances_show_their_mean() -> None:
         "startup": {"wall": view(4, 8.0, None)}, "end": None,
     }  # fmt: skip
     assert _info(node) == "first call 2.00s ×4"
+
+
+def test_label_args_split_the_fields_of_a_resource_label() -> None:
+    ref = "wan22.expert@1"
+    label = f"{ref} (weights=wan22-i2v-high, lora=a, b, subfolder=transformer_2)"
+    assert label_args(ref, label) == [
+        ("weights", "wan22-i2v-high"), ("lora", "a, b"), ("subfolder", "transformer_2"),
+    ]  # fmt: skip
+    assert label_args(ref, ref) == []
