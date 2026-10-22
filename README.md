@@ -36,6 +36,20 @@ fib8.describe()
 
 ## How it is built
 
+```mermaid
+flowchart LR
+  subgraph flow["flow tree: computes"]
+    direction LR
+    S[IcoSource] --> A[IcoAsyncStream] --> F["IcoFold(train_step)"] --> K[IcoSink]
+    A -.-> W1[MPWorker] & W2[MPWorker]
+  end
+  subgraph runtime["runtime tree: runs it"]
+    R[IcoRuntime] --> T["tools: Live Board, profiler, progress"]
+  end
+  R -- "commands: activate, run, cancel" --> flow
+  flow -- "events: progress, profile, errors" --> R
+```
+
 **Operators.** An `IcoOperator[I, O]` wraps a callable from `I` to `O`.
 Signatures are inferred from annotations and generics and checked at every
 link: `validate_signatures(flow)` reports mismatches, and mypy or Pylance
@@ -96,6 +110,10 @@ with each node's time, calls and p95, and the models each process holds.
 Below, the CIFAR-10 example during training: four `MPWorker`s load and
 augment batches, two folds train and validate, and `train_step` takes 95% of
 the work.
+
+<img src="docs/images/live_board.gif" width="900" alt="The Live Board updating during the CIFAR-10 example">
+
+The whole plan with its profile:
 
 <img src="docs/images/live_board.png" width="900" alt="The Live Board during the CIFAR-10 example">
 
