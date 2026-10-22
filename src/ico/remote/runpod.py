@@ -86,6 +86,12 @@ class RunPod:
                     raise RuntimeError(
                         f"RunPod {method} {path}: HTTP {e.code}"
                     ) from None
+            except (urllib.error.URLError, OSError):
+                # A dropped connection (e.g. a TLS EOF on a flaky network)
+                # must not end a long job: reads are retried; a POST is not,
+                # it may have reached RunPod.
+                if method != "GET" or attempt == RETRIES - 1:
+                    raise
             time.sleep(min(2**attempt, 30) + random.uniform(0, 1))
         raise AssertionError("unreachable")
 
