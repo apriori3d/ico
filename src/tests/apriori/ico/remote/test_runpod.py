@@ -40,6 +40,9 @@ class FakeRunPod:
 
     def __init__(self) -> None:
         self.jobs: dict[str, FakeJob] = {}
+        self.gpu = threading.Event()
+        """Cleared: jobs wait in the queue (no worker free)."""
+        self.gpu.set()
         self.throttle = 0
         self.drop = 0
         """Stream reads to answer by closing the connection."""
@@ -102,6 +105,8 @@ class FakeRunPod:
         request.wfile.write(data)
 
     def work(self, id: str, job: FakeJob) -> None:
+        self.gpu.wait()
+
         async def go() -> None:
             async for chunk in handler({"id": id, "input": job.body["input"]}):
                 job.chunks.append(chunk)
@@ -127,6 +132,7 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRunPod
     monkeypatch.setenv("ICO_WORKDIRS", str(tmp_path / "workdirs"))
     server = FakeRunPod()
     yield server
+    server.gpu.set()
     server.server.shutdown()
 
 
@@ -141,6 +147,7 @@ def test_a_job_runs_on_the_endpoint(fake: FakeRunPod, tmp_path: Path) -> None:
         packages=[PACKAGE], sources=SOURCES,
     )  # fmt: skip
     events = [cast(dict[str, Any], e) for e in handle.events()]
+    events = [e for e in events if e["event"] != "queue"]  # RunPod's status
 
     assert events[0]["event"] == "plan" and events[-1]["event"] == "result"
     assert events[-1]["result"]["outputs"] == ["A", "B", "C"]
@@ -217,6 +224,19 @@ def test_dropped_stream_reads_are_retried(
     handle = executor(fake).submit(_job(op("jobs.shout@1"), "x"))
 
     assert result(handle)["outputs"] == ["X"] and fake.drop == 0
+
+
+def test_queue_events_tell_a_job_waits_for_a_worker(fake: FakeRunPod) -> None:
+    fake.gpu.clear()
+    threading.Timer(0.5, fake.gpu.set).start()  # a worker frees up
+    events = executor(fake).submit(_job(op("jobs.shout@1"), "x")).events()
+    first = next(events)
+    rest = list(events)
+
+    assert first == {"event": "queue", "status": "IN_QUEUE"}
+    queue = [e["status"] for e in rest if e["event"] == "queue"]
+    assert queue == ["IN_PROGRESS"]  # once per change
+    assert rest[-1]["event"] == "result"
 
 
 def test_a_wrong_key_is_an_http_error(fake: FakeRunPod) -> None:

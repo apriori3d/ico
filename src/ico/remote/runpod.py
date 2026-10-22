@@ -109,15 +109,21 @@ class RunPodJob:
         return self._id
 
     def events(self) -> Iterator[JsonObject]:
+        """The job's events; a ``queue`` event when RunPod's status of the
+        job changes (``IN_QUEUE``: waiting for a worker)."""
+        last = None
         while True:
             answer = self.executor.call("GET", f"/stream/{self._id}")
+            status = str(answer.get("status", ""))
+            if status and status != last and status not in DONE:
+                last = status
+                yield {"event": "queue", "status": status}
             chunks = _chunks(answer)
             for chunk in chunks:
                 event = cast(JsonObject, chunk)
                 yield event
                 if event.get("event") in FINAL:
                     return
-            status = str(answer.get("status", ""))
             if status in DONE and not chunks:
                 # Ended without our final event: failed, cancelled, timed out.
                 details = self.executor.call("GET", f"/status/{self._id}")

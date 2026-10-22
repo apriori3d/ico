@@ -20,9 +20,12 @@ from ico.spec.model import JsonValue, NodeSpec, PipelineSpec
 
 JsonObject = dict[str, JsonValue]
 
-EventKind = Literal["plan", "progress", "profile", "sample", "result", "error"]
+EventKind = Literal["queue", "plan", "progress", "profile", "sample", "result", "error"]
 """Events of a job, in order: ``plan`` first, then any number of
-``progress`` / ``profile`` / ``sample``, then one ``result`` or ``error``."""
+``progress`` / ``profile`` / ``sample``, then one ``result`` or ``error``.
+``queue`` (``{"status": ...}``, e.g. ``IN_QUEUE``, ``IN_PROGRESS``) comes
+from an executor whose provider queues jobs (RunPod), when the status
+changes: a job may wait minutes for a GPU before its first event."""
 
 FINAL: tuple[EventKind, ...] = ("result", "error")
 
