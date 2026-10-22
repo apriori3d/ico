@@ -252,7 +252,7 @@ PR each:
     uses (from the assets manifest) with `memory()`.
 38. [ ] The runner's `RuntimeWarning: 'ico.remote.runner' found in
     sys.modules after import of package 'ico.remote'` on every RunPod job.
-39. [ ] `RunPodApi.detach` against REST v2: confirmed broken. The v1
+39. [x] `RunPodApi.detach` against REST v2: confirmed broken. The v1
     `networkVolumeIds: []` leaves the mount (`volume_down` then fails with
     "remove this network volume from all pods"); REST v2 PATCH
     `{"mounts": {"network": []}}` detaches. A test with that request.
