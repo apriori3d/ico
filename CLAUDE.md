@@ -219,6 +219,8 @@ PR each:
     `pipeline_ref` to the pipeline: models load once per job), RunPod takes
     queued jobs without idling, and interactive use pays idle time about
     equal to the load it saves.
+    Phase 1 (a job server that keeps the main process's pool between
+    jobs, ~117 s per `clean_video`): `docs/proposals/2026-10-25-job-server.md`.
 32. [x] Prefetch jobs (`docs/design/remote.md`, "Assets on the remote
     side"): `FetchJob` downloads assets into the worker's asset root (the
     network volume); runs that carry the manifest resolve `asset(id)`.
