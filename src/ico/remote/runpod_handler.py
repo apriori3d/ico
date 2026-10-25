@@ -4,7 +4,9 @@ Each RunPod job carries an ICO job (``{"input": {"job": ...}}``); the
 handler runs it in a runner subprocess (``python -m ico.remote``)
 and yields its events, which ``/stream`` delivers to the executor. When
 RunPod cancels the job, the runner gets SIGTERM (it stops between items)
-and is killed after ``CANCEL_GRACE`` seconds.
+and is killed after ``CANCEL_GRACE`` seconds. The runner removes the work
+directory of a job with ``cleanup``; the handler does it for a runner it
+killed.
 
 Environment: ``ICO_WORKDIRS`` (where work directories go; by default on
 the endpoint's network volume when one is mounted, which makes jobs
@@ -21,6 +23,7 @@ import contextlib
 import importlib
 import json
 import os
+import shutil
 import sys
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -62,7 +65,9 @@ async def handler(request: JsonObject) -> AsyncIterator[JsonObject]:
                 yield cast(JsonObject, json.loads(line))
         await process.wait()
     except asyncio.CancelledError:
-        await _stop(process)
+        killed = await _stop(process)
+        if killed and cast(JsonObject, job.get("options") or {}).get("cleanup"):
+            shutil.rmtree(workdir, ignore_errors=True)
         raise
 
 
@@ -81,7 +86,8 @@ def _asset_env() -> dict[str, str]:
     return {"ICO_ASSETS_ROOT": str(VOLUME / "assets")}
 
 
-async def _stop(process: asyncio.subprocess.Process) -> None:
+async def _stop(process: asyncio.subprocess.Process) -> bool:
+    """Stop the runner; whether it had to be killed."""
     with contextlib.suppress(ProcessLookupError):
         process.terminate()
     try:
@@ -89,6 +95,9 @@ async def _stop(process: asyncio.subprocess.Process) -> None:
     except asyncio.TimeoutError:
         with contextlib.suppress(ProcessLookupError):
             process.kill()
+        await process.wait()
+        return True
+    return False
 
 
 def main() -> None:

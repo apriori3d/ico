@@ -76,7 +76,8 @@ class Job:
         spec: A spec document or node, as JSON, without ``pipeline_ref``.
         input: The JSON input. Strings that are storage URIs (``file://``,
             ``s3://``) are downloaded by the runner and replaced by local
-            paths; ``$JOB`` in a string is the job's work directory.
+            paths; ``$JOB`` in a string is the job's work directory and
+            ``$RUN`` its id.
         params: Values of the pipeline parameters (same rules as ``input``).
         packages: The operator packages to load.
         sources: Files of operator packages by their relative path
@@ -94,6 +95,9 @@ class Job:
         volume: The bucket that is the worker's own network volume: its
             ``s3://<volume>/...`` URIs are read and written at the volume's
             mount (``/runpod-volume``) instead of through S3.
+        cleanup: Remove the job's work directory when the job ends, after
+            its outputs are uploaded to ``out``; failed and cancelled jobs
+            too. Such a job cannot be resumed.
     """
 
     spec: JsonObject
@@ -107,6 +111,7 @@ class Job:
     max_items: int | None = None
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     volume: str | None = None
+    cleanup: bool = False
 
     def to_dict(self) -> JsonObject:
         out: JsonObject = {
@@ -126,6 +131,8 @@ class Job:
         options: JsonObject = {"profile": self.profile, "recent": self.recent}
         if self.max_items is not None:
             options["max_items"] = self.max_items
+        if self.cleanup:
+            options["cleanup"] = True
         out["options"] = options
         return out
 
@@ -151,6 +158,7 @@ class Job:
             max_items=max_items if isinstance(max_items, int) else None,
             id=str(data.get("id") or uuid.uuid4().hex),
             volume=str(data["volume"]) if data.get("volume") else None,
+            cleanup=bool(options.get("cleanup", False)),
         )
 
 

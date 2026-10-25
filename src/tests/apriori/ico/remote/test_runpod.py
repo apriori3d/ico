@@ -19,7 +19,13 @@ import ico.remote.runpod_handler as runpod_handler
 from ico.remote import Job, RemoteError, RunPod, result, submit
 from ico.remote.job import JsonObject
 from ico.remote.runpod_handler import handler
-from tests.apriori.ico.remote.test_jobs import PACKAGE, SOURCES, op, words_then
+from tests.apriori.ico.remote.test_jobs import (
+    PACKAGE,
+    SOURCES,
+    op,
+    wait_until_gone,
+    words_then,
+)
 
 KEY = "test-key"
 
@@ -265,3 +271,20 @@ def test_work_directories_go_to_the_network_volume(
     assert runpod_handler.workdirs() == tmp_path / "ico-jobs"
     monkeypatch.setenv("ICO_WORKDIRS", "/data/jobs")
     assert runpod_handler.workdirs() == Path("/data/jobs")
+
+
+def test_the_handler_cleans_up_after_a_runner_it_killed(
+    fake: FakeRunPod, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runpod_handler, "CANCEL_GRACE", 0.0)  # kill at once
+    words = " ".join(f"w{i}" for i in range(200))
+    handle = submit(
+        words_then(op("jobs.slow@1")), words, executor=executor(fake),
+        packages=[PACKAGE], sources=SOURCES, id="killed", cleanup=True,
+    )  # fmt: skip
+    for raw in handle.events():
+        event = cast(dict[str, Any], raw)
+        if event["event"] == "progress" and event["snapshot"]["done"] >= 3:
+            handle.cancel()
+
+    assert wait_until_gone(tmp_path / "workdirs" / "killed")

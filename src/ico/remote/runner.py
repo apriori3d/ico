@@ -7,7 +7,8 @@ its events to ``emit``:
    operator packages (from there, else from the working directory);
 2. downloads the storage URIs of the input and params into
    ``<workdir>/in`` and puts the local paths in their place; ``$JOB`` in a
-   string is the work directory;
+   string is the work directory and ``$RUN`` the job's id (also in
+   ``ICO_RUN_ID``, which the run's worker processes inherit);
 3. sends the plan, runs the spec (progress, recent samples, profile and
    cancellation as asked), and sends the result;
 4. uploads ``<workdir>/out`` to the job's ``out`` and puts URIs in place
@@ -36,6 +37,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import shutil
 import signal
 import sys
 import threading
@@ -59,6 +61,9 @@ from ico.tools.sample import JsonSampleTool, SampleSnapshot
 
 Emit = Callable[[JsonObject], None]
 JOB_VAR = "$JOB"
+RUN_VAR = "$RUN"
+RUN_ENV = "ICO_RUN_ID"
+"""The job's id, for operators and the worker processes they start."""
 VOLUME_ROOT = "/runpod-volume"
 VOLUME_ENV = "ICO_VOLUME_ROOT"
 """Where the worker's network volume is mounted (tests set another)."""
@@ -118,7 +123,16 @@ def _run(job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None) -> 
     workdir = workdir.resolve()
     (workdir / "out").mkdir(parents=True, exist_ok=True)
     with _locked(workdir):
-        _run_locked(job, emit, workdir, cancel)
+        try:
+            _run_locked(job, emit, workdir, cancel)
+        finally:
+            if job.cleanup:
+                remove_workdir(workdir)
+
+
+def remove_workdir(workdir: Path) -> None:
+    """Remove a job's work directory (what is left of it, too)."""
+    shutil.rmtree(workdir, ignore_errors=True)
 
 
 @contextlib.contextmanager
@@ -140,6 +154,7 @@ def _locked(workdir: Path) -> Iterator[None]:
 def _run_locked(
     job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None
 ) -> None:
+    os.environ[RUN_ENV] = job.id
     _load(job, workdir)
     volume_root = Path(os.environ.get(VOLUME_ENV) or VOLUME_ROOT)
     if job.volume is not None and volume_root.is_dir():
@@ -164,8 +179,8 @@ def _run_locked(
             )
             return
     staged = _Staged(workdir / "in" / ".staged.json")
-    input = _stage_in(job.input, workdir, staged)
-    params = cast(JsonObject | None, _stage_in(job.params, workdir, staged))
+    input = _stage_in(job.input, workdir, job.id, staged)
+    params = cast(JsonObject | None, _stage_in(job.params, workdir, job.id, staged))
     spec = _parse(job.spec)
 
     with contextlib.suppress(Exception):  # a spec that does not build fails below
@@ -281,10 +296,13 @@ class _Staged:
         self.manifest.write_text(json.dumps(self.paths, indent=1))
 
 
-def _stage_in(value: JsonValue, workdir: Path, staged: _Staged) -> JsonValue:
-    """``value`` with ``$JOB`` expanded and storage URIs downloaded."""
+def _stage_in(
+    value: JsonValue, workdir: Path, run_id: str, staged: _Staged
+) -> JsonValue:
+    """``value`` with ``$JOB`` and ``$RUN`` expanded and storage URIs
+    downloaded."""
     if isinstance(value, str):
-        text = value.replace(JOB_VAR, str(workdir))
+        text = value.replace(JOB_VAR, str(workdir)).replace(RUN_VAR, run_id)
         storage = storage_for(text)
         if storage is None:
             return text
@@ -296,9 +314,9 @@ def _stage_in(value: JsonValue, workdir: Path, staged: _Staged) -> JsonValue:
             staged.add(text, local)
         return local
     if isinstance(value, list):
-        return [_stage_in(v, workdir, staged) for v in value]
+        return [_stage_in(v, workdir, run_id, staged) for v in value]
     if isinstance(value, dict):
-        return {k: _stage_in(v, workdir, staged) for k, v in value.items()}
+        return {k: _stage_in(v, workdir, run_id, staged) for k, v in value.items()}
     return value
 
 
