@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 import textwrap
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -13,6 +14,7 @@ from ico.remote import Job, LocalExecutor, Package, RemoteError, result, submit
 
 OPS = textwrap.dedent(
     '''
+    import os
     import time
     from collections.abc import Iterator
     from pathlib import Path
@@ -45,6 +47,12 @@ OPS = textwrap.dedent(
     def fail(word: str) -> str:
         """Fail."""
         raise ValueError("boom")
+
+
+    @register("jobs.env", 1)
+    def env(name: str) -> str:
+        """The value of an environment variable in the run."""
+        return os.environ.get(name, "")
 
 
     @register("jobs.once", 1)
@@ -259,10 +267,81 @@ def test_recent_samples_and_profile(tmp_path: Path) -> None:
     assert "nodes" in events[-1]["result"]["profile"]
 
 
+def test_operators_see_the_run_id(tmp_path: Path) -> None:
+    executor = LocalExecutor(tmp_path)
+    in_input = run_events(executor, spec=op("jobs.shout@1"), input="$RUN/w", id="r1")
+    in_env = run_events(executor, spec=op("jobs.env@1"), input="ICO_RUN_ID", id="r2")
+    in_params = run_events(
+        executor, spec=op("jobs.once@1", work_dir={"$param": "marks"}), input="w",
+        params={"marks": "$JOB/marks/$RUN"}, id="r3",
+    )  # fmt: skip
+
+    assert in_input[-1]["result"]["outputs"] == ["R1/W"]
+    assert in_env[-1]["result"]["outputs"] == ["r2"]
+    assert in_params[-1]["result"]["outputs"] == ["w"]
+    assert (tmp_path / "r3" / "marks" / "r3" / "w").is_file()
+
+
+def test_cleanup_removes_the_work_directory(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("hello")
+    executor = LocalExecutor(tmp_path / "jobs")
+    done = submit(
+        op("jobs.upper_file@1", out_dir={"$param": "out_dir"}),
+        f"file://{tmp_path}/a.txt", params={"out_dir": "$JOB/out"},
+        executor=executor, packages=[PACKAGE], sources=SOURCES,
+        out=f"file://{tmp_path}/results", id="ok", cleanup=True,
+    )  # fmt: skip
+    outputs = result(done)["outputs"]
+    failed = submit(
+        op("jobs.fail@1"), "x", executor=executor, packages=[PACKAGE],
+        sources=SOURCES, id="failed", cleanup=True,
+    )  # fmt: skip
+    events = [cast(dict[str, Any], e) for e in failed.events()]
+    kept = submit(
+        op("jobs.shout@1"), "x", executor=executor, packages=[PACKAGE],
+        sources=SOURCES, id="kept",
+    )  # fmt: skip
+    result(kept)
+
+    assert outputs == [f"file://{tmp_path}/results/a.txt"]
+    assert (tmp_path / "results" / "a.txt").read_text() == "HELLO"
+    assert events[-1]["code"] == "run_error"
+    assert wait_until_gone(tmp_path / "jobs" / "ok")
+    assert wait_until_gone(tmp_path / "jobs" / "failed")
+    assert (tmp_path / "jobs" / "kept" / "code").is_dir()
+
+
+def test_a_cancelled_job_cleans_up(tmp_path: Path) -> None:
+    words = " ".join(f"w{i}" for i in range(200))
+    handle = submit(
+        words_then(op("jobs.slow@1")), words, executor=LocalExecutor(tmp_path),
+        packages=[PACKAGE], sources=SOURCES, id="c", cleanup=True,
+    )  # fmt: skip
+    final: dict[str, Any] = {}
+    for raw in handle.events():
+        event = cast(dict[str, Any], raw)
+        if event["event"] == "progress" and event["snapshot"]["done"] >= 3:
+            handle.cancel()
+        final = event
+
+    assert final["result"]["cancelled"] == "cancelled"
+    assert wait_until_gone(tmp_path / "c")
+
+
+def wait_until_gone(path: Path, timeout: float = 10.0) -> bool:
+    """Whether ``path`` disappears within ``timeout`` seconds (a runner
+    removes its work directory after its last event)."""
+    deadline = time.monotonic() + timeout
+    while path.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    return not path.exists()
+
+
 def test_a_job_round_trips_through_json() -> None:
     job = Job(
         spec=op("jobs.shout@1"), input="x", params={"p": 1}, packages=(PACKAGE,),
         sources={"a/b.py": ""}, out="s3://b/o", profile=True, recent=True, max_items=5,
+        cleanup=True,
     )  # fmt: skip
     assert Job.from_dict(job.to_dict()) == job
 

@@ -36,7 +36,8 @@ today, moved into ICO so that both sides share it.
               {"path": "video_draft", "status": "draft",
                "modules": ["text_scan", "text_clean"]}],
  "sources": {"video_draft/text_scan.py": "...", ...},   // optional
- "options": {"profile": false, "recent": true, "max_items": 20},
+ "options": {"profile": false, "recent": true, "max_items": 20,
+             "cleanup": true},
  "storage": {"out": "s3://bucket/jobs/<id>/"}}
 ```
 
@@ -57,7 +58,10 @@ Runs one job in a work directory (`$JOB`):
    what the spec uses.
 2. **Stage in.** Every string of `input` and `params` that is a storage
    URI (`s3://...`) is downloaded into `$JOB/in/` and replaced by the local
-   path (directories by prefix). `$JOB` in a string is the work directory.
+   path (directories by prefix). `$JOB` in a string is the work directory
+   and `$RUN` the job's id, which is also `ICO_RUN_ID` in the runner's
+   environment (the worker processes of the run inherit it): a per-run
+   directory outside the job, e.g. `/tmp/ico-work/$RUN` on a warm worker.
 3. **Run.** `ico.spec.run` with `JsonProgressTool`, `JsonSampleTool`
    (recent), the profiler if asked, and a cancel token; events go to an
    `emit` callback.
@@ -76,6 +80,11 @@ Runs one job in a work directory (`$JOB`):
    the work directories go to the endpoint's network volume
    (`/runpod-volume/ico-jobs`) when one is mounted. A RunPod cancel loses
    the outputs so far (RunPod stops the handler), not the files.
+6. **Cleanup.** A job with `options.cleanup` removes its work directory
+   when it ends, after the stage out, whether it succeeded, failed or was
+   cancelled (it cannot be resumed then); on RunPod the handler removes it
+   for a runner it had to kill. Without it the directory stays: a
+   network volume fills up with them.
 
 The runner knows nothing of a provider: it reads a request and calls
 `emit`.
