@@ -26,7 +26,7 @@ import dataclasses
 import json
 from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager
-from typing import Any, Generic, TypeVar, cast, get_type_hints
+from typing import Any, ClassVar, Generic, TypeVar, cast, get_type_hints
 
 from ico.spec.model import JsonValue, is_json_value
 
@@ -56,6 +56,12 @@ class Resource(Generic[T]):
     ``parameters()`` and ``buffers()``) does not apply, and :meth:`close`
     to release what garbage collection does not.
     """
+
+    resident: ClassVar[str | None] = None
+    """The device the objects live on when they cannot move (``"cuda"`` for
+    a TensorRT engine built on the GPU): they load there, are used only
+    there, and are dropped (:meth:`close`) instead of moved to RAM when the
+    GPU needs room. ``None``: objects load into RAM and move."""
 
     def load(self) -> T:
         raise NotImplementedError(f"{type(self).__name__}.load")

@@ -173,16 +173,41 @@ size against the RAM budget while it stays on the GPU. Within one job
 (one frame size) this is harmless; across jobs, engines of every frame
 size the worker has seen pile up on the GPU, uncounted.
 
-Proposal (core, its own PR): a resource class may declare that its
-objects live on one device, e.g. `resident: ClassVar[str | None] =
-"cuda"`. The pool then counts them on that device, never moves them, and
-when the device holds more than `ICO_RESOURCES_GPU` it drops idle ones
-(`close`), least recently used first, instead of moving them back. With
-`ICO_RESOURCES_GPU` unset, resident objects are never dropped (today's
-behavior, no regression within a job). On the endpoint,
-`ICO_RESOURCES_GPU` (e.g. `32GB` on a 96 GB PRO 6000) then bounds
-engines across frame sizes, and lets `diffueraser` stay on the GPU
-between uses instead of moving back to RAM. The domain sets `resident`
+A byte budget per process (`ICO_RESOURCES_GPU`, revised 2026-10-26)
+does not fit either: the main process and every worker process have a
+pool of their own on one GPU, and each would take its budget (or its
+share) of the whole card. Done instead (core, its own PR), one rule for
+every resource, by the **device's free memory**, which all processes on
+a GPU see alike:
+
+- **Resident resources.** A resource class may declare that its objects
+  live on one device (`resident: ClassVar[str | None] = "cuda"`). They
+  load there, are counted there (not against RAM), never move, and are
+  dropped (`close`) instead of moved to RAM when the GPU needs room.
+- **Headroom.** An idle object stays on the GPU while the GPU has a free
+  headroom (`ICO_RESOURCES_GPU_FREE`, `20%` of its memory by default);
+  below it, idle objects of the process leave the GPU, least recently
+  used first: back to RAM, or dropped if resident. `ICO_RESOURCES_GPU`
+  and the `gpu` budget are removed: `diffueraser` and the engines follow
+  the same rule, and endpoints need no setting.
+- **Room before a load.** Before an object loads on or moves to the GPU,
+  the pool frees its size above the headroom (sizes are known after a
+  first load). If its own idle objects are not enough, it asks the other
+  processes (a file `<tmp>/ico-gpu-asks/<device>.<pid>` with the bytes and
+  a deadline) and waits up to 3 s, then goes on.
+- **A watch.** While a pool holds objects on a GPU, a thread checks every
+  second that the GPU has its headroom plus what others ask for, so an
+  idle process (a worker waiting for its next item) gives memory back.
+- **Out of memory.** After a GPU out-of-memory error in a `use` block,
+  every idle object of the process leaves that GPU, so a retry of the
+  item finds room.
+- **Without CUDA in the process** (no torch, or before its first CUDA
+  use) the free memory is unknown: idle movable objects go back to RAM at
+  once and resident ones stay, as before.
+
+What the pool cannot see stays a risk: activations and other memory an
+operator allocates inside its `use` block get the headroom, not the whole
+card as when the GPU held only objects in use. The domain sets `resident`
 on its two TRT resources and frees GPU memory in their `close`.
 
 ### 5.4 RunPod lifecycle
@@ -254,11 +279,13 @@ One PR each:
    ignores SIGTERM → killed, the next job runs in a new server; a crash →
    `crashed`. `docs/design/remote.md` ("Cold starts", the runner
    process) updated. ~1.5–2 days.
-2. **Resident resources in the pool** (`apriori3d/ico`, 5.3), with
-   tests of the budget and LRU drops. ~0.5 day.
-3. **Domain and endpoint** (`ico-mcp-video`, by its owner): `resident =
-   "cuda"` on `diffusion.trt` and `vae.trt`, `ICO_RESOURCES_GPU` on the
-   endpoint, an image on the new apriori-ico. Measure two `clean_video`
+2. **GPU headroom in the pool** (`apriori3d/ico`, 5.3): resident
+   resources, the headroom rule, asks between processes, the watch, with
+   tests on a fake GPU shared by pools. ~1.5 days.
+3. **Domain** (`ico-mcp-video`, by its owner): `resident = "cuda"` on
+   `diffusion.trt` and `vae.trt`, an image on the new apriori-ico; check
+   `animate_loop` and `clean_video` on cube (the headroom rule changes
+   where idle models stay). Measure two `clean_video`
    runs back to back on one warm worker: `loads: 0` and the time saved,
    then a series of 10 for memory.
 

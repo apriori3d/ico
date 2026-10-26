@@ -222,8 +222,9 @@ PR each:
     Phase 1 (a job server that keeps the main process's pool between
     jobs, ~117 s per `clean_video`): `docs/proposals/2026-10-25-job-server.md`.
     Done: the job server (`python -m ico.remote --serve`, kept by
-    `runpod_handler`). Next: resident resources in the pool (its 5.3),
-    then phase 2.
+    `runpod_handler`); the GPU headroom in the pool (its 5.3: resident
+    resources, idle objects kept while the GPU has 20% free, asks between
+    processes, no `ICO_RESOURCES_GPU`). Next: phase 2.
 32. [x] Prefetch jobs (`docs/design/remote.md`, "Assets on the remote
     side"): `FetchJob` downloads assets into the worker's asset root (the
     network volume); runs that carry the manifest resolve `asset(id)`.
