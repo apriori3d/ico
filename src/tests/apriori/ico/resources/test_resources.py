@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -22,7 +22,8 @@ from ico.resources import (
     resource,
     set_pool,
 )
-from ico.resources.pool import memory, ram_budget
+from ico.resources.device import is_out_of_memory
+from ico.resources.pool import gpu_headroom, memory, ram_budget
 from ico.spec import NodeSpec, SpecError, build, to_spec
 from ico.spec.run import run
 from ico.tools.profiler import ProfilerTool
@@ -75,11 +76,69 @@ class OtherModel(Resource[Model]):
         return Model("other")
 
 
+@resource("test.engine", 1)
+@dataclass(frozen=True)
+class FakeEngine(Resource[Model]):
+    """An engine of ``gb`` gigabytes built on the GPU."""
+
+    resident: ClassVar[str | None] = "cuda"
+    name: str = "e"
+    gb: float = 4.0
+
+    def load(self) -> Model:
+        LOADS[self.name] += 1
+        engine = Model(self.name)
+        engine.device = "cuda"
+        return engine
+
+    def to(self, obj: Model, device: str) -> Model:
+        raise AssertionError("a resident object never moves")
+
+    def size(self, obj: Model) -> int:
+        return int(self.gb * GB)
+
+    def close(self, obj: Model) -> None:
+        CLOSED.append(obj.name)
+
+
+class FakeGpu:
+    """One GPU of ``total`` GB shared by pools (processes): its used memory
+    is what they hold on it, plus ``other``."""
+
+    def __init__(self, total: float = 10) -> None:
+        self.total = int(total * GB)
+        self.other = 0
+        self.pools: list[ResourcePool] = []
+        self.emptied = 0
+
+    def process(self, *, worker: bool = False) -> ResourcePool:
+        pool = ResourcePool(
+            ram=100 * GB, headroom=0.2, device=_GpuView(self), keep_idle=not worker
+        )
+        self.pools.append(pool)
+        return pool
+
+
+class _GpuView:
+    def __init__(self, gpu: FakeGpu) -> None:
+        self.gpu = gpu
+
+    def memory(self, device: str) -> tuple[int, int] | None:
+        if device != "cuda":
+            return None
+        held = [h for p in self.gpu.pools for h in p.held() if h["device"] == "cuda"]
+        used = self.gpu.other + sum(h["bytes"] or 0 for h in held)
+        return self.gpu.total - used, self.gpu.total
+
+    def empty_cache(self, device: str) -> None:
+        self.gpu.emptied += 1
+
+
 @pytest.fixture(autouse=True)
 def fresh_pool() -> Iterator[ResourcePool]:
     LOADS.clear()
     CLOSED.clear()
-    new = ResourcePool(ram=10 * GB, gpu=0)
+    new = ResourcePool(ram=10 * GB)  # no CUDA here: idle objects go back to RAM
     old = set_pool(new)
     yield new
     set_pool(old)
@@ -89,7 +148,7 @@ def test_a_resource_loads_once_and_returns_to_ram(fresh_pool: ResourcePool) -> N
     res = FakeModel()
     with res.use("cuda") as model:
         assert model.device == "cuda"
-    assert model.device == "cpu"  # released: back to RAM (no GPU budget)
+    assert model.device == "cpu"  # released: back to RAM (the GPU is unknown)
     with FakeModel().use("cuda") as again:  # an equal instance: the same object
         assert again is model
     assert LOADS["a"] == 1 and model.moves == ["cuda", "cpu", "cuda", "cpu"]
@@ -119,16 +178,89 @@ def test_a_resource_in_use_is_never_dropped() -> None:
     assert CLOSED == ["b", "c"]  # a alone fits the budget
 
 
-def test_a_gpu_budget_keeps_idle_models_on_the_device() -> None:
-    set_pool(ResourcePool(ram=10 * GB, gpu=1 * GB))
-    with FakeModel().use("cuda") as model:
+def test_idle_objects_stay_on_the_gpu_while_it_has_headroom() -> None:
+    gpu = FakeGpu(total=10)
+    set_pool(gpu.process())
+    with FakeModel(gb=3).use("cuda") as a:
         pass
-    with FakeModel().use("cuda"):
+    with FakeModel(name="b", gb=3).use("cuda") as b:
         pass
-    assert model.moves == ["cuda"]
-    with FakeModel(name="b").use("cuda") as other:  # over the budget: a goes back
+    assert a.moves == ["cuda"] and b.moves == ["cuda"]  # 4 GB free, 2 kept
+    with FakeModel(name="c", gb=3).use("cuda") as c:
+        assert a.moves == ["cuda", "cpu"]  # room for c: the least recently used
+        assert b.device == "cuda"
+    assert c.device == "cuda" and a.device == "cpu"
+
+
+def test_below_the_headroom_idle_objects_go_back_to_ram() -> None:
+    gpu = FakeGpu(total=10)
+    set_pool(gpu.process())
+    with FakeModel(gb=3).use("cuda") as a:
         pass
-    assert model.moves == ["cuda", "cpu"] and other.device == "cuda"
+    gpu.other = 6 * GB  # another process takes memory: 1 GB free
+    with FakeModel(name="b", gb=0.5).use():  # a release checks the headroom
+        pass
+    assert a.device == "cpu"
+
+
+def test_resident_objects_live_on_the_gpu_and_are_dropped_for_room() -> None:
+    gpu = FakeGpu(total=10)
+    pool = gpu.process()
+    pool.ram = 1 * GB  # engines do not count against RAM
+    set_pool(pool)
+    with FakeEngine().use("cuda") as engine:
+        assert engine.device == "cuda"
+    assert [(h["device"], h["bytes"]) for h in pool.held()] == [("cuda", 4 * GB)]
+    with FakeEngine(name="f").use("cuda"):  # 2 GB free: both stay
+        pass
+    with FakeEngine(name="g").use("cuda"):  # too much: the oldest is dropped
+        pass
+    assert CLOSED == ["e"] and gpu.emptied >= 1
+    with FakeEngine().use("cuda"):  # its size is known: room before the load
+        assert CLOSED == ["e", "f"]
+    assert LOADS["e"] == 2
+    with (
+        pytest.raises(RuntimeError, match="lives on cuda, asked for cpu"),
+        FakeEngine().use("cpu"),
+    ):
+        pass
+
+
+def test_a_worker_process_keeps_only_resident_objects_on_the_gpu() -> None:
+    gpu = FakeGpu(total=10)
+    worker = gpu.process(worker=True)  # cannot give memory to the main one
+    with worker.use(FakeModel(gb=1), "cuda") as model:
+        pass
+    with worker.use(FakeEngine(), "cuda") as engine:
+        pass
+    assert model.device == "cpu"  # back to RAM at once
+    assert engine.device == "cuda" and CLOSED == []  # the headroom holds
+
+
+def test_after_an_out_of_memory_error_idle_objects_leave_the_gpu() -> None:
+    gpu = FakeGpu(total=10)
+    set_pool(gpu.process())
+
+    class OutOfMemoryError(RuntimeError):
+        pass
+
+    with FakeModel(gb=1).use("cuda") as a:
+        pass
+    with pytest.raises(OutOfMemoryError), FakeModel(name="b").use("cuda") as b:
+        raise OutOfMemoryError("CUDA out of memory")
+    assert a.device == "cpu" and b.device == "cpu"
+    assert is_out_of_memory(RuntimeError("CUDA error: out of memory"))
+    assert not is_out_of_memory(ValueError("out of memory"))
+
+
+def test_the_headroom_is_a_share_of_the_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert gpu_headroom(None) == gpu_headroom("") == 0.2
+    assert gpu_headroom("35%") == 0.35 and gpu_headroom("0%") == 0
+    for bad in ("100%", "-1%", "2GB", "x%"):
+        with pytest.raises(ValueError, match="not a share of the GPU"):
+            gpu_headroom(bad)
+    monkeypatch.setenv("ICO_RESOURCES_GPU_FREE", "30%")
+    assert ResourcePool().headroom == 0.3
 
 
 def test_a_ram_budget_is_a_size_or_a_share_of_the_memory(tmp_path: Path) -> None:
