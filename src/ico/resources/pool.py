@@ -18,7 +18,9 @@ the pool decides where a released resource stays:
   headroom;
 - before an object loads on or moves to a GPU, the pool makes room for
   it the same way with its own idle objects (its size is known once it
-  has loaded), then goes on;
+  has loaded; a resident key that never loaded counts as the largest
+  loaded one of its reference: an engine for a new frame size), then goes
+  on;
 - after a GPU out-of-memory error in a block, every idle object of this
   process leaves that GPU (a retry of the item then finds room);
 - idle objects in RAM beyond the ``ram`` budget (``ICO_RESOURCES_RAM``:
@@ -143,6 +145,9 @@ class ResourcePool:
         self._entries: dict[str, _Entry] = {}
         self._sizes: dict[str, int] = {}
         """Sizes of keys loaded before (the room a load needs)."""
+        self._ref_sizes: dict[str, int] = {}
+        """The largest size loaded per reference: the room a key that never
+        loaded needs (an engine for a new frame size)."""
         self._lock = threading.Lock()
         self._listeners: list[Callable[[PoolEvent], None]] = []
 
@@ -241,13 +246,17 @@ class ResourcePool:
         acted = False
         if entry.obj is None:
             if entry.resident is not None:
-                self._make_room(entry.resident, self._sizes.get(res.key, 0))
+                need = self._sizes.get(res.key, self._ref_sizes.get(res.ref, 0))
+                self._make_room(entry.resident, need)
             start = self.clock()
             entry.obj = res.load()
             entry.device = entry.resident or CPU
             entry.size = res.size(entry.obj)
             if entry.size is not None:
                 self._sizes[res.key] = entry.size
+                self._ref_sizes[res.ref] = max(
+                    entry.size, self._ref_sizes.get(res.ref, 0)
+                )
             self._emit(entry, "load", self.clock() - start)
             acted = True
         if entry.device != device:

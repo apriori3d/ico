@@ -9,6 +9,7 @@ hundreds of megabytes of the GPU). Without one, :meth:`Device.memory` is
 
 from __future__ import annotations
 
+import gc
 import sys
 from typing import Any, Protocol, cast
 
@@ -21,7 +22,8 @@ class Device(Protocol):
         ...
 
     def empty_cache(self, device: str) -> None:
-        """Return memory freed by dropped objects to the device."""
+        """Return memory freed by dropped objects to the device (collecting
+        garbage first)."""
         ...
 
 
@@ -42,6 +44,10 @@ class TorchDevice:
     def empty_cache(self, device: str) -> None:
         torch = _torch(device)
         if torch is not None:
+            # A dropped object in a reference cycle (a TensorRT program in an
+            # fx GraphModule) holds its device memory until collected: 2.5 of
+            # the 4.8 GB of an engine.
+            gc.collect()
             torch.cuda.empty_cache()
 
 
