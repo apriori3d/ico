@@ -311,6 +311,39 @@ def test_cleanup_removes_the_work_directory(tmp_path: Path) -> None:
     assert (tmp_path / "jobs" / "kept" / "code").is_dir()
 
 
+def test_the_final_event_is_written_to_the_status_uri(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_text("hello")
+    executor = LocalExecutor(tmp_path / "jobs")
+    done = submit(
+        op("jobs.upper_file@1", out_dir={"$param": "out_dir"}),
+        f"file://{tmp_path}/a.txt", params={"out_dir": "$JOB/out"},
+        executor=executor, packages=[PACKAGE], sources=SOURCES, id="ok",
+        out=f"file://{tmp_path}/runs/ok/out", cleanup=True,
+        status=f"file://{tmp_path}/runs/ok/result.json",
+    )  # fmt: skip
+    streamed = result(done)
+    failed = submit(
+        op("jobs.fail@1"), "x", executor=executor, packages=[PACKAGE],
+        sources=SOURCES, id="failed", cleanup=True,
+        status=f"file://{tmp_path}/runs/failed/result.json",
+    )  # fmt: skip
+    last = [cast(dict[str, Any], e) for e in failed.events()][-1]
+
+    written = json.loads((tmp_path / "runs" / "ok" / "result.json").read_text())
+    assert written == {"event": "result", "result": streamed}
+    assert written["result"]["outputs"] == [f"file://{tmp_path}/runs/ok/out/a.txt"]
+    error = json.loads((tmp_path / "runs" / "failed" / "result.json").read_text())
+    assert error == last and error["code"] == "run_error"
+
+
+def test_a_failed_status_write_does_not_fail_the_job(tmp_path: Path) -> None:
+    handle = submit(
+        op("jobs.shout@1"), "x", executor=LocalExecutor(tmp_path),
+        packages=[PACKAGE], sources=SOURCES, status="nowhere://x/result.json",
+    )  # fmt: skip
+    assert result(handle)["outputs"] == ["X"]
+
+
 def test_a_cancelled_job_cleans_up(tmp_path: Path) -> None:
     words = " ".join(f"w{i}" for i in range(200))
     handle = submit(
@@ -341,7 +374,7 @@ def test_a_job_round_trips_through_json() -> None:
     job = Job(
         spec=op("jobs.shout@1"), input="x", params={"p": 1}, packages=(PACKAGE,),
         sources={"a/b.py": ""}, out="s3://b/o", profile=True, recent=True, max_items=5,
-        cleanup=True,
+        cleanup=True, status="s3://b/result.json",
     )  # fmt: skip
     assert Job.from_dict(job.to_dict()) == job
 

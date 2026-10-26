@@ -81,6 +81,7 @@ def submit(
     id: str | None = None,
     volume: str | None = None,
     cleanup: bool = False,
+    status: str | None = None,
 ) -> JobHandle:
     """Send one run of ``spec`` to ``executor``; see :class:`Job`. The same
     ``id`` again resumes the job from its work directory."""
@@ -95,6 +96,7 @@ def submit(
         recent=recent,
         max_items=max_items,
         cleanup=cleanup,
+        status=status,
     )
     if id is not None:
         job = replace(job, id=id)
