@@ -109,7 +109,16 @@ class JobHandle(Protocol):
   whenever RunPod's status of the job changes (`IN_QUEUE` while it waits
   for a worker, `IN_PROGRESS`), `POST /cancel`;
   standard library HTTP, no SDK. The worker side is
-  `ico.remote.runpod_handler`, the image's entry point.
+  `ico.remote.runpod_handler`, the image's entry point. It runs jobs in a
+  **job server** (`python -m ico.remote --serve`, `ico.remote.server`):
+  one process that lives between jobs, so a warm worker keeps its
+  resource pool, imported operators and CUDA context. The server loads a
+  job's code once, into a directory of its own, and runs only jobs with
+  the same code fingerprint (packages and sources); the handler starts a
+  new server for other code, after `run_error` or `load_error`, after
+  `ICO_SERVE_MAX_JOBS` jobs, and after a crash or a kill (a cancel that
+  did not stop within the grace period). A cancelled job that stops
+  keeps the server. See `docs/proposals/2026-10-25-job-server.md`.
 - Modal or a plain SSH pod later, by the same protocol.
 
 ## Storage (`ico.remote.storage`)
@@ -227,9 +236,11 @@ far faster, and the lock proves both copies equal.
   once to S3 and get an `s3://` source in the manifest — when the first
   such file appears.
 - **Cold starts.** Reading the Wan2.2 experts (~60 GB) from the volume
-  takes minutes. A worker that runs jobs in its own process keeps its
-  resource pool between jobs (ico item 31), so a warm worker reads them
-  once; measure on the first real run before anything more.
+  takes minutes. The job server keeps the resource pool of a job's main
+  process between jobs, so a warm worker loads those models once.
+  Models in a worker process (`MPWorker`, e.g. a `gpu` worker) still load
+  once per run: the worker's runner process lives one run (item 31,
+  phase 2).
 
 ## Costs (RunPod, 2026-10)
 

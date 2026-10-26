@@ -10,6 +10,8 @@ outputs. See ``docs/design/remote.md``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -135,6 +137,17 @@ class Job:
             options["cleanup"] = True
         out["options"] = options
         return out
+
+    def code_fingerprint(self) -> str:
+        """A hash of the code the job loads (its packages and sources): a
+        job server runs only jobs of one fingerprint
+        (:mod:`ico.remote.server`)."""
+        code: JsonObject = {
+            "packages": [p.to_dict() for p in self.packages],
+            "sources": dict[str, JsonValue](self.sources),
+        }
+        text = json.dumps(code, sort_keys=True, ensure_ascii=False)
+        return hashlib.sha256(text.encode()).hexdigest()[:16]
 
     @classmethod
     def from_dict(cls, data: JsonObject) -> Job:
