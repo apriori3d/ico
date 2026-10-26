@@ -140,6 +140,7 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeRunPod
     yield server
     server.gpu.set()
     server.server.shutdown()
+    runpod_handler.stop_server()  # the next test starts its own
 
 
 def executor(fake: FakeRunPod, **kwargs: Any) -> RunPod:

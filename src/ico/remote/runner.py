@@ -71,12 +71,26 @@ TRACEBACK_LIMIT = 8000
 
 
 def run_job(
-    job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None = None
+    job: Job,
+    emit: Emit,
+    workdir: Path,
+    cancel: IcoCancelToken | None = None,
+    *,
+    code: Path | None = None,
+    load: bool = True,
 ) -> None:
     """Run ``job`` in ``workdir``; every outcome is an event (never raises
-    for the job's own errors)."""
+    for the job's own errors).
+
+    Args:
+        code: Where the job's sources are written and loaded from;
+            ``<workdir>/code`` by default. A job server keeps one for the
+            jobs it runs (:mod:`ico.remote.server`).
+        load: Write the sources and load the packages; ``False`` when this
+            process already loaded the same code.
+    """
     try:
-        _run(job, emit, workdir, cancel)
+        _run(job, emit, workdir, cancel, code, load)
     except SpecError as e:
         emit(
             {
@@ -119,12 +133,19 @@ class _LoadError(Exception):
         self.errors = errors
 
 
-def _run(job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None) -> None:
+def _run(
+    job: Job,
+    emit: Emit,
+    workdir: Path,
+    cancel: IcoCancelToken | None,
+    code: Path | None,
+    load: bool,
+) -> None:
     workdir = workdir.resolve()
     (workdir / "out").mkdir(parents=True, exist_ok=True)
     with _locked(workdir):
         try:
-            _run_locked(job, emit, workdir, cancel)
+            _run_locked(job, emit, workdir, cancel, code or workdir / "code", load)
         finally:
             if job.cleanup:
                 remove_workdir(workdir)
@@ -152,14 +173,22 @@ def _locked(workdir: Path) -> Iterator[None]:
 
 
 def _run_locked(
-    job: Job, emit: Emit, workdir: Path, cancel: IcoCancelToken | None
+    job: Job,
+    emit: Emit,
+    workdir: Path,
+    cancel: IcoCancelToken | None,
+    code: Path,
+    load: bool,
 ) -> None:
     os.environ[RUN_ENV] = job.id
-    _load(job, workdir)
+    if code != workdir / "code":
+        _write_sources(job, workdir / "code")  # what the job ran, for people
+    if load:
+        _load(job, code)
     volume_root = Path(os.environ.get(VOLUME_ENV) or VOLUME_ROOT)
     if job.volume is not None and volume_root.is_dir():
         mount_bucket(job.volume, volume_root)
-    manifest = workdir / "code" / "assets.toml"
+    manifest = code / "assets.toml"
     if manifest.is_file():
         os.environ["ICO_ASSETS_MANIFEST"] = str(manifest)
         missing = _missing_assets(_parse(job.spec), job.params)
@@ -250,16 +279,9 @@ def _parse(spec: JsonObject) -> PipelineSpec | NodeSpec:
     return NodeSpec.from_dict(spec)
 
 
-def _load(job: Job, workdir: Path) -> None:
-    """Write the sources and load the operator packages."""
-    code = workdir / "code"
-    for relative, text in job.sources.items():
-        path = PurePosixPath(relative)
-        if path.is_absolute() or ".." in path.parts or not path.parts:
-            raise _LoadError(f"invalid source path {relative!r}", [relative])
-        target = code.joinpath(*path.parts)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text, encoding="utf-8")
+def _load(job: Job, code: Path) -> None:
+    """Write the sources under ``code`` and load the operator packages."""
+    _write_sources(job, code)
     errors: list[JsonValue] = []
     for package in job.packages:
         carried = code / package.path
@@ -274,6 +296,16 @@ def _load(job: Job, workdir: Path) -> None:
         errors.extend({"file": f, "error": message} for f, message in report.errors)
     if errors:
         raise _LoadError("operator modules failed to import", errors)
+
+
+def _write_sources(job: Job, code: Path) -> None:
+    for relative, text in job.sources.items():
+        path = PurePosixPath(relative)
+        if path.is_absolute() or ".." in path.parts or not path.parts:
+            raise _LoadError(f"invalid source path {relative!r}", [relative])
+        target = code.joinpath(*path.parts)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
 
 
 class _Staged:
