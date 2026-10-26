@@ -213,8 +213,8 @@ def test_resident_objects_live_on_the_gpu_and_are_dropped_for_room() -> None:
     assert [(h["device"], h["bytes"]) for h in pool.held()] == [("cuda", 4 * GB)]
     with FakeEngine(name="f").use("cuda"):  # 2 GB free: both stay
         pass
-    with FakeEngine(name="g").use("cuda"):  # too much: the oldest is dropped
-        pass
+    with FakeEngine(name="g").use("cuda"):  # never loaded: sized as e and f
+        assert CLOSED == ["e"]  # room made before its load
     assert CLOSED == ["e"] and gpu.emptied >= 1
     with FakeEngine().use("cuda"):  # its size is known: room before the load
         assert CLOSED == ["e", "f"]
