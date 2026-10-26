@@ -39,7 +39,7 @@ wheels = [
 
 [[package]]
 name = "apriori-ico"
-version = "0.1.1"
+version = "0.1.2rc1"
 source = { editable = "." }
 dependencies = [
     { name = "rich" },
