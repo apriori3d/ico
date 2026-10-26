@@ -52,6 +52,8 @@ class FakeRunPod:
         self.throttle = 0
         self.drop = 0
         """Stream reads to answer by closing the connection."""
+        self.unavailable = 0
+        """Stream reads to answer with HTTP 503."""
         self.ids = itertools.count(1)
         fake = self
 
@@ -89,6 +91,9 @@ class FakeRunPod:
             self.drop -= 1
             request.close_connection = True
             return
+        if action == "stream" and self.unavailable:
+            self.unavailable -= 1
+            return self.reply(request, 503, {"error": "unavailable"})
         if action == "stream":
             new = job.chunks[job.read :]
             job.read += len(new)
@@ -233,6 +238,51 @@ def test_dropped_stream_reads_are_retried(
     assert result(handle)["outputs"] == ["X"] and fake.drop == 0
 
 
+def test_reads_are_retried_for_the_window_not_a_count(
+    fake: FakeRunPod, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def sleep(seconds: float) -> None:
+        time.sleep(0.01)
+
+    monkeypatch.setattr(runpod_module, "time", _Clock(sleep))
+    fake.drop, fake.unavailable = 8, 3  # more failures than RETRIES
+    handle = executor(fake).submit(_job(op("jobs.shout@1"), "x"))
+
+    assert result(handle)["outputs"] == ["X"]
+    assert fake.drop == 0 and fake.unavailable == 0
+
+
+def test_a_read_failing_past_the_window_is_a_runtime_error(
+    fake: FakeRunPod,
+) -> None:
+    fake.drop = 1
+    handle = executor(fake, retry=0.0).submit(_job(op("jobs.shout@1"), "x"))
+
+    with pytest.raises(RuntimeError, match="RunPod GET /stream/"):
+        list(handle.events())
+
+
+def test_the_retry_window_comes_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ICO_REMOTE_RETRY", "42")
+    assert RunPod("ep").retry == 42.0
+    monkeypatch.delenv("ICO_REMOTE_RETRY")
+    assert RunPod("ep").retry == 600.0
+
+
+def test_a_job_is_found_again_by_its_runpod_id(fake: FakeRunPod) -> None:
+    words = " ".join(f"w{i}" for i in range(20))
+    first = executor(fake).submit(_job(words_then(op("jobs.slow@1")), words))
+    for event in first.events():  # the client goes away after some progress
+        if event["event"] == "progress":
+            break
+    again = executor(fake).job(first.id)  # e.g. after the client restarted
+
+    assert len(cast(list[str], result(again)["outputs"])) == 20
+    assert again.status()["status"] == "COMPLETED"
+
+
 def test_queue_events_tell_a_job_waits_for_a_worker(fake: FakeRunPod) -> None:
     fake.gpu.clear()
     threading.Timer(0.5, fake.gpu.set).start()  # a worker frees up
@@ -260,6 +310,7 @@ def _job(spec: dict[str, Any], input: str) -> Job:
 @dataclass
 class _Clock:
     sleep: Any
+    monotonic: Any = time.monotonic
 
 
 def test_work_directories_go_to_the_network_volume(

@@ -107,8 +107,12 @@ class JobHandle(Protocol):
 - `RunPodExecutor`: `POST /run` with the request, events from `/stream`
   (the handler is a generator that yields events) and a `queue` event
   whenever RunPod's status of the job changes (`IN_QUEUE` while it waits
-  for a worker, `IN_PROGRESS`), `POST /cancel`;
-  standard library HTTP, no SDK. The worker side is
+  for a worker, `IN_PROGRESS`), `GET /status`, `POST /cancel`;
+  standard library HTTP, no SDK. Reads and cancels are retried for
+  `ICO_REMOTE_RETRY` seconds (600 by default) on dropped connections, DNS
+  failures and HTTP 429/5xx, then raise `RuntimeError`; `RunPod.job(id)`
+  is the handle of a job submitted earlier, by RunPod's id (a client that
+  restarted reads its events on). The worker side is
   `ico.remote.runpod_handler`, the image's entry point. It runs jobs in a
   **job server** (`python -m ico.remote --serve`, `ico.remote.server`):
   one process that lives between jobs, so a warm worker keeps its
