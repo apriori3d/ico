@@ -85,6 +85,13 @@ Runs one job in a work directory (`$JOB`):
    cancelled (it cannot be resumed then); on RunPod the handler removes it
    for a runner it had to kill. Without it the directory stays: a
    network volume fills up with them.
+7. **Status.** A job with `status` (a storage URI; ico-mcp gives
+   `runs/<run_id>/result.json` beside `in/` and `out/`) also gets its
+   final event written there, the same JSON as on the stream, after the
+   stage out: a client that lost the stream learns the outcome and the
+   outputs from the storage alone
+   (`docs/proposals/2026-10-26-remote-results.md`). A `busy` error is not
+   written, and a failed write does not fail the job.
 
 The runner knows nothing of a provider: it reads a request and calls
 `emit`.

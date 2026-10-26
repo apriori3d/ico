@@ -100,6 +100,10 @@ class Job:
         cleanup: Remove the job's work directory when the job ends, after
             its outputs are uploaded to ``out``; failed and cancelled jobs
             too. Such a job cannot be resumed.
+        status: A storage URI the job's final event (``result`` or
+            ``error``, the same JSON as on the stream) is also written to,
+            after the outputs: a client that lost the stream learns the
+            outcome from the storage alone. ``None``: the stream only.
     """
 
     spec: JsonObject
@@ -114,6 +118,7 @@ class Job:
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     volume: str | None = None
     cleanup: bool = False
+    status: str | None = None
 
     def to_dict(self) -> JsonObject:
         out: JsonObject = {
@@ -130,6 +135,8 @@ class Job:
             out["out"] = self.out
         if self.volume is not None:
             out["volume"] = self.volume
+        if self.status is not None:
+            out["status"] = self.status
         options: JsonObject = {"profile": self.profile, "recent": self.recent}
         if self.max_items is not None:
             options["max_items"] = self.max_items
@@ -156,6 +163,7 @@ class Job:
         sources = cast(dict[str, JsonValue], data.get("sources") or {})
         max_items = options.get("max_items")
         out = data.get("out")
+        status = data.get("status")
         return cls(
             spec=cast(JsonObject, data["spec"]),
             input=data.get("input"),
@@ -172,6 +180,7 @@ class Job:
             id=str(data.get("id") or uuid.uuid4().hex),
             volume=str(data["volume"]) if data.get("volume") else None,
             cleanup=bool(options.get("cleanup", False)),
+            status=status if isinstance(status, str) else None,
         )
 
 

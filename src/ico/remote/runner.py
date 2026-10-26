@@ -12,7 +12,10 @@ its events to ``emit``:
 3. sends the plan, runs the spec (progress, recent samples, profile and
    cancellation as asked), and sends the result;
 4. uploads ``<workdir>/out`` to the job's ``out`` and puts URIs in place
-   of the output paths under it.
+   of the output paths under it;
+5. writes the final event (``result`` or ``error``) to the job's
+   ``status`` URI as well, when it has one, so the outcome is in the
+   storage even if nobody read the stream.
 
 A job sent again with the same id into the same work directory resumes:
 its operators find the files they left, and every URI comes back to the
@@ -40,6 +43,7 @@ import os
 import shutil
 import signal
 import sys
+import tempfile
 import threading
 import traceback
 from collections.abc import Callable, Iterator
@@ -50,7 +54,7 @@ from ico.core.runtime.cancel import IcoCancelToken
 from ico.describe.plan.json_renderer import plan_view
 from ico.registry.loader import load_operators
 from ico.registry.registry import Status
-from ico.remote.job import AnyJob, FetchJob, Job, JsonObject
+from ico.remote.job import FINAL, AnyJob, FetchJob, Job, JsonObject
 from ico.remote.storage import basename, join, mount_bucket, storage_for
 from ico.spec.builders import build
 from ico.spec.model import JsonValue, NodeSpec, PipelineSpec, SpecError
@@ -89,6 +93,8 @@ def run_job(
         load: Write the sources and load the packages; ``False`` when this
             process already loaded the same code.
     """
+    if job.status is not None:
+        emit = _recording(emit, job.status)
     try:
         _run(job, emit, workdir, cancel, code, load)
     except SpecError as e:
@@ -121,6 +127,34 @@ def run_job(
                 "traceback": "".join(traceback.format_exception(e))[-TRACEBACK_LIMIT:],
             }
         )
+
+
+def _recording(emit: Emit, uri: str) -> Emit:
+    """``emit`` that also writes the final event to ``uri``. A ``busy``
+    error is not written: another runner of the same job owns the outcome.
+    A failed write is reported on stderr and does not fail the job (the
+    stream still carries the event)."""
+
+    def recorded(event: JsonObject) -> None:
+        if event.get("event") in FINAL and event.get("code") != "busy":
+            try:
+                write_status(event, uri)
+            except Exception as e:  # botocore raises its own types
+                print(f"ico: writing {uri}: {type(e).__name__}: {e}", file=sys.stderr)
+        emit(event)
+
+    return recorded
+
+
+def write_status(event: JsonObject, uri: str) -> None:
+    """Write a job's final event to the storage URI ``uri`` (JSON)."""
+    storage = storage_for(uri)
+    if storage is None:
+        raise ValueError(f"not a storage URI: {uri!r}")
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "status.json"
+        path.write_text(json.dumps(event, ensure_ascii=False, default=str))
+        storage.put(path, uri)
 
 
 class _BusyError(Exception):
