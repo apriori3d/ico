@@ -22,7 +22,7 @@ from ico.resources import (
     resource,
     set_pool,
 )
-from ico.resources.device import TorchDevice, is_out_of_memory
+from ico.resources.device import is_out_of_memory
 from ico.resources.pool import gpu_headroom, memory, ram_budget
 from ico.spec import NodeSpec, SpecError, build, to_spec
 from ico.spec.run import run
@@ -109,22 +109,19 @@ class FakeGpu:
         self.total = int(total * GB)
         self.other = 0
         self.pools: list[ResourcePool] = []
-        self.asks: dict[int, int] = {}
         self.emptied = 0
 
-    def process(self, watch: float | None = None) -> ResourcePool:
+    def process(self, *, worker: bool = False) -> ResourcePool:
         pool = ResourcePool(
-            ram=100 * GB, headroom=0.2, device=_GpuView(self, len(self.pools)),
-            watch=watch,
-        )  # fmt: skip
+            ram=100 * GB, headroom=0.2, device=_GpuView(self), keep_idle=not worker
+        )
         self.pools.append(pool)
         return pool
 
 
 class _GpuView:
-    def __init__(self, gpu: FakeGpu, process: int) -> None:
+    def __init__(self, gpu: FakeGpu) -> None:
         self.gpu = gpu
-        self.process = process
 
     def memory(self, device: str) -> tuple[int, int] | None:
         if device != "cuda":
@@ -133,26 +130,8 @@ class _GpuView:
         used = self.gpu.other + sum(h["bytes"] or 0 for h in held)
         return self.gpu.total - used, self.gpu.total
 
-    def ask(self, device: str, need: int, seconds: float) -> None:
-        if need:
-            self.gpu.asks[self.process] = need
-        else:
-            self.gpu.asks.pop(self.process, None)
-
-    def asked(self, device: str) -> int:
-        return sum(n for p, n in self.gpu.asks.items() if p != self.process)
-
     def empty_cache(self, device: str) -> None:
         self.gpu.emptied += 1
-
-
-def wait_until(condition: Any, timeout: float = 5.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while not condition():
-        if time.monotonic() > deadline:
-            return False
-        time.sleep(0.01)
-    return True
 
 
 @pytest.fixture(autouse=True)
@@ -247,25 +226,15 @@ def test_resident_objects_live_on_the_gpu_and_are_dropped_for_room() -> None:
         pass
 
 
-def test_an_idle_process_frees_what_another_one_asks_for() -> None:
+def test_a_worker_process_keeps_only_resident_objects_on_the_gpu() -> None:
     gpu = FakeGpu(total=10)
-    worker = gpu.process(watch=0.01)  # e.g. a worker waiting for its next item
-    main = gpu.process()
-    with worker.use(FakeModel(gb=5), "cuda") as idle:
+    worker = gpu.process(worker=True)  # cannot give memory to the main one
+    with worker.use(FakeModel(gb=1), "cuda") as model:
         pass
-    assert idle.device == "cuda"  # 5 GB free
-    with main.use(FakeModel(name="big", gb=4), "cuda") as big:
-        assert idle.device == "cpu"  # asked for 4 GB above the headroom
-    assert big.device == "cuda" and gpu.asks == {}
-
-
-def test_the_watch_frees_memory_when_the_gpu_fills_up() -> None:
-    gpu = FakeGpu(total=10)
-    worker = gpu.process(watch=0.01)
-    with worker.use(FakeModel(gb=3), "cuda") as model:
+    with worker.use(FakeEngine(), "cuda") as engine:
         pass
-    gpu.other = 6 * GB
-    assert wait_until(lambda: model.device == "cpu")
+    assert model.device == "cpu"  # back to RAM at once
+    assert engine.device == "cuda" and CLOSED == []  # the headroom holds
 
 
 def test_after_an_out_of_memory_error_idle_objects_leave_the_gpu() -> None:
@@ -292,19 +261,6 @@ def test_the_headroom_is_a_share_of_the_gpu(monkeypatch: pytest.MonkeyPatch) -> 
             gpu_headroom(bad)
     monkeypatch.setenv("ICO_RESOURCES_GPU_FREE", "30%")
     assert ResourcePool().headroom == 0.3
-
-
-def test_asks_of_other_processes_are_files(tmp_path: Path) -> None:
-    device = TorchDevice(tmp_path)
-    (tmp_path / "cuda.1").write_text(f"{GB} {time.time() + 60}")
-    (tmp_path / "cuda.2").write_text(f"{GB} {time.time() - 1}")  # a dead one
-    assert device.asked("cuda") == GB
-    assert not (tmp_path / "cuda.2").exists()
-    device.ask("cuda", 2 * GB, 60)
-    assert device.asked("cuda") == GB  # its own ask does not count
-    assert TorchDevice(tmp_path / "other").asked("cuda") == 0
-    device.ask("cuda", 0, 0)
-    assert not (tmp_path / f"cuda.{os.getpid()}").exists()
 
 
 def test_a_ram_budget_is_a_size_or_a_share_of_the_memory(tmp_path: Path) -> None:

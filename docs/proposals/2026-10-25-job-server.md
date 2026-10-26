@@ -191,19 +191,26 @@ a GPU see alike:
   and the `gpu` budget are removed: `diffueraser` and the engines follow
   the same rule, and endpoints need no setting.
 - **Room before a load.** Before an object loads on or moves to the GPU,
-  the pool frees its size above the headroom (sizes are known after a
-  first load). If its own idle objects are not enough, it asks the other
-  processes (a file `<tmp>/ico-gpu-asks/<device>.<pid>` with the bytes and
-  a deadline) and waits up to 3 s, then goes on.
-- **A watch.** While a pool holds objects on a GPU, a thread checks every
-  second that the GPU has its headroom plus what others ask for, so an
-  idle process (a worker waiting for its next item) gives memory back.
+  the pool frees its size above the headroom with its own idle objects
+  (sizes are known after a first load), then goes on.
+- **Only the main process keeps idle objects.** A process does not free
+  memory for another one, so a worker process (`MPWorker`) would keep its
+  idle models on the GPU while the main process runs short. In a worker
+  process idle movable objects go back to RAM at once, as before; its
+  resident objects follow the headroom.
 - **Out of memory.** After a GPU out-of-memory error in a `use` block,
   every idle object of the process leaves that GPU, so a retry of the
   item finds room.
 - **Without CUDA in the process** (no torch, or before its first CUDA
   use) the free memory is unknown: idle movable objects go back to RAM at
   once and resident ones stay, as before.
+
+Considered and left out: asks between processes (a file per process
+under `/tmp`, read by a watch thread in every pool). Global to the
+machine (two runs would push each other's models out), tied to device
+names, and no pipeline has heavy GPU objects in two processes today. If
+one does, the plan of the run knows when a worker's subtree is done; the
+release then goes through the worker's channel (see "Pool planning").
 
 What the pool cannot see stays a risk: activations and other memory an
 operator allocates inside its `use` block get the headroom, not the whole
@@ -280,8 +287,8 @@ One PR each:
    `crashed`. `docs/design/remote.md` ("Cold starts", the runner
    process) updated. ~1.5–2 days.
 2. **GPU headroom in the pool** (`apriori3d/ico`, 5.3): resident
-   resources, the headroom rule, asks between processes, the watch, with
-   tests on a fake GPU shared by pools. ~1.5 days.
+   resources, the headroom rule in the main process, worker processes
+   back to RAM, with tests on a fake GPU shared by pools. ~1 day.
 3. **Domain** (`ico-mcp-video`, by its owner): `resident = "cuda"` on
    `diffusion.trt` and `vae.trt`, an image on the new apriori-ico; check
    `animate_loop` and `clean_video` on cube (the headroom rule changes

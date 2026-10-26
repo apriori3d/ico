@@ -12,17 +12,13 @@ the pool decides where a released resource stays:
   GPU keeps a free **headroom** (``ICO_RESOURCES_GPU_FREE``, ``"20%"`` of
   its memory by default); below it, idle objects of this process leave
   the GPU, least recently used first: back to RAM, or dropped if resident.
-  The free memory is the device's, so every process on a GPU (the main
-  one and its worker processes) keeps the same headroom;
+  Only the main process keeps idle objects on a GPU: in a worker process
+  (``MPWorker``), which cannot give its memory to the main one, idle
+  movable objects go back to RAM at once, and resident ones follow the
+  headroom;
 - before an object loads on or moves to a GPU, the pool makes room for
-  it the same way (its size is known once it has loaded); if its own idle
-  objects are not enough, it asks the other processes on the GPU for the
-  rest and waits up to ``ROOM_WAIT`` seconds (see
-  :mod:`ico.resources.device`), then goes on;
-- while the pool holds objects on a GPU, a thread checks every ``WATCH``
-  seconds that the GPU has its headroom plus what other processes ask
-  for, so an idle process (a worker waiting for its next item) gives
-  memory back when another one needs it;
+  it the same way with its own idle objects (its size is known once it
+  has loaded), then goes on;
 - after a GPU out-of-memory error in a block, every idle object of this
   process leaves that GPU (a retry of the item then finds room);
 - idle objects in RAM beyond the ``ram`` budget (``ICO_RESOURCES_RAM``:
@@ -34,7 +30,7 @@ the pool decides where a released resource stays:
 The GPU's free memory comes from torch when the process has initialized
 CUDA (:mod:`ico.resources.device`); without it (a process without torch,
 before its first CUDA use) idle objects go back to RAM at once and
-resident ones stay. Sizes come from :meth:`Resource.size` (unknown counts
+resident ones stay. A process does not free memory for another one. Sizes come from :meth:`Resource.size` (unknown counts
 as 0).
 
 Every load, move, hit, release (with the time in use) and drop is an
@@ -44,6 +40,7 @@ event for listeners (the profiler).
 from __future__ import annotations
 
 import contextlib
+import multiprocessing
 import os
 import re
 import threading
@@ -61,13 +58,6 @@ T = TypeVar("T")
 RAM_ENV = "ICO_RESOURCES_RAM"
 HEADROOM_ENV = "ICO_RESOURCES_GPU_FREE"
 DEFAULT_HEADROOM = "20%"
-ROOM_WAIT = 3.0
-"""Seconds a load or move waits for other processes to free GPU memory
-(they check every ``WATCH`` seconds)."""
-ROOM_POLL = 0.1
-WATCH = 1.0
-"""Seconds between checks of the headroom while the pool holds objects on
-a GPU."""
 CGROUP = Path("/sys/fs/cgroup")
 CPU = "cpu"
 
@@ -122,9 +112,10 @@ class ResourcePool:
         headroom: The share of a GPU's memory to keep free;
             ``ICO_RESOURCES_GPU_FREE`` by default.
         device: Free memory of GPUs; torch's by default.
-        clock: Time for LRU order and waits (tests).
-        sleep: Waits for room on a GPU (tests).
-        watch: Seconds between headroom checks; ``None``: no thread.
+        keep_idle: Keep idle movable objects on a GPU while it has its
+            headroom; by default only in the main process, not in a
+            worker process.
+        clock: Time for LRU order (tests).
     """
 
     def __init__(
@@ -133,9 +124,8 @@ class ResourcePool:
         ram: int | None = None,
         headroom: float | None = None,
         device: Device | None = None,
+        keep_idle: bool | None = None,
         clock: Callable[[], float] = time.monotonic,
-        sleep: Callable[[float], None] = time.sleep,
-        watch: float | None = WATCH,
     ) -> None:
         self.ram = ram if ram is not None else ram_budget(os.environ.get(RAM_ENV))
         self.headroom = (
@@ -144,13 +134,15 @@ class ResourcePool:
             else gpu_headroom(os.environ.get(HEADROOM_ENV))
         )
         self.device: Device = device if device is not None else TorchDevice()
+        self.keep_idle = (
+            keep_idle
+            if keep_idle is not None
+            else multiprocessing.parent_process() is None
+        )
         self.clock = clock
-        self.sleep = sleep
-        self.watch = watch
         self._entries: dict[str, _Entry] = {}
         self._sizes: dict[str, int] = {}
         """Sizes of keys loaded before (the room a load needs)."""
-        self._watching = False
         self._lock = threading.Lock()
         self._listeners: list[Callable[[PoolEvent], None]] = []
 
@@ -262,8 +254,6 @@ class ResourcePool:
             self._make_room(device, entry.size or 0)
             self._move(entry, device)
             acted = True
-        if entry.device != CPU:
-            self._watch()
         if not acted:
             self._emit(entry, "hit", 0.0)
 
@@ -282,7 +272,7 @@ class ResourcePool:
             if failed and not entry.users:
                 self._entries.pop(entry.resource.key, None)
                 return
-            devices = self._gpus(idle=True)
+            devices = self._gpus()
         for device in devices:
             self._keep_headroom(device)
         with self._lock:
@@ -298,61 +288,55 @@ class ResourcePool:
 
     # ─── The GPU ───
 
-    def _gpus(self, *, idle: bool = False) -> set[str]:
-        """Devices other than RAM that hold objects (idle ones only, with
-        ``idle``); under the lock."""
+    def _gpus(self) -> set[str]:
+        """Devices other than RAM that hold idle objects; under the lock."""
         return {
             e.device
             for e in self._entries.values()
-            if e.device is not None and e.device != CPU and not (idle and e.users)
+            if e.device is not None and e.device != CPU and not e.users
         }
 
     def _keep_headroom(self, device: str, *, everything: bool = False) -> None:
-        """Idle objects leave ``device`` until it has its headroom free,
-        plus what other processes ask for; without its free memory, idle
-        movable ones go back to RAM (resident ones stay); ``everything``:
-        every idle one leaves."""
+        """Idle objects leave ``device`` until it has its headroom free.
+        Idle movable ones go back to RAM at once where idle objects are not
+        kept (a worker process, or the free memory is unknown); resident
+        ones stay unless the headroom is short. ``everything``: every idle
+        one leaves."""
         while True:
-            memory = None if everything else self.device.memory(device)
-            if memory is not None:
-                free, total = memory
-                if free >= self.headroom * total + self.device.asked(device):
-                    return
-            victim = self._idle_on(device, movable=memory is None and not everything)
+            if everything:
+                victim = self._idle_on(device, movable=False)
+            else:
+                memory = self.device.memory(device)
+                victim = None
+                if memory is None or not self.keep_idle:
+                    victim = self._idle_on(device, movable=True)
+                if (
+                    victim is None
+                    and memory is not None
+                    and memory[0] < self.headroom * memory[1]
+                ):
+                    victim = self._idle_on(device, movable=False)
             if victim is None:
                 return
             self._evict(victim, device)
 
     def _make_room(self, device: str, need: int) -> None:
-        """Free ``need`` bytes on ``device`` above its headroom: idle
-        objects of this process leave first, then other processes are
-        asked and have ``ROOM_WAIT`` seconds to free theirs; the caller
-        then goes on."""
+        """Free ``need`` bytes on ``device`` above its headroom with idle
+        objects of this process; the caller then goes on (other processes
+        keep theirs)."""
         if device == CPU:
             return
-        deadline = self.clock() + ROOM_WAIT
-        asking = False
-        try:
-            while True:
-                memory = self.device.memory(device)
-                if memory is None:
-                    return
-                free, total = memory
-                if free - need >= self.headroom * total:
-                    return
-                victim = self._idle_on(device, movable=False)
-                if victim is not None:
-                    self._evict(victim, device)
-                    continue
-                if self.clock() >= deadline:
-                    return
-                if not asking:
-                    asking = True
-                    self.device.ask(device, need, ROOM_WAIT)
-                self.sleep(ROOM_POLL)
-        finally:
-            if asking:
-                self.device.ask(device, 0, 0)
+        while True:
+            memory = self.device.memory(device)
+            if memory is None:
+                return
+            free, total = memory
+            if free - need >= self.headroom * total:
+                return
+            victim = self._idle_on(device, movable=False)
+            if victim is None:
+                return
+            self._evict(victim, device)
 
     def _idle_on(self, device: str, *, movable: bool) -> _Entry | None:
         """The least recently used idle object on ``device`` (a movable
@@ -379,31 +363,6 @@ class ResourcePool:
                 self._close(entry)
         self._forget(entry)
         self.device.empty_cache(device)
-
-    def _watch(self) -> None:
-        """Start the headroom checks, if they do not run."""
-        if self.watch is None:
-            return
-        with self._lock:
-            if self._watching:
-                return
-            self._watching = True
-        thread = threading.Thread(
-            target=self._watch_loop, name="ico-resource-pool", daemon=True
-        )
-        thread.start()
-
-    def _watch_loop(self) -> None:
-        assert self.watch is not None
-        while True:
-            time.sleep(self.watch)
-            with self._lock:
-                devices = self._gpus()
-                if not devices:
-                    self._watching = False
-                    return
-            for device in devices:
-                self._keep_headroom(device)
 
     # ─── RAM ───
 
