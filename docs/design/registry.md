@@ -82,7 +82,7 @@ editor, caches every operation of a card's layers by content) needs two
 facts the registry does not hold today: which code an operator runs, and
 whether calling it again gives the same result.
 
-### `RegistryEntry.fingerprint`
+### `RegistryEntry.fingerprint()`
 
 The sha256 of the sources an operator runs: the module that defines it
 **and every module it imports, transitively**, except
@@ -102,7 +102,8 @@ miss it and a cache would return a stale result.
 
 ```python
 entry = default_registry.get("layers.mask_subtract@1")
-entry.fingerprint   # "sha256:9c1f…", or None for an entry without a module
+entry.fingerprint()            # "sha256:9c1f…", or None for an entry without a module
+module_sources("layers.masks")  # {"layers.masks": Path(...), "layers.io": Path(...), ...}
 ```
 
 - Imports are found in the source (`ast`), in module bodies and inside
@@ -115,8 +116,11 @@ entry.fingerprint   # "sha256:9c1f…", or None for an entry without a module
 - The hash covers `(module name, sha256 of the file bytes)` pairs in sorted
   order, so the result does not depend on the order of the walk; a module
   that is not a `.py` file is hashed as bytes.
-- Computed on first use and kept on the entry. Reloading a draft
-  re-registers it, so a new entry computes it again.
+- Read from the files on every call (a few files parsed and hashed), not
+  kept on the entry: reloading a draft re-imports the same module object, so
+  a kept value would go stale. A caller keeps it for a run.
+- `module_sources(module)` returns the files themselves, by module name:
+  what a fingerprint covers, and what code by value would carry.
 - Composite flows registered as nodes (`module` is `None`) have no
   fingerprint.
 
