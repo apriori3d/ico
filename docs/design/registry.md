@@ -113,9 +113,18 @@ module_sources("layers.masks")  # {"layers.masks": Path(...), "layers.io": Path(
   `importlib.util.find_spec` otherwise; one that cannot be located is
   skipped. Imports by name at run time (`importlib.import_module(name)`)
   are not seen: documented, not solved.
-- The hash covers `(module name, sha256 of the file bytes)` pairs in sorted
-  order, so the result does not depend on the order of the walk; a module
-  that is not a `.py` file is hashed as bytes.
+- The hash covers `(module name, digest)` pairs in sorted order, so the
+  result does not depend on the order of the walk. A `.py` file's digest is
+  the sha256 of its syntax tree without docstrings (`ast.dump`), so
+  comments, formatting (a `ruff format` pass) and documentation do not
+  change the fingerprint and do not invalidate a cache; a file that is not
+  `.py`, or does not parse, is hashed as bytes. The tree's format can change
+  between Python versions, which the caller's salt (its environment) covers.
+- The unit is the module, not the function: a function reads the module's
+  constants, helpers and classes, and a static guess of what it uses could
+  miss something and leave a stale cache. Any change of a module changes the
+  fingerprints of all its operators, so small modules (one operator, or a
+  close group) keep recomputation down.
 - Read from the files on every call (a few files parsed and hashed), not
   kept on the entry: reloading a draft re-imports the same module object, so
   a kept value would go stale. A caller keeps it for a run.

@@ -26,14 +26,16 @@ FRAMEWORK = "ico"
 
 def module_fingerprint(module: str) -> str | None:
     """``"sha256:<hex>"`` of the files of :func:`module_sources`, or ``None``
-    when ``module`` cannot be located."""
+    when ``module`` cannot be located.
+
+    A Python file counts by its syntax tree without docstrings, so comments,
+    formatting and documentation do not change the fingerprint; any other
+    file (or one that does not parse) counts by its bytes.
+    """
     sources = module_sources(module)
     if sources is None:
         return None
-    digests = sorted(
-        (name, hashlib.sha256(path.read_bytes()).hexdigest())
-        for name, path in sources.items()
-    )
+    digests = sorted((name, _digest(path)) for name, path in sources.items())
     return "sha256:" + hashlib.sha256(json.dumps(digests).encode()).hexdigest()
 
 
@@ -64,6 +66,34 @@ def module_sources(module: str) -> dict[str, Path] | None:
         files[name] = path
         queue.extend(_imports(name, path))
     return files
+
+
+def _digest(path: Path) -> str:
+    data = path.read_bytes()
+    if path.suffix == ".py":
+        try:
+            tree = ast.parse(data, filename=str(path))
+        except SyntaxError:
+            pass
+        else:
+            _strip_docstrings(tree)
+            data = ast.dump(tree).encode()
+    return hashlib.sha256(data).hexdigest()
+
+
+def _strip_docstrings(tree: ast.Module) -> None:
+    """Drop the docstrings of the module, its classes and its functions."""
+    owners = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+    for node in ast.walk(tree):
+        if not isinstance(node, owners) or not node.body:
+            continue
+        first = node.body[0]
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            node.body = node.body[1:]
 
 
 def _locate(name: str) -> Path | None:

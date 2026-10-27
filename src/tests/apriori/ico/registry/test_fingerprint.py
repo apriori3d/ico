@@ -92,6 +92,65 @@ def test_a_module_it_does_not_import_does_not_count(packages: Packages) -> None:
     assert module_fingerprint(f"{pkg}.ops") == before
 
 
+OPS = '''
+"""Operators."""
+
+
+class Scale:
+    """Scale a number."""
+
+    factor = 2
+
+
+def apply(x: int) -> int:
+    """Apply the scale."""
+    return x * Scale.factor
+'''
+
+
+@pytest.mark.parametrize(
+    "edited",
+    [
+        OPS.replace("    return x", "    # the scale of the class\n    return x"),
+        OPS.replace("x * Scale.factor", "(x *\n            Scale.factor)"),
+        OPS.replace('"""Operators."""', '"""Operators, documented."""'),
+        OPS.replace('"""Scale a number."""', '"""Scale a number by a factor."""'),
+        OPS.replace('"""Apply the scale."""\n', ""),
+    ],
+    ids=["comment", "formatting", "module doc", "class doc", "no function doc"],
+)
+def test_comments_formatting_and_docs_do_not_count(
+    packages: Packages, edited: str
+) -> None:
+    pkg = packages.new()
+    packages.write(f"{pkg}.ops", OPS)
+    before = module_fingerprint(f"{pkg}.ops")
+
+    packages.write(f"{pkg}.ops", edited)
+
+    assert module_fingerprint(f"{pkg}.ops") == before
+
+
+def test_a_string_that_is_not_a_docstring_counts(packages: Packages) -> None:
+    pkg = packages.new()
+    packages.write(f"{pkg}.ops", 'PROMPT = "paint the straps"\n')
+    before = module_fingerprint(f"{pkg}.ops")
+
+    packages.write(f"{pkg}.ops", 'PROMPT = "paint the backpack"\n')
+
+    assert module_fingerprint(f"{pkg}.ops") != before
+
+
+def test_a_file_that_does_not_parse_counts_by_bytes(packages: Packages) -> None:
+    pkg = packages.new()
+    packages.write(f"{pkg}.ops", "def broken(:\n")
+    before = module_fingerprint(f"{pkg}.ops")
+
+    packages.write(f"{pkg}.ops", "def broken(:  # still broken\n")
+
+    assert module_fingerprint(f"{pkg}.ops") != before
+
+
 def test_skips_stdlib_installed_and_ico(
     packages: Packages, monkeypatch: pytest.MonkeyPatch
 ) -> None:
