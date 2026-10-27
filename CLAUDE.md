@@ -269,29 +269,14 @@ PR each:
     (`runs/<run_id>/result.json`), retries are by time, and ico-mcp gets
     `fetch_run`: `docs/proposals/2026-10-26-remote-results.md`.
 
-Recipes (design: `docs/design/recipes.md`; first user: Apriori Studio,
-a layered image editor whose card recipes are sequences of steps over a
-context). One PR each, in this order:
+Caching by callers (Apriori Studio caches the operations of a card's
+layers by content; design: `docs/design/registry.md`, "Code fingerprints
+and non-deterministic operators"). One PR:
 
-41. [ ] Artifacts: `ico.artifacts` with `Artifact` (`{"$artifact":
-    "sha256:…"}`), the `ArtifactStore` protocol, `LocalStore` (moved from
-    `apriori-studio`'s `layers.store`), `current_store()` (the run's store,
-    else `$ICO_ARTIFACTS`), codable values (`IcoCodable`, `to_json`,
-    `from_json`, `content_hash`).
-42. [ ] Binding node: `IcoBind`, spec kind `bind` (`in`, `const`, `out`),
-    `C → C` over an `IcoFields` context (`get`, `replace`) around an
-    operator `I → O`; `validate_bindings(spec, fields)` with errors by
-    spec path. Sequential: no graph, no step ids in ICO.
-43. [ ] Step events: `IcoStepEvent` (spec path, plan key, ref, key, cache
-    state, output delta, seconds), `StepRecorder`,
-    `spec.run(steps=True)` → `RunResult.steps`.
-44. [ ] Registry: `RegistryEntry.fingerprint` (sources of the module and
-    of the modules it imports, except installed distributions and the
-    stdlib) and `@register(..., deterministic=False)`.
-45. [ ] Content cache: `IcoCache`, `DirCache`; keys from ref, fingerprint,
-    params, input content hashes and a salt; early cutoff by content; a
-    non-deterministic miss runs only when allowed (`allow_calls`), else
-    `ConfirmationNeeded`; `spec.run(store=, cache=, salt=, allow_calls=)`.
+41. [ ] `RegistryEntry.fingerprint` (sha256 of the defining module and of
+    the modules it imports, transitively, except the stdlib, installed
+    distributions and `ico`) and `@register(..., deterministic=False)`
+    (`OperatorMeta.deterministic`, in the card when false).
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
@@ -303,8 +288,8 @@ Do not implement until a real task hits the limitation. Designs are in
   are not enough, likely the first GPU-model pipeline.
 - Registered contexts, `IcoStateful`, `checkpoint` node. Revisit when a
   fold's state has to be snapshotted (resume a training run).
-- `live` / `pinned` modes for non-deterministic sources outside recipes
-  (a `bind` step with a cache already reuses a recorded result: item 45).
+- Artifact handles (URI + content hash). Revisit together with caching.
+- `live` / `pinned` modes for non-deterministic sources.
 - Shared resources across workers (`IcoShareable`, scope `shared`, memmap
   artifact store). Revisit when per-worker loading cost is a real problem.
 - `find_path` (see `docs/design/registry.md`).
