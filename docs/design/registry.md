@@ -82,7 +82,7 @@ editor, caches every operation of a card's layers by content) needs two
 facts the registry does not hold today: which code an operator runs, and
 whether calling it again gives the same result.
 
-### `RegistryEntry.fingerprint`
+### `RegistryEntry.fingerprint()`
 
 The sha256 of the sources an operator runs: the module that defines it
 **and every module it imports, transitively**, except
@@ -102,7 +102,8 @@ miss it and a cache would return a stale result.
 
 ```python
 entry = default_registry.get("layers.mask_subtract@1")
-entry.fingerprint   # "sha256:9c1f…", or None for an entry without a module
+entry.fingerprint()            # "sha256:9c1f…", or None for an entry without a module
+module_sources("layers.masks")  # {"layers.masks": Path(...), "layers.io": Path(...), ...}
 ```
 
 - Imports are found in the source (`ast`), in module bodies and inside
@@ -112,11 +113,23 @@ entry.fingerprint   # "sha256:9c1f…", or None for an entry without a module
   `importlib.util.find_spec` otherwise; one that cannot be located is
   skipped. Imports by name at run time (`importlib.import_module(name)`)
   are not seen: documented, not solved.
-- The hash covers `(module name, sha256 of the file bytes)` pairs in sorted
-  order, so the result does not depend on the order of the walk; a module
-  that is not a `.py` file is hashed as bytes.
-- Computed on first use and kept on the entry. Reloading a draft
-  re-registers it, so a new entry computes it again.
+- The hash covers `(module name, digest)` pairs in sorted order, so the
+  result does not depend on the order of the walk. A `.py` file's digest is
+  the sha256 of its syntax tree without docstrings (`ast.dump`), so
+  comments, formatting (a `ruff format` pass) and documentation do not
+  change the fingerprint and do not invalidate a cache; a file that is not
+  `.py`, or does not parse, is hashed as bytes. The tree's format can change
+  between Python versions, which the caller's salt (its environment) covers.
+- The unit is the module, not the function: a function reads the module's
+  constants, helpers and classes, and a static guess of what it uses could
+  miss something and leave a stale cache. Any change of a module changes the
+  fingerprints of all its operators, so small modules (one operator, or a
+  close group) keep recomputation down.
+- Read from the files on every call (a few files parsed and hashed), not
+  kept on the entry: reloading a draft re-imports the same module object, so
+  a kept value would go stale. A caller keeps it for a run.
+- `module_sources(module)` returns the files themselves, by module name:
+  what a fingerprint covers, and what code by value would carry.
 - Composite flows registered as nodes (`module` is `None`) have no
   fingerprint.
 

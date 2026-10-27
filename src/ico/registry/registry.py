@@ -11,6 +11,7 @@ from ico.assets.ids import is_asset_hint, strip_annotated
 from ico.core.node import IcoNodeProtocol
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, O, wrap_operator
 from ico.core.signature import IcoSignature
+from ico.registry.fingerprint import module_fingerprint
 from ico.registry.matching import EXACT, match_type
 from ico.resources.base import Resource, resource_meta, spec_of
 from ico.spec.model import JsonValue, is_json_value
@@ -42,6 +43,9 @@ class OperatorMeta:
         caps: Capabilities the operator requires or provides
             (e.g. ``"network"``, ``"gpu"``).
         status: Review status: ``"draft"``, ``"verified"`` or ``"stable"``.
+        deterministic: ``False`` when calling again with the same input and
+            params gives another result (an image model API); a caller that
+            caches results reuses a recorded one instead of calling again.
     """
 
     name: str
@@ -49,6 +53,7 @@ class OperatorMeta:
     tags: frozenset[str] = frozenset()
     caps: frozenset[str] = frozenset()
     status: Status = "draft"
+    deterministic: bool = True
 
     @property
     def ref(self) -> str:
@@ -126,6 +131,15 @@ class RegistryEntry:
     def ref(self) -> str:
         return self.meta.ref
 
+    def fingerprint(self) -> str | None:
+        """``"sha256:<hex>"`` of the code the operator runs: its module and the
+        modules it imports, except the standard library, installed
+        distributions and ``ico`` (see :func:`module_fingerprint`). ``None``
+        for an entry without a module. Read from the files on every call."""
+        if self.module is None:
+            return None
+        return module_fingerprint(self.module)
+
     def card(self) -> dict[str, JsonValue]:
         """Compact JSON-compatible description of the operator."""
         card: dict[str, JsonValue] = {
@@ -137,6 +151,8 @@ class RegistryEntry:
             "caps": _json_strings(self.meta.caps),
             "status": self.meta.status,
         }
+        if not self.meta.deterministic:
+            card["deterministic"] = False
         if self.cls is not None:
             params: list[JsonValue] = []
             params.extend(p.card() for p in self.params)
@@ -495,6 +511,7 @@ def register(
     tags: Collection[str] = (),
     caps: Collection[str] = (),
     status: Status = "draft",
+    deterministic: bool = True,
     description: str | None = None,
     registry: IcoRegistry | None = None,
     replace: bool = False,
@@ -519,6 +536,8 @@ def register(
         tags: Labels for search.
         caps: Capabilities, e.g. ``"network"``.
         status: ``"draft"`` (default), ``"verified"`` or ``"stable"``.
+        deterministic: ``False`` for an operator whose result changes from
+            call to call (see :attr:`OperatorMeta.deterministic`).
         description: Overrides the docstring-based description, e.g. for
             composite flows that have no docstring.
         registry: Target registry; defaults to :data:`default_registry`.
@@ -536,6 +555,7 @@ def register(
         tags=frozenset(tags),
         caps=frozenset(caps),
         status=status,
+        deterministic=deterministic,
     )
     target = registry if registry is not None else default_registry
     return _Registrar(meta, target, description, replace)
