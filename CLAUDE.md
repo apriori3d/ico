@@ -269,6 +269,15 @@ PR each:
     (`runs/<run_id>/result.json`), retries are by time, and ico-mcp gets
     `fetch_run`: `docs/proposals/2026-10-26-remote-results.md`.
 
+Caching by callers (Apriori Studio caches the operations of a card's
+layers by content; design: `docs/design/registry.md`, "Code fingerprints
+and non-deterministic operators"). One PR:
+
+41. [x] `RegistryEntry.fingerprint()` (sha256 of the defining module and of
+    the modules it imports, transitively, except the stdlib, installed
+    distributions and `ico`) and `@register(..., deterministic=False)`
+    (`OperatorMeta.deterministic`, in the card when false).
+
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.
