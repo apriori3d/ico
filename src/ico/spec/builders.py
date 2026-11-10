@@ -269,6 +269,7 @@ class BuildContext:
             # Constructor kwargs are validated by the class itself.
             create = cast(Callable[..., IcoNodeProtocol], target.cls)
             kwargs = _resource_params(ref, target.cls, spec.params)
+            kwargs.update(self._child_params(ref, target.cls, spec))
             try:
                 node: IcoNodeProtocol = create(**kwargs)
             except TypeError as e:
@@ -276,6 +277,8 @@ class BuildContext:
         else:
             if spec.params:
                 raise SpecError(f"Operator '{ref}' takes no params.")
+            if spec.children:
+                raise SpecError(f"Operator '{ref}' takes no children.")
             if self.fresh:
                 fn = target.snapshot().function()
                 fresh_op: IcoOperator[Any, Any] = IcoOperator(
@@ -294,6 +297,29 @@ class BuildContext:
                 f"registry has {actual!r}."
             )
         return node
+
+    def _child_params(self, ref: str, cls: type, spec: NodeSpec) -> dict[str, Any]:
+        """Constructor kwargs of child parameters, built from ``children`` in
+        constructor order; a child parameter given as ``null`` is ``None``."""
+        from ico.registry.registry import init_params
+
+        names = [p.name for p in init_params(cls) if p.child]
+        expected = [n for n in names if n not in spec.params]
+        for name in names:
+            if name in spec.params and spec.params[name] is not None:
+                raise SpecError(
+                    f"Cannot create '{ref}': child parameter '{name}' must be "
+                    "given as a child, or as null in params."
+                )
+        if len(spec.children) != len(expected):
+            raise SpecError(
+                f"Operator '{ref}' expects {len(expected)} children "
+                f"({', '.join(expected) or 'none'}), got {len(spec.children)}."
+            )
+        kwargs: dict[str, Any] = {n: None for n in names if n in spec.params}
+        for name, child in zip(expected, spec.children, strict=True):
+            kwargs[name] = self.op(child)
+        return kwargs
 
 
 def _resource_params(
