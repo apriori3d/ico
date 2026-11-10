@@ -147,6 +147,9 @@ def test_build_returns_registered_instances() -> None:
         pytest.param(route(parity, {"even": double}), id="route-no-default"),
         pytest.param(IcoFold(count_to_four, add_to_total), id="fold"),
         pytest.param(IcoFold(count_to_four, add_to_total | double), id="fold-chain"),
+        pytest.param(
+            IcoFold(count_to_four, add_to_total, until=is_large), id="fold-until"
+        ),
         pytest.param(keep(is_even), id="filter"),
         pytest.param(partition(is_even, name="split"), id="partition"),
         pytest.param(BATCHER, id="batcher"),
@@ -190,6 +193,12 @@ def test_a_rebuilt_fold_folds() -> None:
     fold = cast(IcoFold[int, int], rebuilt)
     assert isinstance(rebuilt, IcoFold) and fold.name == "sum"
     assert fold(100) == 110
+
+
+def test_a_rebuilt_fold_stops_early() -> None:
+    _, rebuilt = roundtrip(IcoFold(count_to_four, add_to_total, until=is_large))
+    assert cast_call(rebuilt, 48) == 51  # 48 + 1 + 2, then is_large
+    assert cast_call(rebuilt, 0) == 10
 
 
 def cast_call(node: IcoNodeProtocol, value: Any) -> Any:

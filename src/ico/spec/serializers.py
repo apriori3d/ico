@@ -259,12 +259,12 @@ def serialize_process(node: IcoProcess[object], ctx: SpecContext) -> NodeSpec:
 
 @spec_serializer(IcoFold)
 def serialize_fold(node: IcoFold[object, object], ctx: SpecContext) -> NodeSpec:
-    # children: [source, step]
+    # children: [source, step] or [source, step, until]
     return NodeSpec(
         kind="fold",
         name=node.name,
         sig=node_signature(node),
-        children=(ctx.walk(node.source), ctx.walk(node.step)),
+        children=tuple(ctx.walk(child) for child in node.children),
     )
 
 

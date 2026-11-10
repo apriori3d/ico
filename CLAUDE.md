@@ -278,6 +278,19 @@ and non-deterministic operators"). One PR:
     distributions and `ico`) and `@register(..., deterministic=False)`
     (`OperatorMeta.deterministic`, in the card when false).
 
+Stateful steps (the analysis of `ai_vision` `recon/body3d`: a per-frame
+SMPL-X fit with a warm start, and fitter iterations with an early stop on a
+loss plateau). One PR each:
+
+42. [x] `IcoFold(..., until=)`: a stop condition on the state, checked
+    before pulling each item (as in `IcoProcess`); the source is closed,
+    so its workers stop. Spec: `until` is the fold's third child. CIFAR:
+    `--patience` ends an epoch on a loss plateau.
+43. [ ] `IcoScan(source, step, until=None)`: `C → Iterator[O]`, a step
+    `tuple[I, C] → tuple[O, C]`; an output per item while the state flows
+    to the next one (per-frame tracking with a warm start). Spec kind
+    `scan`.
+
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in
 `docs/design/spec.md`.

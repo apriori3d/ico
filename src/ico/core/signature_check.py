@@ -386,6 +386,9 @@ def _validate_node(
                     path=path.add_child(1),
                 )
             )
+        if fold.until is not None:
+            # The state the step gives feeds `until`.
+            found.append(check_link(step, fold.until, path=path.add_child(2)))
     elif isinstance(node, IcoProcess) and len(node.children) == 2:
         # Process with a stop condition: the body output feeds `until`.
         body, until = node.children

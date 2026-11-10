@@ -1,6 +1,7 @@
 from collections.abc import Callable, Iterator
 from typing import Any, Generic, TypeVar, get_args, get_origin
 
+from ico.core.node import IcoNodeProtocol
 from ico.core.operator import I, IcoOperator, IcoOperatorProtocol, wrap_operator
 from ico.core.runtime.cancel import check_cancelled
 from ico.core.signature import IcoSignature
@@ -49,18 +50,27 @@ class IcoFold(
         step: The operator that folds an item into the state
             (``tuple[I, C] → C``).
 
+        until: Stop condition on the state (``C → bool``), or ``None``.
+
     Note:
         A cancelled run stops between items (``IcoCancelled``).
+        With ``until`` the fold checks the state before pulling each item
+        and stops as soon as the condition holds (an early stop, e.g. on a
+        loss plateau); the source is closed, so its workers stop. As in
+        ``IcoProcess``, an initial state that already satisfies it is
+        returned without pulling an item.
     """
 
     source: IcoOperatorProtocol[None, Iterator[I]]
     step: IcoOperatorProtocol[tuple[I, C], C]
+    until: IcoOperatorProtocol[C, Any] | None
 
     def __init__(
         self,
         source: Callable[[None], Iterator[I]],
         step: Callable[[tuple[I, C]], C],
         *,
+        until: Callable[[C], object] | None = None,
         name: str | None = None,
     ) -> None:
         """Args:
@@ -68,18 +78,35 @@ class IcoFold(
             that starts with one).
         step: Folds an item into the state; a plain callable is wrapped
             into an operator.
+        until: Stop before the next item once ``until(state)`` is truthy.
         name: Optional name for plans and progress.
         """
         source_op = wrap_operator(source)
         step_op = wrap_operator(step)
-        super().__init__(fn=self._fold, name=name, children=[source_op, step_op])
+        until_op = wrap_operator(until) if until is not None else None
+        children: list[IcoNodeProtocol] = [source_op, step_op]
+        if until_op is not None:
+            children.append(until_op)
+        super().__init__(fn=self._fold, name=name, children=children)
         self.source = source_op
         self.step = step_op
+        self.until = until_op
 
     def _fold(self, state: C) -> C:
-        for item in self.source(None):
-            check_cancelled()
-            state = self.step((item, state))
+        until = self.until
+        if until is not None and until(state):
+            return state
+        items = self.source(None)
+        try:
+            for item in items:
+                check_cancelled()
+                state = self.step((item, state))
+                if until is not None and until(state):
+                    break
+        finally:
+            close = getattr(items, "close", None)
+            if close is not None:
+                close()
         return state
 
     @property
