@@ -16,6 +16,7 @@ from ico.core.runtime.node import IcoRuntimeNode
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
 from ico.core.runtime.worker import IcoWorker
+from ico.core.scan import IcoScan
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
 from ico.core.stream import IcoStream
@@ -86,6 +87,7 @@ class PlanRendererOptions(RendererOptions):
             IcoSink: "🏁",
             IcoProgress: "⏳",
             IcoFold: "🧠",
+            IcoScan: "🧭",
             IcoFork: "🔀",
             IcoRoute: "🚦",
             IcoFilter: "🔍",

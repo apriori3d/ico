@@ -137,8 +137,8 @@ back. So "a context in a spec" means:
   e.g. `cifar.train_context` with params `arch`, `lr` and an optional
   `init` snapshot handle; it is the only place where the context is built;
 - the nodes that move it (`IcoProcess`, `IcoFold`, chains) are serialized
-  as structure (`fold` builds from its source, its step and an optional
-  `until`, a third child);
+  as structure (`fold` and `scan` build from their source, their step and
+  an optional `until`, a third child);
 - per-batch functions (`train_step`, `calculate_accuracy`, logging) become
   registered operators whose signatures name the context type (a step over
   `tuple[Item, Context]`).

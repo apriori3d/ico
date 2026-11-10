@@ -1,5 +1,6 @@
-"""Plan renderer for ``IcoFold``: the source the items come from, then the
-step that folds each item into the state, then the state it emits::
+"""Plan renderer for ``IcoFold`` and ``IcoScan``: the source the items come
+from, then the step that folds each item into the state, then the state it
+emits (a scan: ``scan`` and ``yield each``, a pair per item)::
 
     🧠IcoFold()                          CifarTrainContext → CifarTrainContext
     ╭── for each in                      CifarBatch
@@ -18,7 +19,8 @@ from rich.text import Text
 
 from ico.core.fold import IcoFold
 from ico.core.node import IcoNodeProtocol
-from ico.describe.plan.options import PlanRendererOptions
+from ico.core.scan import IcoScan
+from ico.describe.plan.options import PlanRendererOptions, SignatureFormat
 from ico.describe.plan.rich_renderer.custom_renderer import CustomRenderer
 from ico.describe.plan.rich_renderer.node.stream import StreamGroupPartRenderer
 from ico.describe.plan.rich_renderer.render_target import (
@@ -30,9 +32,10 @@ from ico.describe.plan.rich_renderer.row_renderer import RowRenderer
 from ico.describe.rich_style import DescribeStyle
 
 
-@register_renderer(IcoFold)
+@register_renderer(IcoFold, IcoScan)
 class IcoFoldRenderer(CustomRenderer):
-    """The fold's row, its source as a group, its step, and what it emits."""
+    """The fold's (or scan's) row, its source as a group, its step, and what
+    it emits."""
 
     def __init__(self, options: PlanRendererOptions) -> None:
         super().__init__(options=options)
@@ -47,30 +50,24 @@ class IcoFoldRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
-        step_header = Text("├─▸ ") + Text("fold", style=DescribeStyle.keyword.value)
-        self._step_header_renderer = RowRenderer(
-            flow_column_prefix=step_header,
-            options=replace(options, signature_format="Input"),
-            show_name_column=False,
-            show_type_column=False,
-            show_state_column=False,
-            flow_includes_node_info=False,
-        )
+        self._step_header_renderers = {
+            keyword: self._header("├─▸ ", keyword, "Input")
+            for keyword in ("fold", "scan")
+        }
 
-        until_header = Text("├─▸ ") + Text("until", style=DescribeStyle.keyword.value)
-        self._until_header_renderer = RowRenderer(
-            flow_column_prefix=until_header,
-            options=replace(options, signature_format="Input"),
-            show_name_column=False,
-            show_type_column=False,
-            show_state_column=False,
-            flow_includes_node_info=False,
-        )
+        self._until_header_renderer = self._header("├─▸ ", "until", "Input")
+        self._footer_renderers = {
+            keyword: self._header("╰─▸ ", keyword, "Output")
+            for keyword in ("emit", "yield each")
+        }
 
-        footer_text = Text("╰─▸ ") + Text("emit", style=DescribeStyle.keyword.value)
-        self._footer_renderer = RowRenderer(
-            flow_column_prefix=footer_text,
-            options=replace(options, signature_format="Output"),
+    def _header(
+        self, prefix: str, keyword: str, signature_format: SignatureFormat
+    ) -> RowRenderer:
+        return RowRenderer(
+            flow_column_prefix=Text(prefix)
+            + Text(keyword, style=DescribeStyle.keyword.value),
+            options=replace(self.options, signature_format=signature_format),
             show_name_column=False,
             show_type_column=False,
             show_state_column=False,
@@ -78,8 +75,9 @@ class IcoFoldRenderer(CustomRenderer):
         )
 
     def render(self, plan: PlanRenderTarget, node: IcoNodeProtocol) -> None:
-        assert isinstance(node, IcoFold)
-        fold = cast(IcoFold[Any, Any], node)
+        assert isinstance(node, IcoFold | IcoScan)
+        fold = cast(IcoFold[Any, Any] | IcoScan[Any, Any, Any], node)
+        is_scan = isinstance(node, IcoScan)
 
         plan.render_row(self._row_renderer, fold)
 
@@ -96,7 +94,7 @@ class IcoFoldRenderer(CustomRenderer):
         plan.pop_group_indent()
 
         plan.render_row(
-            self._step_header_renderer,
+            self._step_header_renderers["scan" if is_scan else "fold"],
             fold.step,
             keyed=flattened(self.options, fold.step),
         )
@@ -114,4 +112,5 @@ class IcoFoldRenderer(CustomRenderer):
             plan.render_subtree(fold.until)
             plan.pop_group_indent()
 
-        plan.render_row(self._footer_renderer, fold, keyed=False)
+        footer = self._footer_renderers["yield each" if is_scan else "emit"]
+        plan.render_row(footer, fold, keyed=False)

@@ -28,6 +28,7 @@ from ico.core.partition import IcoPartition
 from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
 from ico.core.route import IcoRoute
+from ico.core.scan import IcoScan
 from ico.core.signature import IcoSignature
 from ico.core.stream import IcoStream
 from ico.core.tap import IcoTap
@@ -494,6 +495,19 @@ def build_fold(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
         raise SpecError(f"'fold' expects 2 or 3 children, got {len(children)}.")
     source, step, *until = children
     return IcoFold(source, step, until=until[0] if until else None, name=spec.name)
+
+
+@spec_builder("scan")
+def build_scan(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
+    # children: [source, step] or [source, step, until]
+    children = [ctx.op(c) for c in spec.children]
+    if len(children) not in (2, 3):
+        raise SpecError(f"'scan' expects 2 or 3 children, got {len(children)}.")
+    source, step, *until = children
+    node: IcoScan[Any, Any, Any] = IcoScan(
+        source, step, until=until[0] if until else None, name=spec.name
+    )
+    return node
 
 
 @spec_builder("process")

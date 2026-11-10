@@ -28,6 +28,7 @@ from ico.core.runtime.monitor import IcoMonitor
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper
 from ico.core.runtime.worker import IcoWorker
+from ico.core.scan import IcoScan
 from ico.core.signature import IcoSignature
 from ico.core.sink import IcoSink
 from ico.core.source import IcoSource
@@ -262,6 +263,17 @@ def serialize_fold(node: IcoFold[object, object], ctx: SpecContext) -> NodeSpec:
     # children: [source, step] or [source, step, until]
     return NodeSpec(
         kind="fold",
+        name=node.name,
+        sig=node_signature(node),
+        children=tuple(ctx.walk(child) for child in node.children),
+    )
+
+
+@spec_serializer(IcoScan)
+def serialize_scan(node: IcoScan[object, object, object], ctx: SpecContext) -> NodeSpec:
+    # children: [source, step] or [source, step, until]
+    return NodeSpec(
+        kind="scan",
         name=node.name,
         sig=node_signature(node),
         children=tuple(ctx.walk(child) for child in node.children),

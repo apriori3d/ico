@@ -28,6 +28,7 @@ from ico.core.runtime.printer import IcoPrinter
 from ico.core.runtime.progress import IcoProgress
 from ico.core.runtime.runtime import IcoRuntime
 from ico.core.runtime.runtime_wrapper import IcoRuntimeWrapper, wrap_runtime
+from ico.core.scan import IcoScan
 from ico.core.signature import IcoSignature
 from ico.core.signature_check import (
     IcoSignatureError,
@@ -74,6 +75,7 @@ __all__ = [
     "IcoChain",
     "IcoFilter",
     "IcoFold",
+    "IcoScan",
     "keep",
     "tap",
     "IcoTap",

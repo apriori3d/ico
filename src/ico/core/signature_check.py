@@ -350,6 +350,7 @@ def _validate_node(
     from ico.core.fork import IcoFork
     from ico.core.process import IcoProcess
     from ico.core.route import IcoRoute
+    from ico.core.scan import IcoScan, scan_input, scan_state
     from ico.registry.registry import get_meta
 
     if get_meta(node) is not None:
@@ -368,27 +369,32 @@ def _validate_node(
     elif isinstance(node, IcoFold):
         # The step takes an item of the source with the state it emits.
         fold = cast(IcoFold[Any, Any], node)
-        expected = fold_input(fold)
-        step = fold.step
-        step_sig = _inferred_signature(_boundary_node(step, side="input"))
+        found.append(_check_step_input(fold.source, fold.step, fold_input(fold), path))
+        if fold.until is not None:
+            # The state the step gives feeds `until`.
+            found.append(check_link(fold.step, fold.until, path=path.add_child(2)))
+    elif isinstance(node, IcoScan):
+        # As a fold, but the step gives (output, state); `until` takes the state.
+        scan = cast(IcoScan[Any, Any, Any], node)
+        found.append(_check_step_input(scan.source, scan.step, scan_input(scan), path))
+        state = scan_state(scan)
+        until_sig = _inferred_signature(scan.until) if scan.until else None
         if (
-            expected is not None
-            and step_sig is not None
-            and is_assignable(expected, step_sig.i) is False
+            scan.until is not None
+            and state is not None
+            and until_sig is not None
+            and is_assignable(state, until_sig.i) is False
         ):
             found.append(
                 SignatureIssue(
                     "mismatch",
-                    _label(_boundary_node(fold.source, side="output")),
-                    _label(_boundary_node(step, side="input")),
-                    expected,
-                    step_sig.i,
-                    path=path.add_child(1),
+                    _label(_boundary_node(scan.step, side="output")),
+                    _label(scan.until),
+                    state,
+                    until_sig.i,
+                    path=path.add_child(2),
                 )
             )
-        if fold.until is not None:
-            # The state the step gives feeds `until`.
-            found.append(check_link(step, fold.until, path=path.add_child(2)))
     elif isinstance(node, IcoProcess) and len(node.children) == 2:
         # Process with a stop condition: the body output feeds `until`.
         body, until = node.children
@@ -397,6 +403,30 @@ def _validate_node(
 
     for index, child in enumerate(children):
         _validate_node(child, path.add_child(index), issues)
+
+
+def _check_step_input(
+    source: IcoNodeProtocol,
+    step: IcoNodeProtocol,
+    expected: Any | None,
+    path: TreePathIndex,
+) -> SignatureIssue | None:
+    """The step of a fold or scan takes ``expected``, ``tuple[I, C]``."""
+    step_sig = _inferred_signature(_boundary_node(step, side="input"))
+    if (
+        expected is None
+        or step_sig is None
+        or is_assignable(expected, step_sig.i) is not False
+    ):
+        return None
+    return SignatureIssue(
+        "mismatch",
+        _label(_boundary_node(source, side="output")),
+        _label(_boundary_node(step, side="input")),
+        expected,
+        step_sig.i,
+        path=path.add_child(1),
+    )
 
 
 def _progress_on_iterators(
