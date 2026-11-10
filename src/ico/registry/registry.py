@@ -664,7 +664,8 @@ def is_node_hint(hint: object) -> bool:
     """
     from ico.core.node import IcoNode
 
-    if get_origin(hint) in (Union, UnionType):
+    origin = cast(object, get_origin(hint))
+    if origin is Union or origin is UnionType:
         args = [
             a for a in cast(tuple[object, ...], get_args(hint)) if a is not NoneType
         ]

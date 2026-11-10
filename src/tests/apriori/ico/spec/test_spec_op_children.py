@@ -1,6 +1,7 @@
 """Registered operator classes whose constructor takes child operators."""
 
 from collections.abc import Iterator
+from typing import cast
 
 import pytest
 
@@ -83,7 +84,7 @@ def registry() -> Iterator[IcoRegistry]:
 def _op(registry: IcoRegistry, ref: str) -> IcoOperatorProtocol[float, float]:
     node = registry.get(ref).node
     assert node is not None
-    return node  # pyright: ignore[reportReturnType]
+    return cast(IcoOperatorProtocol[float, float], node)
 
 
 def _round_trip(node: IcoNodeProtocol, registry: IcoRegistry) -> IcoNodeProtocol:
