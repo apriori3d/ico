@@ -88,6 +88,14 @@ def test_the_manifest_and_its_lock(tmp_path: Path) -> None:
             f'hf = {{ repo = "r", revision = "{REV}", file = "f" }}\npath = "../x"',
             "inside the root",
         ),
+        (
+            f'hf = {{ repo = "r", revision = "{REV}", file = "f" }}\nunpack = "zip"',
+            "'unpack' is for 'url' assets",
+        ),
+        (
+            f'url = "https://x/y.tar"\nsha256 = "{SHA}"\nunpack = "tar"',
+            "'unpack' is \"zip\"",
+        ),
     ],
 )
 def test_bad_entries_are_named(tmp_path: Path, entry: str, message: str) -> None:
@@ -183,3 +191,13 @@ def test_a_changed_lock_is_read_again(
         asset("wan-high")
     write(tmp_path, lock=LOCK.replace("size = 5", "size = 7"))
     assert asset("wan-high").is_file()
+
+
+def test_an_archive_is_a_tree_under_its_id(tmp_path: Path) -> None:
+    write(
+        tmp_path,
+        f'[assets.rtmpose]\nurl = "https://x/rtmpose.zip"\nsha256 = "{SHA}"\nunpack = "zip"\n',
+        lock=None,
+    )
+    spec = load_manifest(tmp_path / "assets.toml").assets["rtmpose"]
+    assert (spec.kind, spec.path, spec.unpack) == ("tree", "rtmpose", "zip")

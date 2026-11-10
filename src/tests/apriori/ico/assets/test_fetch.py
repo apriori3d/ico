@@ -2,9 +2,11 @@
 127.0.0.1 (metadata API, resolve with ranges and a CDN redirect)."""
 
 import hashlib
+import io
 import json
 import textwrap
 import threading
+import zipfile
 from collections import Counter
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -13,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from ico.assets import Assets, asset, load_manifest
+from ico.assets import Assets, ManifestError, asset, load_manifest
 from ico.assets.fetch import FetchError, fetch, status, verify
 from ico.assets.hub import HubError
 from ico.assets.lockfile import lock
@@ -308,3 +310,132 @@ def test_the_command_line(repo: Path, capsys: pytest.CaptureFixture[str]) -> Non
     assert main(["assets", "verify", "--full", "wan-high"]) == 0
     assert main(["assets", "status", "nope"]) == 1
     assert "unknown asset 'nope'" in capsys.readouterr().err
+
+
+# ─── Archives (unpack = "zip") ───
+
+
+def zipped(members: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zf:
+        zf.writestr("model/", b"")  # a directory entry: not a file of the asset
+        for name, data in members.items():
+            zf.writestr(name, data)
+    return buffer.getvalue()
+
+
+MEMBERS = {"model/end2end.onnx": b"O" * 4000, "model/pipeline.json": b'{"p": 1}'}
+
+
+@pytest.fixture
+def archive_repo(tmp_path: Path, hub: FakeHub, monkeypatch: pytest.MonkeyPatch) -> Path:
+    hub.files["rtmpose.zip"] = zipped(MEMBERS)
+    manifest = tmp_path / "assets.toml"
+    manifest.write_text(textwrap.dedent(f'''
+        [assets.rtmpose]
+        url = "{hub.url}/files/rtmpose.zip"
+        sha256 = "{sha(hub.files["rtmpose.zip"])}"
+        unpack = "zip"
+    '''))  # fmt: skip
+    monkeypatch.setenv("ICO_ASSETS_MANIFEST", str(manifest))
+    monkeypatch.setenv("ICO_ASSETS_ROOT", str(tmp_path / "root"))
+    return tmp_path
+
+
+def test_an_archive_is_locked_as_the_tree_of_its_files(archive_repo: Path) -> None:
+    (rtmpose,) = lock(store().manifest).values()
+
+    assert rtmpose.kind == "tree"
+    assert [(f.name, f.size, f.sha256) for f in rtmpose.files] == [
+        (name, len(data), sha(data)) for name, data in sorted(MEMBERS.items())
+    ]
+    assert store().manifest.locks["rtmpose"] == rtmpose
+
+
+def test_an_archive_is_fetched_unpacked_and_removed(
+    archive_repo: Path, hub: FakeHub
+) -> None:
+    lock(store().manifest)
+    assert status(store())[0].state == "missing"
+    seen: list[tuple[str, int, int]] = []
+
+    (after,) = fetch(
+        store(), progress=lambda id, done, total: seen.append((id, done, total))
+    )
+
+    assert after.state == "present" and after.verified
+    directory = asset("rtmpose")
+    assert directory == archive_repo / "root" / "rtmpose"
+    for name, data in MEMBERS.items():
+        assert (directory / name).read_bytes() == data
+    size = len(hub.files["rtmpose.zip"])
+    assert seen[-1] == ("rtmpose", size, size)
+    ico = archive_repo / "root" / ".ico"
+    assert not any((ico / "partial").iterdir())
+    assert not (ico / "archives").exists() or not any((ico / "archives").iterdir())
+    gets = hub.gets["rtmpose.zip"]
+    fetch(store())
+    assert hub.gets["rtmpose.zip"] == gets
+    assert verify(store(), full=True) == {}
+
+
+def test_a_missing_file_of_an_archive_is_unpacked_again(
+    archive_repo: Path, hub: FakeHub
+) -> None:
+    lock(store().manifest)
+    fetch(store())
+    (asset("rtmpose") / "model/pipeline.json").unlink()
+    assert status(store())[0].state == "missing"
+
+    fetch(store())
+    assert (asset("rtmpose") / "model/pipeline.json").read_bytes() == MEMBERS[
+        "model/pipeline.json"
+    ]
+    assert hub.gets["rtmpose.zip"] == 3  # lock, the first fetch, this one
+
+
+def test_an_interrupted_archive_download_continues(
+    archive_repo: Path, hub: FakeHub
+) -> None:
+    lock(store().manifest)
+    data = hub.files["rtmpose.zip"]
+    part = archive_repo / "root" / ".ico" / "partial" / sha(data)
+    part.parent.mkdir(parents=True)
+    part.write_bytes(data[:100])
+    assert status(store())[0].state == "partial"
+
+    fetch(store())
+    assert hub.ranged == ["rtmpose.zip"]
+    assert (asset("rtmpose") / "model/end2end.onnx").read_bytes() == MEMBERS[
+        "model/end2end.onnx"
+    ]
+
+
+def test_an_archive_of_another_sha256_is_refused(
+    archive_repo: Path, hub: FakeHub
+) -> None:
+    good = hub.files["rtmpose.zip"]
+    hub.files["rtmpose.zip"] = zipped({"model/end2end.onnx": b"X" * 4000})
+    with pytest.raises(ManifestError, match="has sha256"):
+        lock(store().manifest)
+
+    hub.files["rtmpose.zip"] = good
+    lock(store().manifest)
+    hub.files["rtmpose.zip"] = zipped({"model/end2end.onnx": b"X" * 4000})
+    with pytest.raises(FetchError, match="does not match the lock"):
+        fetch(store())
+    assert not (archive_repo / "root" / "rtmpose").exists()
+
+
+def test_an_archive_leaving_its_directory_is_refused(
+    archive_repo: Path, hub: FakeHub, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hub.files["rtmpose.zip"] = zipped({"../escape.onnx": b"E"})
+    manifest = archive_repo / "assets.toml"
+    manifest.write_text(
+        manifest.read_text().replace(
+            sha(zipped(MEMBERS)), sha(hub.files["rtmpose.zip"])
+        )
+    )
+    with pytest.raises(ManifestError, match="unsafe path"):
+        lock(store().manifest)

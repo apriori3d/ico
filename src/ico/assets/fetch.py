@@ -10,7 +10,11 @@ A fetch downloads only what is missing or of a wrong size, into a
 partial file hashed while it streams; a partial file is continued with
 a range request after hashing what is there. Only a file of the right
 size and sha256 is ``fsync``-ed and renamed into place, so a crash never
-leaves a wrong file at the final path. A run never fetches.
+leaves a wrong file at the final path. An archive (``unpack``) is
+downloaded the same way (its partial file keyed by the archive's sha256),
+its missing files unpacked into ``partial/<id>.unpack``, each checked
+against the lock, then moved into place; the archive is removed. A run
+never fetches.
 """
 
 from __future__ import annotations
@@ -23,10 +27,11 @@ import shutil
 import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
-from ico.assets.hub import HubError, check_online, hf_url, open_url
+from ico.assets.archive import ArchiveError, place, unpack
+from ico.assets.hub import HubError, check_online, hf_url, open_url, remote_size
 from ico.assets.manifest import AssetFile, AssetLock, AssetSpec
 from ico.assets.store import Assets
 
@@ -79,12 +84,18 @@ def _status(assets: Assets, id: str) -> Status:
     if lock is None:
         assets.location(id)  # unknown ids raise
         return Status(id, "unlocked", 0, 0, False)
+    spec = assets.manifest.assets[id]
     to_fetch, partial, wrong = 0, False, False
     for f in _files(assets, id, lock):
         size = _size(f.path)
         if size == f.entry.size:
             continue
         wrong = wrong or size is not None
+        if spec.unpack is not None:
+            # Unpacked files count whole; the archive may be part-way.
+            partial = partial or bool(_size(_archive_partial(assets.root, spec)))
+            to_fetch += f.entry.size
+            continue
         done = _size(_partial(assets.root, f.entry)) or 0
         partial = partial or done > 0
         to_fetch += f.entry.size - min(done, f.entry.size)
@@ -169,6 +180,12 @@ def _fetch_one(assets: Assets, id: str, progress: Progress | None) -> None:
     lock = assets.manifest.locks[id]
     with _locked(assets.root / ".ico" / "locks" / f"{id}.lock"):
         files = [f for f in _files(assets, id, lock) if _size(f.path) != f.entry.size]
+        spec = assets.manifest.assets[id]
+        if spec.unpack is not None:
+            if files:
+                _fetch_archive(assets, spec, tuple(f.entry for f in files), progress)
+            _record(assets, id, lock)
+            return
         total = sum(f.entry.size for f in files)
         done = 0
         for f in files:
@@ -184,6 +201,36 @@ def _fetch_one(assets: Assets, id: str, progress: Progress | None) -> None:
             _download(assets.root, f, token, step)
             done += f.entry.size
         _record(assets, id, lock)
+
+
+def _fetch_archive(
+    assets: Assets,
+    spec: AssetSpec,
+    wanted: tuple[AssetFile, ...],
+    progress: Progress | None,
+) -> None:
+    """Download the archive of ``spec``, unpack the ``wanted`` files and
+    move them into place."""
+    assert spec.url is not None and spec.sha256 is not None
+    size = remote_size(spec.url)
+    archive = assets.root / ".ico" / "archives" / spec.sha256
+    entry = AssetFile(PurePosixPath(spec.url.split("?")[0]).name, size, spec.sha256)
+
+    def step(n: int) -> None:
+        if progress is not None:
+            progress(spec.id, n, size)
+
+    _download(assets.root, _File(spec, entry, archive, spec.url), None, step)
+    unpacked = assets.root / ".ico" / "partial" / f"{spec.id}.unpack"
+    shutil.rmtree(unpacked, ignore_errors=True)
+    try:
+        unpack(archive, unpacked, wanted)
+    except ArchiveError as e:
+        shutil.rmtree(unpacked, ignore_errors=True)
+        raise FetchError(f"{spec.id}: {e}") from None
+    finally:
+        archive.unlink(missing_ok=True)
+    place(unpacked, assets.location(spec.id), wanted)
 
 
 def _download(
@@ -258,6 +305,11 @@ def _files(assets: Assets, id: str, lock: AssetLock) -> list[_File]:
 
 def _partial(root: Path, entry: AssetFile) -> Path:
     return root / ".ico" / "partial" / entry.sha256
+
+
+def _archive_partial(root: Path, spec: AssetSpec) -> Path:
+    assert spec.sha256 is not None
+    return root / ".ico" / "partial" / spec.sha256
 
 
 def _size(path: Path) -> int | None:
