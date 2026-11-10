@@ -286,10 +286,12 @@ loss plateau). One PR each:
     before pulling each item (as in `IcoProcess`); the source is closed,
     so its workers stop. Spec: `until` is the fold's third child. CIFAR:
     `--patience` ends an epoch on a loss plateau.
-43. [ ] `IcoScan(source, step, until=None)`: `C → Iterator[O]`, a step
-    `tuple[I, C] → tuple[O, C]`; an output per item while the state flows
-    to the next one (per-frame tracking with a warm start). Spec kind
-    `scan`.
+43. [x] `IcoScan(source, step, until=None)`: `C → Iterator[tuple[O, C]]`,
+    a step `tuple[I, C] → tuple[O, C]`; a pair per item while the state
+    flows to the next one (per-frame tracking with a warm start); a
+    consumer that needs only the outputs drops the states. Spec kind
+    `scan`. Example: `src/examples/ico_tracking.py` (a scan over frames, a
+    fold with `until` per frame).
 
 ## Deferred (after MCP)
 Do not implement until a real task hits the limitation. Designs are in

@@ -16,6 +16,7 @@ from ico.core.pipeline import IcoPipeline
 from ico.core.process import IcoProcess
 from ico.core.route import route
 from ico.core.runtime.progress import IcoProgress
+from ico.core.scan import IcoScan
 from ico.core.stream import IcoStream
 from ico.registry import IcoRegistry, register
 from ico.spec import (
@@ -71,6 +72,12 @@ def parity(x: int) -> str:
 @_reg("count_to_four")
 def count_to_four(_: None) -> Iterator[int]:
     return iter(range(1, 5))
+
+
+@_reg("total_and_count")
+def total_and_count(pair: tuple[int, int]) -> tuple[str, int]:
+    x, total = pair
+    return f"+{x}", total + x
 
 
 @_reg("add_to_total")
@@ -150,6 +157,10 @@ def test_build_returns_registered_instances() -> None:
         pytest.param(
             IcoFold(count_to_four, add_to_total, until=is_large), id="fold-until"
         ),
+        pytest.param(IcoScan(count_to_four, total_and_count), id="scan"),
+        pytest.param(
+            IcoScan(count_to_four, total_and_count, until=is_large), id="scan-until"
+        ),
         pytest.param(keep(is_even), id="filter"),
         pytest.param(partition(is_even, name="split"), id="partition"),
         pytest.param(BATCHER, id="batcher"),
@@ -199,6 +210,13 @@ def test_a_rebuilt_fold_stops_early() -> None:
     _, rebuilt = roundtrip(IcoFold(count_to_four, add_to_total, until=is_large))
     assert cast_call(rebuilt, 48) == 51  # 48 + 1 + 2, then is_large
     assert cast_call(rebuilt, 0) == 10
+
+
+def test_a_rebuilt_scan_scans() -> None:
+    _, rebuilt = roundtrip(IcoScan(count_to_four, total_and_count, until=is_large))
+    assert isinstance(rebuilt, IcoScan)
+    scan = cast(IcoScan[int, str, int], rebuilt)
+    assert list(scan(48)) == [("+1", 49), ("+2", 51)]
 
 
 def cast_call(node: IcoNodeProtocol, value: Any) -> Any:

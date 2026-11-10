@@ -67,6 +67,7 @@ rest:
 | `fork`, `route`, `keep`, `partition`, `tap` | | fan out, choose by key, filter, split, side effect |
 | `IcoBatcher(n)` | `Iterator[I] → Iterator[Iterator[I]]` | batches |
 | `IcoFold(source, step, until=)` | `C → C` | `step((item, state))` for each item: a training epoch; `until(state)` stops it early (a loss plateau) |
+| `IcoScan(source, step, until=)` | `C → Iterator[tuple[O, C]]` | `(out, state) = step((item, state))` for each item, yielded as a pair: per-frame tracking with a warm start (`src/examples/ico_tracking.py`) |
 | `IcoProcess(body, ...)` | `C → C` | repeat `n` times or until a predicate |
 | `IcoProgress(total)` | `I → I` | counts the items that pass it |
 
