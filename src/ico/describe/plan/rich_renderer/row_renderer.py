@@ -10,6 +10,7 @@ from ico.core.node import IcoNodeProtocol
 from ico.core.operator import IcoOperator, IcoOperatorProtocol
 from ico.core.runtime.progress import IcoProgress
 from ico.core.signature_utils import format_ico_type
+from ico.describe.params import shown_params
 from ico.describe.plan.options import (
     PlanRendererColumn,
     PlanRendererOptions,
@@ -162,6 +163,13 @@ class RowRenderer:
         if isinstance(node, IcoProgress) and node.name:
             # What it counts: the label its bar has.
             return Text(node.name, style=DescribeStyle.fn.value)
+
+        target = cast(object, node)
+        shown = shown_params(target)
+        if shown:
+            # Fields the class asked to show (``show_params``).
+            args = ", ".join(f"{name}={getattr(target, name)!r}" for name in shown)
+            return Text(args, style=DescribeStyle.meta.value)
 
         if isinstance(node, IcoOperatorProtocol):
             op_fn: object = cast(IcoOperator[Any, Any], node).fn
