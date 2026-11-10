@@ -262,7 +262,7 @@ PR each:
     `networkVolumeIds: []` leaves the mount (`volume_down` then fails with
     "remove this network volume from all pods"); REST v2 PATCH
     `{"mounts": {"network": []}}` detaches. A test with that request.
-40. [ ] Results of remote runs without a live stream: a lost `/stream`
+40. [x] Results of remote runs without a live stream: a lost `/stream`
     (about 20 s of a DNS failure) fails the run locally while the job
     finishes on the worker, and the client keeps neither RunPod's job id
     nor the result. The final event is written to the storage
