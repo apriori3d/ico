@@ -6,6 +6,8 @@ step that folds each item into the state, then the state it emits::
     │   ...                              (the source)
     ├─▸ fold                             tuple[CifarBatch, CifarTrainContext]
     │   ...                              (the step)
+    ├─▸ until                            CifarTrainContext
+    │   ...                              (the stop condition, if any)
     ╰─▸ emit                             CifarTrainContext
 """
 
@@ -55,6 +57,16 @@ class IcoFoldRenderer(CustomRenderer):
             flow_includes_node_info=False,
         )
 
+        until_header = Text("├─▸ ") + Text("until", style=DescribeStyle.keyword.value)
+        self._until_header_renderer = RowRenderer(
+            flow_column_prefix=until_header,
+            options=replace(options, signature_format="Input"),
+            show_name_column=False,
+            show_type_column=False,
+            show_state_column=False,
+            flow_includes_node_info=False,
+        )
+
         footer_text = Text("╰─▸ ") + Text("emit", style=DescribeStyle.keyword.value)
         self._footer_renderer = RowRenderer(
             flow_column_prefix=footer_text,
@@ -91,5 +103,15 @@ class IcoFoldRenderer(CustomRenderer):
         plan.push_group_indent(Text("│   "))
         plan.render_subtree(fold.step)
         plan.pop_group_indent()
+
+        if fold.until is not None:
+            plan.render_row(
+                self._until_header_renderer,
+                fold.until,
+                keyed=flattened(self.options, fold.until),
+            )
+            plan.push_group_indent(Text("│   "))
+            plan.render_subtree(fold.until)
+            plan.pop_group_indent()
 
         plan.render_row(self._footer_renderer, fold, keyed=False)

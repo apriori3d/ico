@@ -1,6 +1,6 @@
 """IcoFold: a fold over a source with an ordinary step over (item, state)."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 
 import pytest
@@ -72,5 +72,82 @@ def test_the_plan_shows_the_source_the_step_and_what_it_emits() -> None:
         "├─▸ fold",
         "│   add",
         "│   mean",
+        "╰─▸ emit",
+    ]
+
+
+# ─── until: an early stop ───
+
+
+def at_least(limit: int) -> Callable[[Stats], bool]:
+    def reached(stats: Stats) -> bool:
+        return stats.total >= limit
+
+    return reached
+
+
+def test_until_stops_before_the_next_item_and_closes_the_source() -> None:
+    pulled: list[int] = []
+    closed: list[bool] = []
+
+    def tracked() -> Iterator[int]:
+        try:
+            for number in [1, 2, 3, 4]:
+                pulled.append(number)
+                yield number
+        finally:
+            closed.append(True)
+
+    fold = IcoFold(IcoSource(tracked), add, until=at_least(3))
+    assert fold(Stats()) == Stats(total=3, count=2)
+    assert pulled == [1, 2]  # 3 is never pulled
+    assert closed == [True]
+
+
+def test_until_holding_at_the_start_pulls_nothing() -> None:
+    pulled: list[int] = []
+
+    def tracked() -> Iterator[int]:
+        for number in [1, 2]:
+            pulled.append(number)
+            yield number
+
+    fold = IcoFold(IcoSource(tracked), add, until=at_least(3))
+    assert fold(Stats(total=5)) == Stats(total=5)
+    assert pulled == []
+
+
+def test_until_never_holding_folds_every_item() -> None:
+    fold = IcoFold(IcoSource(numbers), add, until=at_least(100))
+    assert fold(Stats()) == Stats(total=10, count=4)
+
+
+def test_an_until_that_does_not_take_the_state_is_reported() -> None:
+    def positive(x: int) -> bool:
+        return x > 0
+
+    assert (
+        validate_signatures(IcoFold(IcoSource(numbers), add, until=at_least(3))) == []
+    )
+    wrong = IcoFold(IcoSource(numbers), add, until=positive)  # pyright: ignore[reportArgumentType]
+    [issue] = validate_signatures(wrong)
+    assert issue.kind == "mismatch"
+    assert issue.output == Stats and issue.input is int
+
+
+def test_the_plan_shows_until() -> None:
+    def converged(stats: Stats) -> bool:
+        return stats.count > 2
+
+    fold = IcoFold(IcoSource(numbers), add, until=converged)
+    rows = ["".join(s["text"] for s in row[0]) for row in plan_view(fold)["rows"]]
+    assert rows == [
+        "🧠IcoFold()",
+        "╭── for each in ",
+        "│   📚IcoSource(numbers)",
+        "├─▸ fold",
+        "│   add",
+        "├─▸ until",
+        "│   converged",
         "╰─▸ emit",
     ]

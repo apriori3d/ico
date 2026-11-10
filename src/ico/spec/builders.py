@@ -488,8 +488,12 @@ def build_pipeline(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
 
 @spec_builder("fold")
 def build_fold(spec: NodeSpec, ctx: BuildContext) -> IcoNodeProtocol:
-    _children(spec, 2)
-    return IcoFold(ctx.op(spec.children[0]), ctx.op(spec.children[1]), name=spec.name)
+    # children: [source, step] or [source, step, until]
+    children = [ctx.op(c) for c in spec.children]
+    if len(children) not in (2, 3):
+        raise SpecError(f"'fold' expects 2 or 3 children, got {len(children)}.")
+    source, step, *until = children
+    return IcoFold(source, step, until=until[0] if until else None, name=spec.name)
 
 
 @spec_builder("process")

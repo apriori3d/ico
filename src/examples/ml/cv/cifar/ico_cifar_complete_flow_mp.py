@@ -313,6 +313,13 @@ class CifarTrainContext:
     loss_fn: torch.nn.Module = torch.nn.CrossEntropyLoss()
     iter_num: int = 0
     total_loss: float = 0.0
+    # A plateau of the loss within an epoch (for an early stop): the loss
+    # smoothed over batches, its best value and batches since it improved;
+    # the first WARMUP batches of an epoch only smooth the loss.
+    smoothed_loss: float | None = None
+    best_loss: float = float("inf")
+    stale: int = 0
+    epoch_batches: int = 0
 
 
 @operator()
@@ -331,9 +338,13 @@ def finalize_train_context(context: CifarTrainContext) -> None:
 
 @operator()
 def start_train(context: CifarTrainContext) -> CifarTrainContext:
-    """Set model to training mode."""
+    """Set model to training mode; a new epoch looks for its own plateau."""
     context.model.train()
+    context.best_loss, context.stale, context.epoch_batches = float("inf"), 0, 0
     return context
+
+
+WARMUP = 50  # batches of an epoch before a plateau is looked for
 
 
 def train_step(pair: tuple[CifarBatch, CifarTrainContext]) -> CifarTrainContext:
@@ -349,6 +360,17 @@ def train_step(pair: tuple[CifarBatch, CifarTrainContext]) -> CifarTrainContext:
 
     context.total_loss = loss.item()
     context.iter_num += 1
+
+    previous = context.smoothed_loss
+    smoothed = loss.item() if previous is None else 0.9 * previous + 0.1 * loss.item()
+    context.smoothed_loss = smoothed
+    context.epoch_batches += 1
+    if context.epoch_batches <= WARMUP:
+        return context
+    if smoothed < context.best_loss - 1e-3:
+        context.best_loss, context.stale = smoothed, 0
+    else:
+        context.stale += 1
     return context
 
 
@@ -398,6 +420,7 @@ def calculate_accuracy(pair: tuple[CifarItem, CifarEvalContext]) -> CifarEvalCon
 @operator()
 def start_eval(context: CifarTrainContext) -> CifarEvalContext:
     """Initialize evaluation context and set model to eval mode."""
+    print(f"Training epoch ended: {context.iter_num=}, {context.stale=}")
     context.model.eval()
     return CifarEvalContext(train_context=context)
 
@@ -442,6 +465,12 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument(
         "--limit", type=int, default=None, help="use only this many images (a check)"
+    )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=None,
+        help="end an epoch early after this many batches without a better loss",
     )
     parser.add_argument(
         "--profile", action="store_true", help="profile every node on the Live Board"
@@ -575,7 +604,19 @@ if __name__ == "__main__":
     )
     train_pipeline.name = "Training Pipeline"
 
-    train_epoch = IcoFold(train_data_flow, train_pipeline, name="Training Epoch")
+    # An early stop: the epoch ends once the loss stops improving for
+    # `patience` batches; the fold closes the data flow, so its workers stop.
+    patience = args.patience
+
+    def loss_plateau(context: CifarTrainContext) -> bool:
+        return patience is not None and context.stale >= patience
+
+    train_epoch = IcoFold(
+        train_data_flow,
+        train_pipeline,
+        until=loss_plateau if patience is not None else None,
+        name="Training Epoch",
+    )
 
     train_flow = start_train | train_epoch
     train_flow.name = "Complete Train Flow"
