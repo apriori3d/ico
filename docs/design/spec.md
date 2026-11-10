@@ -27,6 +27,33 @@ Rules this example establishes:
 - A local function is never referenced from a spec; it becomes a method of
   a registered operator class.
 
+## Operators with child operators
+
+A registered operator class may take other operators or flows in its
+constructor (an optimizer step that runs a loss flow, a retry around a
+body). A parameter annotated with an ICO node type (`IcoOperatorProtocol[A,
+B]`, `IcoNodeProtocol`, an `IcoNode` subclass, each optionally `| None`) is
+a *child parameter* (`ParamInfo.child`, `"child": true` in the card). The
+`op` spec carries child parameters as its `children`, in constructor order,
+and the other parameters in `params`; a child parameter set to `None` is
+written as `null` in `params` and has no child:
+
+```json
+{"kind": "op", "op": "body3d_optim_step@1", "params": {"steps": 20},
+ "children": [{"kind": "seq", "children": [
+   {"kind": "op", "op": "body3d_forward@1"},
+   {"kind": "op", "op": "body3d_loss@1"}]}]}
+```
+
+`build` builds the children (located at their spec paths, fresh per worker
+like any node) and passes them to the constructor; a wrong number of
+children is a `SpecError`. No hand-written `spec_serializer` /
+`spec_builder` is needed (a registered class is exported by reference before
+any serializer is looked up, so one would not be used anyway). Out of scope
+until needed: lists or dicts of children (`list[IcoOperatorProtocol[...]]`).
+A node held by a parameter without a node annotation fails the export with
+a hint to annotate it.
+
 ## Known limitation: specs carry no resources
 
 A spec carries structure and JSON params, not resources. Heavy objects

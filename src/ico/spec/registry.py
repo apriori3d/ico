@@ -72,24 +72,29 @@ class SpecContext:
 
     def walk(self, node: IcoNodeProtocol) -> NodeSpec:
         """Serialize a node: registered operators by reference, others by type."""
-        registered = registered_spec(node)
+        registered = registered_spec(node, self)
         if registered is not None:
             return registered
         return find_serializer(node)(node, self)
 
 
-def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
+def registered_spec(
+    node: IcoNodeProtocol, ctx: SpecContext | None = None
+) -> NodeSpec | None:
     """Opaque spec of an operator registered in an operator registry.
 
     Registered nodes, including whole flows registered as one operator, are
-    exported as ``kind="op"`` with an ``op="name@version"`` reference and no
-    children: the registry entry is the source of truth for their contents.
-    Instances of registered operator classes also export their constructor
-    kwargs, read from same-named attributes, as ``params``.
+    exported as ``kind="op"`` with an ``op="name@version"`` reference: the
+    registry entry is the source of truth for their contents. Instances of
+    registered operator classes also export their constructor kwargs, read
+    from same-named attributes: child parameters (annotated with a node
+    type, see :class:`~ico.registry.ParamInfo`) as ``children`` in
+    constructor order, a child parameter set to ``None`` as ``null`` in
+    ``params``, and the others as ``params``.
 
     Raises:
-        SpecError: If a constructor parameter has no same-named attribute or
-            its value is not JSON-compatible.
+        SpecError: If a constructor parameter has no same-named attribute, a
+            child parameter holds no node, or a value is not JSON-compatible.
     """
     from ico.registry.registry import get_meta, init_params, registered_class
     from ico.resources.base import spec_of
@@ -100,6 +105,7 @@ def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
         return None
 
     params: dict[str, JsonValue] = {}
+    children: list[NodeSpec] = []
     cls = registered_class(node)
     if cls is not None:
         for param in init_params(cls):
@@ -109,14 +115,29 @@ def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
                     f"'{param.name}' must be stored in an attribute of the same name."
                 )
             value = cast(object, getattr(node, param.name))
+            if param.child and value is not None:
+                if not isinstance(value, IcoNodeProtocol):
+                    raise SpecError(
+                        f"Cannot export '{meta.ref}': child parameter "
+                        f"'{param.name}' = {value!r} is not an ICO node."
+                    )
+                walker = ctx if ctx is not None else SpecContext(strict=False)
+                children.append(walker.walk(value))
+                continue
             spec = spec_of(value)
             if spec is not None:
                 params[param.name] = spec
                 continue
             if not is_json_value(value):
+                hint = (
+                    " Annotate it with a node type (e.g. IcoOperatorProtocol[A, B]) "
+                    "to export it as a child."
+                    if isinstance(value, IcoNodeProtocol)
+                    else ""
+                )
                 raise SpecError(
                     f"Cannot export '{meta.ref}': parameter '{param.name}' = "
-                    f"{value!r} is not JSON-compatible."
+                    f"{value!r} is not JSON-compatible.{hint}"
                 )
             params[param.name] = cast(JsonValue, value)
 
@@ -126,6 +147,7 @@ def registered_spec(node: IcoNodeProtocol) -> NodeSpec | None:
         sig=node_signature(node),
         op=meta.ref,
         params=params,
+        children=tuple(children),
     )
 
 

@@ -5,7 +5,19 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
-from typing import Any, Literal, TypeAlias, TypeVar, cast, get_type_hints, overload
+from types import NoneType, UnionType
+from typing import (
+    Any,
+    Literal,
+    TypeAlias,
+    TypeVar,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+    overload,
+)
 
 from ico.assets.ids import is_asset_hint, strip_annotated
 from ico.core.node import IcoNodeProtocol
@@ -74,6 +86,9 @@ class ParamInfo:
             (see :mod:`ico.resources`); specs give it as
             ``{"ref": "name@version", "params": {...}}``.
         asset: The parameter is an :data:`~ico.assets.AssetId`.
+        child: The parameter is annotated with an ICO node type (e.g.
+            ``IcoOperatorProtocol[A, B]``, possibly ``| None``): specs give
+            its value as one of the node's ``children``, not in ``params``.
     """
 
     name: str
@@ -82,6 +97,7 @@ class ParamInfo:
     default: Any = None
     resource: ResourceClass | None = None
     asset: bool = False
+    child: bool = False
 
     def card(self) -> dict[str, JsonValue]:
         out: dict[str, JsonValue] = {"name": self.name, "required": self.required}
@@ -93,6 +109,8 @@ class ParamInfo:
                 out["resource"] = meta.ref
         if self.asset:
             out["asset"] = True
+        if self.child:
+            out["child"] = True
         spec = spec_of(cast(object, self.default))
         if not self.required and spec is not None:
             out["default"] = spec
@@ -631,9 +649,32 @@ def init_params(cls: type) -> tuple[ParamInfo, ...]:
                 default=None if required else cast(object, param.default),
                 resource=resource,
                 asset=is_asset_hint(annotated),
+                child=is_node_hint(cast(object, hint)),
             )
         )
     return tuple(params)
+
+
+def is_node_hint(hint: object) -> bool:
+    """True for an ICO node type, optionally ``| None`` (a child parameter).
+
+    Node types are the node protocols (``IcoNodeProtocol``,
+    ``IcoOperatorProtocol[A, B]``) and node classes (``IcoNode`` subclasses,
+    e.g. ``IcoChain``), parametrized or not.
+    """
+    from ico.core.node import IcoNode
+
+    if get_origin(hint) in (Union, UnionType):
+        args = [
+            a for a in cast(tuple[object, ...], get_args(hint)) if a is not NoneType
+        ]
+        if len(args) != 1:
+            return False
+        hint = args[0]
+    cls = cast(object, get_origin(hint) or hint)
+    if not isinstance(cls, type):
+        return False
+    return IcoNodeProtocol in cls.__mro__ or IcoNode in cls.__mro__
 
 
 def class_signature(cls: type[IcoOperator[Any, Any]]) -> IcoSignature | None:
