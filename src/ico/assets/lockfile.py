@@ -1,14 +1,17 @@
 """``ico assets lock``: sizes and sha256 of every file, from the sources'
 metadata (LFS files are not downloaded; small git files are fetched and
-hashed), written to ``assets.lock``."""
+hashed), written to ``assets.lock``. An archive (``unpack``) is
+downloaded once to list and hash its files."""
 
 from __future__ import annotations
 
 import fnmatch
 import hashlib
 import os
+import tempfile
 from pathlib import Path, PurePosixPath
 
+from ico.assets.archive import ArchiveError, members
 from ico.assets.hub import check_online, hf_files, hf_url, open_url, remote_size
 from ico.assets.manifest import AssetFile, AssetLock, AssetSpec, Manifest, ManifestError
 
@@ -35,6 +38,8 @@ def lock(manifest: Manifest, ids: list[str] | None = None) -> dict[str, AssetLoc
 
 
 def lock_one(spec: AssetSpec) -> AssetLock:
+    if spec.url is not None and spec.unpack is not None:
+        return _lock_archive(spec, spec.url)
     if spec.url is not None:
         assert spec.sha256 is not None
         name = PurePosixPath(spec.path).name
@@ -68,6 +73,29 @@ def lock_one(spec: AssetSpec) -> AssetLock:
         name = PurePosixPath(spec.path).name if spec.kind == "file" else f.name
         files.append(AssetFile(name, f.size, sha256))
     return AssetLock(spec.id, spec.kind, tuple(files))
+
+
+def _lock_archive(spec: AssetSpec, url: str) -> AssetLock:
+    """The files of the archive at ``url``, after checking its sha256."""
+    with tempfile.TemporaryDirectory(prefix="ico-lock-") as tmp:
+        archive = Path(tmp) / "archive"
+        digest = hashlib.sha256()
+        with open_url(url) as response, archive.open("wb") as out:
+            while chunk := response.read(CHUNK):
+                out.write(chunk)
+                digest.update(chunk)
+        if digest.hexdigest() != spec.sha256:
+            raise ManifestError(
+                f"{spec.id!r}: the archive at {url} has sha256 "
+                f"{digest.hexdigest()}, not {spec.sha256}"
+            )
+        try:
+            files = members(archive)
+        except ArchiveError as e:
+            raise ManifestError(f"{spec.id!r}: {e}") from None
+    if not files:
+        raise ManifestError(f"{spec.id!r}: the archive at {url} has no files")
+    return AssetLock(spec.id, "tree", files)
 
 
 def _hash_url(url: str, token: str | None) -> str:
